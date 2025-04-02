@@ -6,6 +6,7 @@ export type UiState = {
   tableState: PlDataTableState;
   volcanoState: GraphMakerState;
   bubbleState: GraphMakerState;
+  // lineState: GraphMakerState;
 };
 
 export type BlockArgs = {
@@ -38,6 +39,11 @@ export const model = BlockModel.create()
       template: 'bubble',
       currentTab: null,
     },
+    // lineState: {
+    //   title: 'Differential clonotype enrichment',
+    //   template: 'line',
+    //   currentTab: null,
+    // },
   })
 
   // User can only select as input UMI count matrices or read count matrices
