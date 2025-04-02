@@ -12,7 +12,9 @@
   "dependencies": {
     "@platforma-open/milaboratories.clonotype-enrichment.model": "workspace:*",
     "@platforma-sdk/ui-vue": "catalog:",
-    "vue": "catalog:"
+    "vue": "catalog:",
+    "@milaboratories/graph-maker": "catalog:",
+    "@platforma-sdk/model": "catalog:"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "catalog:",

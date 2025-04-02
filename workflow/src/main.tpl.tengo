@@ -6,6 +6,7 @@ xsv := import("@platforma-sdk/workflow-tengo:pframes.xsv")
 pframes := import("@platforma-sdk/workflow-tengo:pframes")
 
 pfEnrichmentConv := import(":pf-enrichment-conv")
+pfBubbleConv := import(":pf-bubble-conv")
 
 wf.prepare(func(args){
 
@@ -65,9 +66,17 @@ wf.body(func(args) {
 	EnrichmentImportParams := pfEnrichmentConv.getColumns(countsSpec)
 	enrichmentPf := xsv.importFile(calculateEnrichment.getFile("enrichment_results.csv"), "csv", EnrichmentImportParams)
 
+	// volcano and enrichment have same columns
+	volcanoPf := xsv.importFile(calculateEnrichment.getFile("volcano_data.csv"), "csv", EnrichmentImportParams)
+
+	bubbleImportParams := pfBubbleConv.getColumns(countsSpec)
+	bubblePf := xsv.importFile(calculateEnrichment.getFile("bubble_data.csv"), "csv", bubbleImportParams)
+
 	return {
 		outputs: {
-			enrichmentPf: pframes.exportFrame(enrichmentPf)
+			enrichmentPf: pframes.exportFrame(enrichmentPf),
+			volcanoPf: pframes.exportFrame(volcanoPf),
+			bubblePf: pframes.exportFrame(bubblePf)
 		},
 		exports: {}
 	}

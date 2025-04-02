@@ -1,8 +1,10 @@
-import type { InferOutputsType, PlDataTableState, PlRef } from '@platforma-sdk/model';
-import { BlockModel, createPlDataTable, isPColumnSpec } from '@platforma-sdk/model';
+import type { GraphMakerState } from '@milaboratories/graph-maker';
+import type { InferOutputsType, PColumnIdAndSpec, PFrameHandle, PlDataTableState, PlRef } from '@platforma-sdk/model';
+import { BlockModel, createPFrameForGraphs, createPlDataTable, isPColumnSpec } from '@platforma-sdk/model';
 
 export type UiState = {
   tableState: PlDataTableState;
+  volcanoState: GraphMakerState;
 };
 
 export type BlockArgs = {
@@ -15,6 +17,21 @@ export const model = BlockModel.create()
 
   .withArgs<BlockArgs>({
     roundOrder: [],
+  })
+
+  .withUiState<UiState>({
+    tableState: {
+      gridState: {},
+      pTableParams: {
+        sorting: [],
+        filters: [],
+      },
+    },
+    volcanoState: {
+      title: 'Differential clonotype enrichment',
+      template: 'dots',
+      currentTab: null,
+    },
   })
 
   // User can only select as input UMI count matrices or read count matrices
@@ -70,12 +87,33 @@ export const model = BlockModel.create()
       return undefined;
     }
 
-    // // Filter by selected comparison
-    // pCols = pCols.filter(
-    //   (col) => col.spec.axesSpec[0]?.domain?.['pl7.app/differentialAbundance/comparison'] === ctx.uiState.comparison,
-    // );
-
     return createPlDataTable(ctx, pCols, ctx.uiState?.tableState);
+  })
+
+  // Returns a map of results for volcano plot
+  .output('volcanoPf', (ctx): PFrameHandle | undefined => {
+    const pCols = ctx.outputs?.resolve('volcanoPf')?.getPColumns();
+    if (pCols === undefined) {
+      return undefined;
+    }
+
+    return createPFrameForGraphs(ctx, pCols);
+  })
+
+  // Returns a list pof Pcols for volcano plot defaults
+  .output('volcanoPcols', (ctx) => {
+    const pCols = ctx.outputs?.resolve('volcanoPf')?.getPColumns();
+    if (pCols === undefined) {
+      return undefined;
+    }
+
+    return pCols.map(
+      (c) =>
+        ({
+          columnId: c.id,
+          spec: c.spec,
+        } satisfies PColumnIdAndSpec),
+    );
   })
 
   .sections((_ctx) => ([
