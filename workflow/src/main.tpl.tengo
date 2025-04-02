@@ -1,0 +1,53 @@
+// "hello world"
+wf := import("@platforma-sdk/workflow-tengo:workflow")
+exec := import("@platforma-sdk/workflow-tengo:exec")
+assets:= import("@platforma-sdk/workflow-tengo:assets")
+xsv := import("@platforma-sdk/workflow-tengo:pframes.xsv")
+
+wf.prepare(func(args){
+
+	// below solution not working currently
+	metaRefs := {}
+
+	i := 0
+	for metaRef in args.covariateRefs {
+		metaRefs["metaRef" + i ] = wf.resolve(metaRef, { errIfMissing: true })
+		i = i + 1
+	}
+
+	return {
+		resolvedInput: wf.resolve(args.countsRef, { errIfMissing: true }),
+		resolvedContrastFactor: wf.resolve(args.contrastFactor),
+		metaRefs: metaRefs
+	}
+})
+
+wf.body(func(args) {
+	blockId := wf.blockId().getDataAsJson()
+
+	allCounts := args.resolvedInput
+	countsSpec := allCounts.spec
+
+	contrastFactor := args.resolvedContrastFactor
+	numeratorList := args.numerators
+
+	covariates := []
+	for _, v in args.metaRefs {
+		covariates = append(covariates, v)
+	}
+	
+	// convert PColumns to csv
+	csvCounts := xsv.exportFrame([allCounts], "csv", {})
+	csvCovariates := xsv.exportFrame(covariates, "csv", {})
+
+	
+
+	return {
+		outputs: {
+			
+		},
+
+		exports: {}
+	}
+})
+
