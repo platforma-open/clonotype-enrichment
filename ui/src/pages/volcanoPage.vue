@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { GraphMakerProps } from '@milaboratories/graph-maker';
+import type { GraphMakerProps, PredefinedGraphOption } from '@milaboratories/graph-maker';
 import { GraphMaker } from '@milaboratories/graph-maker';
 import '@milaboratories/graph-maker/styles';
 import { useApp } from '../app';
@@ -16,7 +16,7 @@ const defaultOptions = computed((): GraphMakerProps['defaultOptions'] => {
   function getIndex(name: string, pcols: PColumnIdAndSpec[]): number {
     return pcols.findIndex((p) => p.spec.name === name);
   }
-  const defaults: GraphMakerProps['defaultOptions'] = [
+  const defaults: PredefinedGraphOption<'scatterplot-umap'>[] = [
     {
       inputName: 'x',
       selectedSource: volcanoPcols[getIndex('pl7.app/vdj/enrichment',
@@ -35,7 +35,7 @@ const defaultOptions = computed((): GraphMakerProps['defaultOptions'] => {
     {
       inputName: 'tooltipContent',
       selectedSource: volcanoPcols[getIndex('pl7.app/vdj/temporarylabel',
-        volcanoPcols)].spec.axesSpec[0],
+        volcanoPcols)].spec,
     },
   ];
   return defaults;
