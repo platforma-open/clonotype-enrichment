@@ -6,7 +6,7 @@ def hybrid_enrichment_analysis(
     sample_metadata_csv,
     condition_column,
     condition_order,
-    output_csv,
+    enrichment_csv,
     volcano_csv,
     bubble_csv,
     use_penalty=True,
@@ -15,34 +15,22 @@ def hybrid_enrichment_analysis(
     top_n_volcano=1000,
     top_n_bubble=20
 ):
-    # Load data
     counts_df = pd.read_csv(counts_csv)
     metadata_df = pd.read_csv(sample_metadata_csv)
 
-    # Rename columns to match expected format
-    counts_df = counts_df.rename(columns={
-        "Clonotype key": "Clonotype",
-        "Number Of Reads": "Count"
-    })
+    counts_df = counts_df.rename(columns={"Clonotype key": "Clonotype", "Number Of Reads": "Count"})
     if condition_column not in metadata_df.columns:
         raise ValueError(f"'{condition_column}' not found in metadata CSV columns.")
     metadata_df = metadata_df.rename(columns={condition_column: "Condition"})
 
-    # Merge on Sample
     merged_df = counts_df.merge(metadata_df, on='Sample')
-
-    # Total reads per condition
     total_reads = merged_df.groupby('Condition')['Count'].sum().to_dict()
-
-    # Pivot table of clonotype x condition counts
     pivot_df = merged_df.groupby(['Clonotype', 'Condition'])['Count'].sum().unstack(fill_value=0)
 
-    # Ensure all conditions are present
     for condition in condition_order:
         if condition not in pivot_df.columns:
             pivot_df[condition] = 0
 
-    # Calculate frequencies and enrichments
     result_rows = []
     for clonotype in pivot_df.index:
         freqs = {}
@@ -77,34 +65,60 @@ def hybrid_enrichment_analysis(
 
     result_df = pd.DataFrame(result_rows)
 
-    # Add simplified consistent Clonotype labels
     clonotype_labels = {
         clonotype: f"Clonotype_{i+1}"
         for i, clonotype in enumerate(result_df["Clonotype"])
     }
     result_df["Label"] = result_df["Clonotype"].map(clonotype_labels)
+    result_df = result_df[["Clonotype", "Label"] + [col for col in result_df.columns if col not in ["Clonotype", "Label"]]]
 
-    # Reorder columns: Label after Clonotype
-    cols = result_df.columns.tolist()
-    if "Label" in cols and "Clonotype" in cols:
-        cols.insert(cols.index("Clonotype") + 1, cols.pop(cols.index("Label")))
-    result_df = result_df[cols]
-
-    result_df.to_csv(output_csv, index=False)
-
-    # Create volcano_data.csv
+    # Unified enrichment CSV
+    freq_cols = [f"Frequency {cond}" for cond in condition_order]
     enrich_cols = [f"Enrichment {cond} vs {condition_order[0]}" for cond in condition_order[1:]]
+
+    freq_long = result_df.melt(
+        id_vars=["Clonotype", "Label"],
+        value_vars=freq_cols,
+        var_name="Condition",
+        value_name="Frequency"
+    )
+    freq_long["Condition"] = freq_long["Condition"].str.replace("Frequency ", "")
+
+    enrich_long = result_df.melt(
+        id_vars=["Clonotype", "Label"],
+        value_vars=enrich_cols,
+        var_name="Condition",
+        value_name="Enrichment"
+    )
+    enrich_long["Condition"] = enrich_long["Condition"].str.extract(r'Enrichment (.+) vs')[0]
+
+    enrichment_df = pd.merge(freq_long, enrich_long, on=["Clonotype", "Label", "Condition"])
+    enrichment_df.to_csv(enrichment_csv, index=False)
+
+    # Volcano (same format)
     result_df["MaxAbsEnrichment"] = result_df[enrich_cols].abs().max(axis=1)
     volcano_df = result_df.nlargest(top_n_volcano, "MaxAbsEnrichment")
 
-    # Reorder volcano columns
-    cols = volcano_df.columns.tolist()
-    if "Label" in cols and "Clonotype" in cols:
-        cols.insert(cols.index("Clonotype") + 1, cols.pop(cols.index("Label")))
-    volcano_df = volcano_df[cols]
-    volcano_df.to_csv(volcano_csv, index=False)
+    volcano_freq_long = volcano_df.melt(
+        id_vars=["Clonotype", "Label"],
+        value_vars=freq_cols,
+        var_name="Condition",
+        value_name="Frequency"
+    )
+    volcano_freq_long["Condition"] = volcano_freq_long["Condition"].str.replace("Frequency ", "")
 
-    # Create bubble_data.csv
+    volcano_enrich_long = volcano_df.melt(
+        id_vars=["Clonotype", "Label"],
+        value_vars=enrich_cols,
+        var_name="Condition",
+        value_name="Enrichment"
+    )
+    volcano_enrich_long["Condition"] = volcano_enrich_long["Condition"].str.extract(r'Enrichment (.+) vs')[0]
+
+    volcano_output = pd.merge(volcano_freq_long, volcano_enrich_long, on=["Clonotype", "Label", "Condition"])
+    volcano_output.to_csv(volcano_csv, index=False)
+
+    # Bubble plot (unchanged)
     bubble_rows = []
     for _, row in result_df.iterrows():
         clonotype = row["Clonotype"]
@@ -123,12 +137,7 @@ def hybrid_enrichment_analysis(
                 })
 
     bubble_df = pd.DataFrame(bubble_rows)
-
-    # Reorder bubble columns
-    cols = bubble_df.columns.tolist()
-    if "Label" in cols and "Clonotype" in cols:
-        cols.insert(cols.index("Clonotype") + 1, cols.pop(cols.index("Label")))
-    bubble_df = bubble_df[cols]
+    bubble_df = bubble_df[["Clonotype", "Label"] + [col for col in bubble_df.columns if col not in ["Clonotype", "Label"]]]
 
     top_clonotypes = (
         bubble_df.groupby("Clonotype")["MaxEnrichment"]
@@ -140,25 +149,23 @@ def hybrid_enrichment_analysis(
     bubble_df = bubble_df[bubble_df["Clonotype"].isin(top_clonotypes)]
     bubble_df.to_csv(bubble_csv, index=False)
 
-    return result_df
 
-# --- Command-line interface ---
 if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="Hybrid Enrichment Analysis")
-    parser.add_argument("--counts", required=True, help="Path to counts CSV")
-    parser.add_argument("--metadata", required=True, help="Path to sample metadata CSV")
-    parser.add_argument("--condition_column", required=True, help="Column name in metadata representing condition")
-    parser.add_argument("--output", required=True, help="Path to enrichment output CSV")
-    parser.add_argument("--volcano", required=True, help="Path to volcano plot CSV")
-    parser.add_argument("--bubble", required=True, help="Path to bubble plot CSV")
-    parser.add_argument("--conditions", nargs="+", required=True, help="Ordered list of condition labels")
-    parser.add_argument("--use_penalty", action="store_true", help="Use correction factor penalty")
-    parser.add_argument("--penalty_enrich", type=int, default=2, help="Penalty for enrichment absences")
-    parser.add_argument("--penalty_deplete", type=int, default=10, help="Penalty for depletion absences")
-    parser.add_argument("--top_n_volcano", type=int, default=1000, help="Top N clonotypes for volcano plot")
-    parser.add_argument("--top_n_bubble", type=int, default=20, help="Top N clonotypes for bubble plot")
+    parser.add_argument("--counts", required=True)
+    parser.add_argument("--metadata", required=True)
+    parser.add_argument("--condition_column", required=True)
+    parser.add_argument("--conditions", nargs="+", required=True)
+    parser.add_argument("--enrichment", required=True)
+    parser.add_argument("--volcano", required=True)
+    parser.add_argument("--bubble", required=True)
+    parser.add_argument("--use_penalty", action="store_true")
+    parser.add_argument("--penalty_enrich", type=int, default=2)
+    parser.add_argument("--penalty_deplete", type=int, default=10)
+    parser.add_argument("--top_n_volcano", type=int, default=1000)
+    parser.add_argument("--top_n_bubble", type=int, default=20)
 
     args = parser.parse_args()
 
@@ -167,7 +174,7 @@ if __name__ == "__main__":
         sample_metadata_csv=args.metadata,
         condition_column=args.condition_column,
         condition_order=args.conditions,
-        output_csv=args.output,
+        enrichment_csv=args.enrichment,
         volcano_csv=args.volcano,
         bubble_csv=args.bubble,
         use_penalty=args.use_penalty,
