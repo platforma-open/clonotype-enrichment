@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import json
 
 def hybrid_enrichment_analysis(
     counts_csv,
@@ -157,7 +158,7 @@ if __name__ == "__main__":
     parser.add_argument("--counts", required=True)
     parser.add_argument("--metadata", required=True)
     parser.add_argument("--condition_column", required=True)
-    parser.add_argument("--conditions", nargs="+", required=True)
+    parser.add_argument("--conditions", type=str, required=True)
     parser.add_argument("--enrichment", required=True)
     parser.add_argument("--volcano", required=True)
     parser.add_argument("--bubble", required=True)
@@ -173,7 +174,8 @@ if __name__ == "__main__":
         counts_csv=args.counts,
         sample_metadata_csv=args.metadata,
         condition_column=args.condition_column,
-        condition_order=args.conditions,
+         # Input will be a string of a list, we use json.loads() to convert it to a list
+        condition_order=json.loads(args.conditions),
         enrichment_csv=args.enrichment,
         volcano_csv=args.volcano,
         bubble_csv=args.bubble,

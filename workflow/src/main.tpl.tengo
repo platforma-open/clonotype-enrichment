@@ -49,14 +49,14 @@ wf.body(func(args) {
 		addFile("covariates.csv", csvCovariates).
 		arg("--counts").arg("rawCounts.csv").
 		arg("--metadata").arg("covariates.csv").
-		arg("--condition_column").arg(string(roundColumn)).
+		arg("--condition_column").arg(string(roundColumn.spec.annotations["pl7.app/label"])).
 		arg("--conditions").arg(string(roundOrder)).
-		arg("--output").arg("enrichment_results.csv").
+		arg("--enrichment").arg("enrichment_results.csv").
 		arg("--volcano").arg("volcano_data.csv").
 		arg("--bubble").arg("bubble_data.csv").
-		saveFile("enrichment.csv").
-		saveFile("volcano.csv").
-		saveFile("bubble.csv").
+		saveFile("enrichment_results.csv").
+		saveFile("volcano_data.csv").
+		saveFile("bubble_data.csv").
 		printErrStreamToStdout().
 		saveStdoutContent().
 		cache(24 * 60 * 60 * 1000).
@@ -71,5 +71,6 @@ wf.body(func(args) {
 		},
 		exports: {}
 	}
+	
 })
 

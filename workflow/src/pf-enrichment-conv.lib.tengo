@@ -4,6 +4,19 @@ getColumns := func(countsSpec) {
   return {
     "axes": [
       {
+        "column": "Condition",
+        "id": "round",
+        "allowNA": false,
+        "spec": {
+          "name": "pl7.app/vdj/round",
+          "type": "String",
+          "domain": {},
+          "annotations": {
+            "pl7.app/label": "Round"
+          }
+        }
+      },
+      {
         "column": "Clonotype",
         "spec": countsSpec.axesSpec[1]
       }
@@ -19,19 +32,6 @@ getColumns := func(countsSpec) {
           "domain": {},
           "annotations": {
             "pl7.app/label": "Clonotype label"
-          }
-        }
-      },
-      {
-        "column": "Condition",
-        "id": "round",
-        "allowNA": false,
-        "spec": {
-          "name": "pl7.app/vdj/round",
-          "valueType": "String",
-          "domain": {},
-          "annotations": {
-            "pl7.app/label": "Round"
           }
         }
       },
