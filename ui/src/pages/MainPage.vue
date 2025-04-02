@@ -28,17 +28,17 @@ const showSettings = () => {
 };
 
 // Allowed options for contrast Factor (metadata columns)
-const contrastFactorOptions = computed(() => {
+const roundColumnOptions = computed(() => {
   return app.model.outputs.metadataOptions?.map((v) => ({
     value: v.ref,
     label: v.label,
   })) ?? [];
 });
 
-// Get list of availables values within contras Factor
+// Get list of availables values within round column
 // we will select them in list, being the first one denominator and rest numerators
-const numeratorOptions = computed(() => {
-  return app.model.outputs.numeratorOptions?.map((v) => ({
+const roundOptions = computed(() => {
+  return app.model.outputs.roundOptions?.map((v) => ({
     value: v,
     label: v,
   }));
@@ -50,7 +50,7 @@ const numeratorOptions = computed(() => {
   <PlBlockPage>
     <template #title>Clonotype Enrichment</template>
     <template #append>
-      {{ app.model.args.numerators }}
+      <!-- {{ app.model.args.roundOrder }} -->
       <!-- PlAgDataTableToolsPanel controls showing  Export column and filter-->
       <PlAgDataTableToolsPanel/>
       <PlBtnGhost @click.stop="showSettings">
@@ -72,8 +72,8 @@ const numeratorOptions = computed(() => {
         v-model="app.model.args.countsRef" :options="app.model.outputs.countsOptions"
         label="Select dataset"
       />
-      <PlDropdown v-model="app.model.args.contrastFactor" :options="contrastFactorOptions" label="Contrast factor" />
-      <PlDropdownMulti v-model="app.model.args.numerators" :options="numeratorOptions" label="Numerator" >
+      <PlDropdown v-model="app.model.args.roundColumn" :options="roundColumnOptions" label="Round column" />
+      <PlDropdownMulti v-model="app.model.args.roundOrder" :options="roundOptions" label="Round order" >
         <template #tooltip>
           Order aware selection. Calculate a contrast between first element (denominator) and each of the other selected options (numerators).
         </template>

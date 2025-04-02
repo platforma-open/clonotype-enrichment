@@ -7,14 +7,14 @@ export type UiState = {
 
 export type BlockArgs = {
   countsRef?: PlRef;
-  contrastFactor?: PlRef;
-  numerators: string[];
+  roundColumn?: PlRef;
+  roundOrder: string[];
 };
 
 export const model = BlockModel.create()
 
   .withArgs<BlockArgs>({
-    numerators: [],
+    roundOrder: [],
   })
 
   // User can only select as input UMI count matrices or read count matrices
@@ -51,10 +51,10 @@ export const model = BlockModel.create()
     else return undefined;
   })
 
-  .output('numeratorOptions', (ctx) => {
-    if (!ctx.args.contrastFactor) return undefined;
+  .output('roundOptions', (ctx) => {
+    if (!ctx.args.roundColumn) return undefined;
 
-    const data = ctx.resultPool.getDataByRef(ctx.args.contrastFactor)?.data;
+    const data = ctx.resultPool.getDataByRef(ctx.args.roundColumn)?.data;
 
     // @TODO need a convenient method in API
     const values = data?.getDataAsJson<Record<string, string>>()?.['data'];
@@ -65,15 +65,15 @@ export const model = BlockModel.create()
 
   // Returns a map of results
   .output('pt', (ctx) => {
-    let pCols = ctx.outputs?.resolve('topTablePf')?.getPColumns();
+    const pCols = ctx.outputs?.resolve('enrichmentPf')?.getPColumns();
     if (pCols === undefined) {
       return undefined;
     }
 
-    // Filter by selected comparison
-    pCols = pCols.filter(
-      (col) => col.spec.axesSpec[0]?.domain?.['pl7.app/differentialAbundance/comparison'] === ctx.uiState.comparison,
-    );
+    // // Filter by selected comparison
+    // pCols = pCols.filter(
+    //   (col) => col.spec.axesSpec[0]?.domain?.['pl7.app/differentialAbundance/comparison'] === ctx.uiState.comparison,
+    // );
 
     return createPlDataTable(ctx, pCols, ctx.uiState?.tableState);
   })
