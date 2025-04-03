@@ -47,19 +47,6 @@ getColumns := func(countsSpec) {
             "pl7.app/label": "Frequency"
           }
         }
-      },
-      {
-        "column": "Enrichment",
-        "id": "enrichment",
-        "allowNA": true,
-        "spec": {
-          "name": "pl7.app/vdj/enrichment",
-          "valueType": "Double",
-          "domain": {},
-          "annotations": {
-            "pl7.app/label": "Enrichment"
-          }
-        }
       }
       ],
     "storageFormat": "Binary",

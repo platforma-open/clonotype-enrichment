@@ -10,11 +10,14 @@ def hybrid_enrichment_analysis(
     enrichment_csv,
     volcano_csv,
     bubble_csv,
+    top_enriched_csv,
     use_penalty=True,
     penalty_enrich=2,
     penalty_deplete=10,
     top_n_volcano=1000,
-    top_n_bubble=20
+    top_n_bubble=20,
+    top_n_enriched=5,
+    min_enrichment=3
 ):
     counts_df = pd.read_csv(counts_csv)
     metadata_df = pd.read_csv(sample_metadata_csv)
@@ -67,13 +70,12 @@ def hybrid_enrichment_analysis(
     result_df = pd.DataFrame(result_rows)
 
     clonotype_labels = {
-        clonotype: f"Clonotype_{i+1}"
+        clonotype: f"C{i+1}"
         for i, clonotype in enumerate(result_df["Clonotype"])
     }
     result_df["Label"] = result_df["Clonotype"].map(clonotype_labels)
     result_df = result_df[["Clonotype", "Label"] + [col for col in result_df.columns if col not in ["Clonotype", "Label"]]]
 
-    # Unified enrichment CSV
     freq_cols = [f"Frequency {cond}" for cond in condition_order]
     enrich_cols = [f"Enrichment {cond} vs {condition_order[0]}" for cond in condition_order[1:]]
 
@@ -93,10 +95,11 @@ def hybrid_enrichment_analysis(
     )
     enrich_long["Condition"] = enrich_long["Condition"].str.extract(r'Enrichment (.+) vs')[0]
 
-    enrichment_df = pd.merge(freq_long, enrich_long, on=["Clonotype", "Label", "Condition"])
+    baseline_df = freq_long[freq_long["Condition"] == condition_order[0]].copy()
+    baseline_df["Enrichment"] = np.nan
+    enrichment_df = pd.concat([baseline_df, pd.merge(freq_long, enrich_long, on=["Clonotype", "Label", "Condition"])])
     enrichment_df.to_csv(enrichment_csv, index=False)
 
-    # Volcano (same format)
     result_df["MaxAbsEnrichment"] = result_df[enrich_cols].abs().max(axis=1)
     volcano_df = result_df.nlargest(top_n_volcano, "MaxAbsEnrichment")
 
@@ -116,18 +119,25 @@ def hybrid_enrichment_analysis(
     )
     volcano_enrich_long["Condition"] = volcano_enrich_long["Condition"].str.extract(r'Enrichment (.+) vs')[0]
 
-    volcano_output = pd.merge(volcano_freq_long, volcano_enrich_long, on=["Clonotype", "Label", "Condition"])
+    volcano_baseline = volcano_freq_long[volcano_freq_long["Condition"] == condition_order[0]].copy()
+    volcano_baseline["Enrichment"] = np.nan
+    volcano_output = pd.concat([volcano_baseline, pd.merge(volcano_freq_long, volcano_enrich_long, on=["Clonotype", "Label", "Condition"])])
     volcano_output.to_csv(volcano_csv, index=False)
 
-    # Bubble plot (unchanged)
+    # Bubble and top enriched
     bubble_rows = []
     for _, row in result_df.iterrows():
         clonotype = row["Clonotype"]
-        max_enrich = max([row[f"Enrichment {cond} vs {condition_order[0]}"] for cond in condition_order[1:]])
+        enrich_vals = [row.get(f"Enrichment {cond} vs {condition_order[0]}") for cond in condition_order[1:] if pd.notnull(row.get(f"Enrichment {cond} vs {condition_order[0]}"))]
+        if not enrich_vals:
+            continue
+        max_enrich = max(enrich_vals)
+        if max_enrich < min_enrichment:
+            continue
         for cond in condition_order[1:]:
-            enrich = row[f"Enrichment {cond} vs {condition_order[0]}"]
+            enrich = row.get(f"Enrichment {cond} vs {condition_order[0]}")
             freq = row[f"Frequency {cond}"]
-            if enrich > 0:
+            if pd.notnull(enrich) and enrich > 0:
                 bubble_rows.append({
                     "Clonotype": clonotype,
                     "Label": clonotype_labels[clonotype],
@@ -150,6 +160,16 @@ def hybrid_enrichment_analysis(
     bubble_df = bubble_df[bubble_df["Clonotype"].isin(top_clonotypes)]
     bubble_df.to_csv(bubble_csv, index=False)
 
+    # Top enriched (frequencies only)
+    top_enriched_ids = (
+        bubble_df.groupby("Clonotype")["MaxEnrichment"]
+        .max()
+        .sort_values(ascending=False)
+        .head(top_n_enriched)
+        .index
+    )
+    top_enriched_freq = freq_long[freq_long["Clonotype"].isin(top_enriched_ids)]
+    top_enriched_freq.to_csv(top_enriched_csv, index=False)
 
 if __name__ == "__main__":
     import argparse
@@ -162,11 +182,14 @@ if __name__ == "__main__":
     parser.add_argument("--enrichment", required=True)
     parser.add_argument("--volcano", required=True)
     parser.add_argument("--bubble", required=True)
+    parser.add_argument("--top_enriched", required=True)
     parser.add_argument("--use_penalty", action="store_true")
     parser.add_argument("--penalty_enrich", type=int, default=2)
     parser.add_argument("--penalty_deplete", type=int, default=10)
     parser.add_argument("--top_n_volcano", type=int, default=1000)
     parser.add_argument("--top_n_bubble", type=int, default=20)
+    parser.add_argument("--top_n_enriched", type=int, default=5)
+    parser.add_argument("--min_enrichment", type=float, default=3)
 
     args = parser.parse_args()
 
@@ -174,14 +197,16 @@ if __name__ == "__main__":
         counts_csv=args.counts,
         sample_metadata_csv=args.metadata,
         condition_column=args.condition_column,
-         # Input will be a string of a list, we use json.loads() to convert it to a list
         condition_order=json.loads(args.conditions),
         enrichment_csv=args.enrichment,
         volcano_csv=args.volcano,
         bubble_csv=args.bubble,
+        top_enriched_csv=args.top_enriched,
         use_penalty=args.use_penalty,
         penalty_enrich=args.penalty_enrich,
         penalty_deplete=args.penalty_deplete,
         top_n_volcano=args.top_n_volcano,
-        top_n_bubble=args.top_n_bubble
+        top_n_bubble=args.top_n_bubble,
+        top_n_enriched=args.top_n_enriched,
+        min_enrichment=args.min_enrichment
     )

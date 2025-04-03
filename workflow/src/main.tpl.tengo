@@ -7,17 +7,8 @@ pframes := import("@platforma-sdk/workflow-tengo:pframes")
 
 pfEnrichmentConv := import(":pf-enrichment-conv")
 pfBubbleConv := import(":pf-bubble-conv")
-
+pfStackedConv := import(":pf-stacked-conv")
 wf.prepare(func(args){
-
-	// // below solution not working currently
-	// metaRefs := {}
-
-	// i := 0
-	// for metaRef in args.roundColumn {
-	// 	metaRefs["metaRef" + i ] = wf.resolve(metaRef, { errIfMissing: true })
-	// 	i = i + 1
-	// }
 
 	return {
 		resolvedInput: wf.resolve(args.countsRef, { errIfMissing: true }),
@@ -34,11 +25,6 @@ wf.body(func(args) {
 
 	roundColumn := args.resolvedRoundColumn
 	roundOrder := args.roundOrder
-
-	// covariates := []
-	// for _, v in args.metaRefs {
-	// 	covariates = append(covariates, v)
-	// }
 	
 	// convert PColumns to csv
 	csvCounts := xsv.exportFrame([allCounts], "csv", {})
@@ -55,9 +41,15 @@ wf.body(func(args) {
 		arg("--enrichment").arg("enrichment_results.csv").
 		arg("--volcano").arg("volcano_data.csv").
 		arg("--bubble").arg("bubble_data.csv").
+		arg("--top_enriched").arg("top_enriched.csv").
+		// arg("--min_enrichment").arg("3").
+		// arg("--top_n_volcano").arg("1000").
+		// arg("--top_n_bubble").arg("20").
+		// arg("--top_n_enriched").arg("5").
 		saveFile("enrichment_results.csv").
 		saveFile("volcano_data.csv").
 		saveFile("bubble_data.csv").
+		saveFile("top_enriched.csv").
 		printErrStreamToStdout().
 		saveStdoutContent().
 		cache(24 * 60 * 60 * 1000).
@@ -72,11 +64,15 @@ wf.body(func(args) {
 	bubbleImportParams := pfBubbleConv.getColumns(countsSpec)
 	bubblePf := xsv.importFile(calculateEnrichment.getFile("bubble_data.csv"), "csv", bubbleImportParams)
 
+	stackedImportParams := pfStackedConv.getColumns(countsSpec)
+	stackedPf := xsv.importFile(calculateEnrichment.getFile("top_enriched.csv"), "csv", stackedImportParams)
+
 	return {
 		outputs: {
 			enrichmentPf: pframes.exportFrame(enrichmentPf),
 			volcanoPf: pframes.exportFrame(volcanoPf),
-			bubblePf: pframes.exportFrame(bubblePf)
+			bubblePf: pframes.exportFrame(bubblePf),
+			stackedPf: pframes.exportFrame(stackedPf)
 		},
 		exports: {}
 	}

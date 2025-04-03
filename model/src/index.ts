@@ -6,7 +6,8 @@ export type UiState = {
   tableState: PlDataTableState;
   volcanoState: GraphMakerState;
   bubbleState: GraphMakerState;
-  // lineState: GraphMakerState;
+  lineState: GraphMakerState;
+  stackedState: GraphMakerState;
 };
 
 export type BlockArgs = {
@@ -30,20 +31,21 @@ export const model = BlockModel.create()
       },
     },
     volcanoState: {
-      title: 'Differential clonotype enrichment',
+      title: 'Clonotype enrichment',
       template: 'dots',
-      currentTab: null,
     },
     bubbleState: {
-      title: 'Differential clonotype enrichment',
+      title: 'Clonotype enrichment',
       template: 'bubble',
-      currentTab: null,
     },
-    // lineState: {
-    //   title: 'Differential clonotype enrichment',
-    //   template: 'line',
-    //   currentTab: null,
-    // },
+    lineState: {
+      title: 'Clonotype enrichment',
+      template: 'line',
+    },
+    stackedState: {
+      title: 'Top clonotype frequencies',
+      template: 'stackedBar',
+    },
   })
 
   // User can only select as input UMI count matrices or read count matrices
@@ -128,7 +130,7 @@ export const model = BlockModel.create()
     );
   })
 
-  // Returns a map of results for volcano plot
+  // Returns a map of results for plot
   .output('bubblePf', (ctx): PFrameHandle | undefined => {
     const pCols = ctx.outputs?.resolve('bubblePf')?.getPColumns();
     if (pCols === undefined) {
@@ -138,7 +140,7 @@ export const model = BlockModel.create()
     return createPFrameForGraphs(ctx, pCols);
   })
 
-  // Returns a list pof Pcols for volcano plot defaults
+  // Returns a list pof Pcols for plot defaults
   .output('bubblePcols', (ctx) => {
     const pCols = ctx.outputs?.resolve('bubblePf')?.getPColumns();
     if (pCols === undefined) {
@@ -154,11 +156,20 @@ export const model = BlockModel.create()
     );
   })
 
+  .output('stackedPf', (ctx): PFrameHandle | undefined => {
+    const pCols = ctx.outputs?.resolve('stackedPf')?.getPColumns();
+    if (pCols === undefined) {
+      return undefined;
+    }
+
+    return createPFrameForGraphs(ctx, pCols);
+  })
+
   .sections((_ctx) => ([
     { type: 'link', href: '/', label: 'Main' },
-    { type: 'link', href: '/volcano', label: 'Volcano plot' },
-    { type: 'link', href: '/buble', label: 'Bubble plot' },
-    { type: 'link', href: '/line', label: 'Line plot' },
+    { type: 'link', href: '/buble', label: 'Enriched bubble plot' },
+    { type: 'link', href: '/line', label: 'Enrichment line plot' },
+    { type: 'link', href: '/stacked', label: 'Frequency bar plot' },
   ]))
 
   .done();
