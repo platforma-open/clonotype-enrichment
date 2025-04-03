@@ -27,10 +27,14 @@
       "url": "https://github.com/milaboratory/platforma-clonotype-enrichment",
       "docs": "https://github.com/milaboratory/platforma-clonotype-enrichment/docs",
       "support": "mailto:support@milaboratories.com",
-      "description": "Simple Hello World block that can be used as a boilerplate for newly created blocks.",
+      "description": "Identifies and ranks clonotypes enriched through selection rounds, showing how their frequencies change across conditions.",
       "longDescription": "file:../docs/description.md",
       "changelog": "file:../CHANGELOG.md",
-      "tags": ["tutorial"],
+      "tags": [
+        "AIRR",
+        "downstream",
+        "enrichment"
+      ],
       "organization": {
         "name": "MiLaboratories Inc",
         "url": "https://milaboratories.com/",
