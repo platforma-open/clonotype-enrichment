@@ -24,8 +24,8 @@
     "meta": {
       "title": "Clonotype Enrichment",
       "logo": "file:../logos/block-logo.png",
-      "url": "https://github.com/milaboratory/platforma-clonotype-enrichment",
-      "docs": "https://github.com/milaboratory/platforma-clonotype-enrichment/docs",
+      "url": "https://github.com/platforma-open/clonotype-enrichment",
+      "docs": "https://github.com/platforma-open/clonotype-enrichment/docs",
       "support": "mailto:support@milaboratories.com",
       "description": "Identifies and ranks clonotypes enriched through selection rounds, showing how their frequencies change across conditions.",
       "longDescription": "file:../docs/description.md",
