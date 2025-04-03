@@ -12,11 +12,18 @@ import {
   PlMaskIcon24,
   PlNumberField,
   PlSlideModal,
+  PlTableFilters,
 } from '@platforma-sdk/ui-vue';
 import { useApp } from '../app';
 import { computed, ref } from 'vue';
+import type { PTableColumnSpec } from '@platforma-sdk/model';
 
 const app = useApp();
+
+/** UI state upgrader */ (() => {
+  if ('filtersOpen' in app.model.ui) delete app.model.ui.filtersOpen;
+  if (app.model.ui.filterModel === undefined) app.model.ui.filterModel = {};
+})();
 
 const tableSettings = computed<PlDataTableSettings>(() => ({
   sourceType: 'ptable',
@@ -45,6 +52,7 @@ const roundOptions = computed(() => {
   }));
 });
 
+const columns = ref<PTableColumnSpec[]>([]);
 </script>
 
 <template>
@@ -53,7 +61,9 @@ const roundOptions = computed(() => {
     <template #append>
       <!-- {{ app.model.args.roundOrder }} -->
       <!-- PlAgDataTableToolsPanel controls showing  Export column and filter-->
-      <PlAgDataTableToolsPanel/>
+      <PlAgDataTableToolsPanel>
+        <PlTableFilters v-model="app.model.ui.filterModel" :columns="columns" />
+      </PlAgDataTableToolsPanel>
       <PlBtnGhost @click.stop="showSettings">
         Settings
         <template #append>
@@ -62,10 +72,12 @@ const roundOptions = computed(() => {
       </PlBtnGhost>
     </template>
     <PlAgDataTable
+      ref="tableInstance"
       v-model="app.model.ui.tableState"
       :settings="tableSettings"
       show-columns-panel
       show-export-button
+      @columns-changed="(newColumns) => (columns = newColumns)"
     />
     <PlSlideModal v-model="settingsAreShown">
       <template #title>Settings</template>

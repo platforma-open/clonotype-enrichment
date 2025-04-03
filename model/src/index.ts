@@ -1,5 +1,5 @@
 import type { GraphMakerState } from '@milaboratories/graph-maker';
-import type { InferOutputsType, PColumnIdAndSpec, PFrameHandle, PlDataTableState, PlRef } from '@platforma-sdk/model';
+import type { InferOutputsType, PColumnIdAndSpec, PFrameHandle, PlDataTableState, PlRef, PlTableFiltersModel } from '@platforma-sdk/model';
 import { BlockModel, createPFrameForGraphs, createPlDataTable, isPColumnSpec } from '@platforma-sdk/model';
 
 export type UiState = {
@@ -8,6 +8,7 @@ export type UiState = {
   bubbleState: GraphMakerState;
   lineState: GraphMakerState;
   stackedState: GraphMakerState;
+  filterModel: PlTableFiltersModel;
 };
 
 export type BlockArgs = {
@@ -48,6 +49,7 @@ export const model = BlockModel.create()
       title: 'Top clonotype frequencies',
       template: 'stackedBar',
     },
+    filterModel: {},
   })
 
   // User can only select as input UMI count matrices or read count matrices
@@ -96,14 +98,16 @@ export const model = BlockModel.create()
     return [...new Set(Object.values(values))];
   })
 
-  // Returns a map of results
+  // Returns a map of results for main table
   .output('pt', (ctx) => {
     const pCols = ctx.outputs?.resolve('enrichmentPf')?.getPColumns();
     if (pCols === undefined) {
       return undefined;
     }
 
-    return createPlDataTable(ctx, pCols, ctx.uiState?.tableState);
+    return createPlDataTable(ctx, pCols, ctx.uiState.tableState, {
+      filters: ctx.uiState.filterModel?.filters,
+    });
   })
 
   // Returns a map of results for volcano plot
