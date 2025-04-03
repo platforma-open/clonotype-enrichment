@@ -25,6 +25,8 @@ wf.body(func(args) {
 
 	roundColumn := args.resolvedRoundColumn
 	roundOrder := args.roundOrder
+
+	enrichmentThreshold := args.enrichmentThreshold
 	
 	// convert PColumns to csv
 	csvCounts := xsv.exportFrame([allCounts], "csv", {})
@@ -42,7 +44,7 @@ wf.body(func(args) {
 		arg("--volcano").arg("volcano_data.csv").
 		arg("--bubble").arg("bubble_data.csv").
 		arg("--top_enriched").arg("top_enriched.csv").
-		// arg("--min_enrichment").arg("3").
+		arg("--min_enrichment").arg(string(enrichmentThreshold)).
 		// arg("--top_n_volcano").arg("1000").
 		// arg("--top_n_bubble").arg("20").
 		// arg("--top_n_enriched").arg("5").

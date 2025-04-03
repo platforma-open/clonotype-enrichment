@@ -14,12 +14,14 @@ export type BlockArgs = {
   countsRef?: PlRef;
   roundColumn?: PlRef;
   roundOrder: string[];
+  enrichmentThreshold: number;
 };
 
 export const model = BlockModel.create()
 
   .withArgs<BlockArgs>({
     roundOrder: [],
+    enrichmentThreshold: 3,
   })
 
   .withUiState<UiState>({
@@ -137,7 +139,7 @@ export const model = BlockModel.create()
       return undefined;
     }
 
-    return createPFrameForGraphs(ctx, pCols);
+    return ctx.createPFrame(pCols);
   })
 
   // Returns a list pof Pcols for plot defaults
@@ -162,7 +164,7 @@ export const model = BlockModel.create()
       return undefined;
     }
 
-    return createPFrameForGraphs(ctx, pCols);
+    return ctx.createPFrame(pCols);
   })
 
   .sections((_ctx) => ([

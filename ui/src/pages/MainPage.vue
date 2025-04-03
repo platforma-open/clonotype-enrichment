@@ -10,6 +10,7 @@ import {
   PlDropdownMulti,
   PlDropdownRef,
   PlMaskIcon24,
+  PlNumberField,
   PlSlideModal,
 } from '@platforma-sdk/ui-vue';
 import { useApp } from '../app';
@@ -78,6 +79,14 @@ const roundOptions = computed(() => {
           Order aware selection. Calculate a contrast between first element (denominator) and each of the other selected options (numerators).
         </template>
       </PlDropdownMulti>
+      <PlNumberField
+        v-model="app.model.args.enrichmentThreshold"
+        label="Enrichment threshold" :minValue="1" :step="0.1"
+      >
+        <template #tooltip>
+          Select enrichment threshold to consider a clonotype enriched.
+        </template>
+      </PlNumberField>
     </PlSlideModal>
   </PlBlockPage>
 </template>
