@@ -1,0 +1,34 @@
+ll := import("@platforma-sdk/workflow-tengo:ll")
+
+getColumns := func(countsSpec) {
+  return {
+    "axes": [
+      {
+        "column": "Clonotype",
+        "spec": countsSpec.axesSpec[1]
+      }
+      ],
+    "columns": [
+      {
+        "column": "Label",
+        "id": "label",
+        "allowNA": false,
+        "spec": {
+          "name": "pl7.app/label",
+          "valueType": "String",
+          "domain": {},
+          "annotations": {
+            "pl7.app/label": "Clonotype key",
+            "pl7.app/isLabel": "true"
+          }
+        }
+      }
+      ],
+    "storageFormat": "Binary",
+    "partitionKeyLength": 0
+  }
+}
+
+export ll.toStrict({
+	getColumns: getColumns
+})

@@ -143,7 +143,14 @@ export const model = BlockModel.create()
       return undefined;
     }
 
-    return ctx.createPFrame(pCols);
+    const labelPCol = ctx.outputs?.resolve('clonotypeMapPf')?.getPColumns();
+    if (labelPCol === undefined) {
+      return undefined;
+    }
+
+    const pColsWithLabel = [...pCols, ...labelPCol];
+
+    return ctx.createPFrame(pColsWithLabel);
   })
 
   // Returns a list pof Pcols for plot defaults

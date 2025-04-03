@@ -11,6 +11,7 @@ def hybrid_enrichment_analysis(
     volcano_csv,
     bubble_csv,
     top_enriched_csv,
+    clonotype_map_csv=None,
     use_penalty=True,
     penalty_enrich=2,
     penalty_deplete=10,
@@ -73,6 +74,11 @@ def hybrid_enrichment_analysis(
         clonotype: f"C{i+1}"
         for i, clonotype in enumerate(result_df["Clonotype"])
     }
+
+    # Optional: export mapping of clonotype to label
+    if clonotype_map_csv:
+        pd.DataFrame(list(clonotype_labels.items()), columns=["Clonotype", "Label"]).to_csv(clonotype_map_csv, index=False)
+
     result_df["Label"] = result_df["Clonotype"].map(clonotype_labels)
     result_df = result_df[["Clonotype", "Label"] + [col for col in result_df.columns if col not in ["Clonotype", "Label"]]]
 
@@ -183,6 +189,7 @@ if __name__ == "__main__":
     parser.add_argument("--volcano", required=True)
     parser.add_argument("--bubble", required=True)
     parser.add_argument("--top_enriched", required=True)
+    parser.add_argument("--clonotype_map", required=False)
     parser.add_argument("--use_penalty", action="store_true")
     parser.add_argument("--penalty_enrich", type=int, default=2)
     parser.add_argument("--penalty_deplete", type=int, default=10)
@@ -202,6 +209,7 @@ if __name__ == "__main__":
         volcano_csv=args.volcano,
         bubble_csv=args.bubble,
         top_enriched_csv=args.top_enriched,
+        clonotype_map_csv=args.clonotype_map,
         use_penalty=args.use_penalty,
         penalty_enrich=args.penalty_enrich,
         penalty_deplete=args.penalty_deplete,

@@ -8,6 +8,8 @@ pframes := import("@platforma-sdk/workflow-tengo:pframes")
 pfEnrichmentConv := import(":pf-enrichment-conv")
 pfBubbleConv := import(":pf-bubble-conv")
 pfStackedConv := import(":pf-stacked-conv")
+pfClonotypeMapConv := import(":pf-clonotype-map-conv")
+
 wf.prepare(func(args){
 
 	return {
@@ -44,6 +46,7 @@ wf.body(func(args) {
 		arg("--volcano").arg("volcano_data.csv").
 		arg("--bubble").arg("bubble_data.csv").
 		arg("--top_enriched").arg("top_enriched.csv").
+		arg("--clonotype_map").arg("clonotype_map.csv").
 		arg("--min_enrichment").arg(string(enrichmentThreshold)).
 		// arg("--top_n_volcano").arg("1000").
 		// arg("--top_n_bubble").arg("20").
@@ -52,6 +55,7 @@ wf.body(func(args) {
 		saveFile("volcano_data.csv").
 		saveFile("bubble_data.csv").
 		saveFile("top_enriched.csv").
+		saveFile("clonotype_map.csv").
 		printErrStreamToStdout().
 		saveStdoutContent().
 		cache(24 * 60 * 60 * 1000).
@@ -69,12 +73,16 @@ wf.body(func(args) {
 	stackedImportParams := pfStackedConv.getColumns(countsSpec)
 	stackedPf := xsv.importFile(calculateEnrichment.getFile("top_enriched.csv"), "csv", stackedImportParams)
 
+	clonotypeMapImportParams := pfClonotypeMapConv.getColumns(countsSpec)
+	clonotypeMapPf := xsv.importFile(calculateEnrichment.getFile("clonotype_map.csv"), "csv", clonotypeMapImportParams)
+
 	return {
 		outputs: {
 			enrichmentPf: pframes.exportFrame(enrichmentPf),
 			volcanoPf: pframes.exportFrame(volcanoPf),
 			bubblePf: pframes.exportFrame(bubblePf),
-			stackedPf: pframes.exportFrame(stackedPf)
+			stackedPf: pframes.exportFrame(stackedPf),
+			clonotypeMapPf: pframes.exportFrame(clonotypeMapPf)
 		},
 		exports: {}
 	}
