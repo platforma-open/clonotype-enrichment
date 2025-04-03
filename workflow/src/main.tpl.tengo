@@ -1,0 +1,91 @@
+// "hello world"
+wf := import("@platforma-sdk/workflow-tengo:workflow")
+exec := import("@platforma-sdk/workflow-tengo:exec")
+assets:= import("@platforma-sdk/workflow-tengo:assets")
+xsv := import("@platforma-sdk/workflow-tengo:pframes.xsv")
+pframes := import("@platforma-sdk/workflow-tengo:pframes")
+
+pfEnrichmentConv := import(":pf-enrichment-conv")
+pfBubbleConv := import(":pf-bubble-conv")
+pfStackedConv := import(":pf-stacked-conv")
+pfClonotypeMapConv := import(":pf-clonotype-map-conv")
+
+wf.prepare(func(args){
+
+	return {
+		resolvedInput: wf.resolve(args.countsRef, { errIfMissing: true }),
+		resolvedRoundColumn: wf.resolve(args.roundColumn),
+		metaRefs: args.roundColumn
+	}
+})
+
+wf.body(func(args) {
+	blockId := wf.blockId().getDataAsJson()
+
+	allCounts := args.resolvedInput
+	countsSpec := allCounts.spec
+
+	roundColumn := args.resolvedRoundColumn
+	roundOrder := args.roundOrder
+
+	enrichmentThreshold := args.enrichmentThreshold
+	
+	// convert PColumns to csv
+	csvCounts := xsv.exportFrame([allCounts], "csv", {})
+	csvCovariates := xsv.exportFrame([roundColumn], "csv", {})
+
+	calculateEnrichment := exec.builder().
+		software(assets.importSoftware("@platforma-open/milaboratories.clonotype-enrichment.software:calculate-enrichment")).
+		addFile("rawCounts.csv", csvCounts).
+		addFile("covariates.csv", csvCovariates).
+		arg("--counts").arg("rawCounts.csv").
+		arg("--metadata").arg("covariates.csv").
+		arg("--condition_column").arg(string(roundColumn.spec.annotations["pl7.app/label"])).
+		arg("--conditions").arg(string(roundOrder)).
+		arg("--enrichment").arg("enrichment_results.csv").
+		arg("--volcano").arg("volcano_data.csv").
+		arg("--bubble").arg("bubble_data.csv").
+		arg("--top_enriched").arg("top_enriched.csv").
+		arg("--clonotype_map").arg("clonotype_map.csv").
+		arg("--min_enrichment").arg(string(enrichmentThreshold)).
+		// arg("--top_n_volcano").arg("1000").
+		// arg("--top_n_bubble").arg("20").
+		// arg("--top_n_enriched").arg("5").
+		saveFile("enrichment_results.csv").
+		saveFile("volcano_data.csv").
+		saveFile("bubble_data.csv").
+		saveFile("top_enriched.csv").
+		saveFile("clonotype_map.csv").
+		printErrStreamToStdout().
+		saveStdoutContent().
+		cache(24 * 60 * 60 * 1000).
+		run()
+
+	EnrichmentImportParams := pfEnrichmentConv.getColumns(countsSpec)
+	enrichmentPf := xsv.importFile(calculateEnrichment.getFile("enrichment_results.csv"), "csv", EnrichmentImportParams)
+
+	// volcano and enrichment have same columns
+	volcanoPf := xsv.importFile(calculateEnrichment.getFile("volcano_data.csv"), "csv", EnrichmentImportParams)
+
+	bubbleImportParams := pfBubbleConv.getColumns(countsSpec)
+	bubblePf := xsv.importFile(calculateEnrichment.getFile("bubble_data.csv"), "csv", bubbleImportParams)
+
+	stackedImportParams := pfStackedConv.getColumns(countsSpec)
+	stackedPf := xsv.importFile(calculateEnrichment.getFile("top_enriched.csv"), "csv", stackedImportParams)
+
+	clonotypeMapImportParams := pfClonotypeMapConv.getColumns(countsSpec)
+	clonotypeMapPf := xsv.importFile(calculateEnrichment.getFile("clonotype_map.csv"), "csv", clonotypeMapImportParams)
+
+	return {
+		outputs: {
+			enrichmentPf: pframes.exportFrame(enrichmentPf),
+			volcanoPf: pframes.exportFrame(volcanoPf),
+			bubblePf: pframes.exportFrame(bubblePf),
+			stackedPf: pframes.exportFrame(stackedPf),
+			clonotypeMapPf: pframes.exportFrame(clonotypeMapPf)
+		},
+		exports: {}
+	}
+	
+})
+

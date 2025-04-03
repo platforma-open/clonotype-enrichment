@@ -1,0 +1,72 @@
+ll := import("@platforma-sdk/workflow-tengo:ll")
+
+getColumns := func(countsSpec) {
+  return {
+    "axes": [
+      {
+        "column": "Condition",
+        "id": "round",
+        "allowNA": false,
+        "spec": {
+          "name": "pl7.app/vdj/round",
+          "type": "String",
+          "domain": {},
+          "annotations": {
+            "pl7.app/label": "Round"
+          }
+        }
+      },
+      {
+        "column": "Clonotype",
+        "spec": countsSpec.axesSpec[1]
+      }
+      ],
+    "columns": [
+      {
+        "column": "Label",
+        "id": "label",
+        "allowNA": false,
+        "spec": {
+          "name": "pl7.app/vdj/temporarylabel",
+          "valueType": "String",
+          "domain": {},
+          "annotations": {
+            "pl7.app/label": "Clonotype label"
+          }
+        }
+      },
+      {
+        "column": "Frequency",
+        "id": "frequency",
+        "allowNA": false,
+        "spec": {
+          "name": "pl7.app/vdj/frequency",
+          "valueType": "Double",
+          "domain": {},
+          "annotations": {
+            "pl7.app/label": "Frequency"
+          }
+        }
+      },
+      {
+        "column": "Enrichment",
+        "id": "enrichment",
+        "allowNA": true,
+        "spec": {
+          "name": "pl7.app/vdj/enrichment",
+          "valueType": "Double",
+          "domain": {},
+          "annotations": {
+            "pl7.app/label": "Enrichment"
+          }
+        }
+      }
+      ],
+    "storageFormat": "Binary",
+    "partitionKeyLength": 1
+  }
+}
+
+export ll.toStrict({
+	getColumns: getColumns
+})
