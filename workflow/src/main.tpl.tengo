@@ -76,6 +76,17 @@ wf.body(func(args) {
 	clonotypeMapImportParams := pfClonotypeMapConv.getColumns(countsSpec)
 	clonotypeMapPf := xsv.importFile(calculateEnrichment.getFile("clonotype_map.csv"), "csv", clonotypeMapImportParams)
 
+	exports := {
+		enrichment: {
+			spec: enrichmentPf["enrichment.spec"],
+			data: enrichmentPf["enrichment.data"]
+	 	},
+		frequency: {
+			spec: enrichmentPf["frequency.spec"],
+			data: enrichmentPf["frequency.data"]
+	 	}
+	}
+
 	return {
 		outputs: {
 			enrichmentPf: pframes.exportFrame(enrichmentPf),
@@ -84,7 +95,7 @@ wf.body(func(args) {
 			stackedPf: pframes.exportFrame(stackedPf),
 			clonotypeMapPf: pframes.exportFrame(clonotypeMapPf)
 		},
-		exports: {}
+		exports: exports
 	}
 	
 })
