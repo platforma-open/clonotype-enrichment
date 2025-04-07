@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.workflow
 
+## 2.1.0
+
+### Minor Changes
+
+- d9ba31f: Export enrichment and frequency
+
 ## 2.0.1
 
 ### Patch Changes
