@@ -105,6 +105,18 @@ export const model = BlockModel.create()
       return undefined;
     }
 
+    // const newCols = [];
+    // for (const pCol of pCols) {
+    //   if (pCol.spec.name === 'pl7.app/vdj/enrichment')
+    //     continue;
+
+    //   pCol.spec.axesSpec[0].annotations!['pl7.app/axisNature'] = 'heterogeneous';
+    //   if (pCol.spec.name === 'pl7.app/vdj/frequency') {
+    //     pCol.spec.annotations!['pl7.app/table/hValue'] = 'true';
+    //   }
+    //   newCols.push(pCol);
+    // }
+
     return createPlDataTable(ctx, pCols, ctx.uiState.tableState, {
       filters: ctx.uiState.filterModel?.filters,
     });
@@ -143,14 +155,7 @@ export const model = BlockModel.create()
       return undefined;
     }
 
-    const labelPCol = ctx.outputs?.resolve('clonotypeMapPf')?.getPColumns();
-    if (labelPCol === undefined) {
-      return undefined;
-    }
-
-    const pColsWithLabel = [...pCols, ...labelPCol];
-
-    return ctx.createPFrame(pColsWithLabel);
+    return createPFrameForGraphs(ctx, pCols);
   })
 
   // Returns a list pof Pcols for plot defaults

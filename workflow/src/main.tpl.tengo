@@ -8,7 +8,6 @@ pframes := import("@platforma-sdk/workflow-tengo:pframes")
 pfEnrichmentConv := import(":pf-enrichment-conv")
 pfBubbleConv := import(":pf-bubble-conv")
 pfStackedConv := import(":pf-stacked-conv")
-pfClonotypeMapConv := import(":pf-clonotype-map-conv")
 
 wf.prepare(func(args){
 
@@ -73,9 +72,6 @@ wf.body(func(args) {
 	stackedImportParams := pfStackedConv.getColumns(countsSpec)
 	stackedPf := xsv.importFile(calculateEnrichment.getFile("top_enriched.csv"), "csv", stackedImportParams)
 
-	clonotypeMapImportParams := pfClonotypeMapConv.getColumns(countsSpec)
-	clonotypeMapPf := xsv.importFile(calculateEnrichment.getFile("clonotype_map.csv"), "csv", clonotypeMapImportParams)
-
 	exports := {
 		enrichment: {
 			spec: enrichmentPf["enrichment.spec"],
@@ -92,8 +88,7 @@ wf.body(func(args) {
 			enrichmentPf: pframes.exportFrame(enrichmentPf),
 			volcanoPf: pframes.exportFrame(volcanoPf),
 			bubblePf: pframes.exportFrame(bubblePf),
-			stackedPf: pframes.exportFrame(stackedPf),
-			clonotypeMapPf: pframes.exportFrame(clonotypeMapPf)
+			stackedPf: pframes.exportFrame(stackedPf)
 		},
 		exports: exports
 	}
