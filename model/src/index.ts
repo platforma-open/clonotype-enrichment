@@ -73,13 +73,13 @@ export const model = BlockModel.create()
       !umiBlockIds.includes(item.ref.blockId));
 
     // Add single cell da
-    const scReadCountOptions = ctx.resultPool.getOptions((spec) => isPColumnSpec(spec)
+    const validScOptions = ctx.resultPool.getOptions((spec) => isPColumnSpec(spec)
       && (spec.name === 'pl7.app/vdj/uniqueCellCount')
       && (spec.annotations?.['pl7.app/abundance/normalized'] === 'false')
     , { includeNativeLabel: true, addLabelAsSuffix: true });
 
     // Combine all valid options
-    const validOptions = [...validUmiOptions, ...validCountOptions, ...scReadCountOptions];
+    const validOptions = [...validUmiOptions, ...validCountOptions, ...validScOptions];
     return validOptions;
   })
 
