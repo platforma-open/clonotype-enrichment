@@ -19,5 +19,10 @@
     "turbo": "catalog:",
     "@changesets/cli": "catalog:"
   },
-  "packageManager": "pnpm@9.12.0"
+  "packageManager": "pnpm@9.12.0",
+  "//": {
+    "overrides": {
+      "@platforma-sdk/ui-vue": "file:/Users/poslavskysv/Projects/milab/platforma/platforma-sdk/sdk/ui-vue/package.tgz"
+    }
+  }
 }
