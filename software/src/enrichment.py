@@ -25,6 +25,7 @@ def hybrid_enrichment_analysis(
 
     counts_df = counts_df.rename(columns={"Clonotype key": "Clonotype", 
                                           "SC Clonotype key": "Clonotype",
+                                          "Clone label": "Clonotype",
                                           "Number Of Reads": "Count",
                                           "Number of UMIs": "Count",
                                           "Number of Cells": "Count"})
