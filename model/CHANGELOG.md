@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.model
 
+## 2.1.1
+
+### Patch Changes
+
+- 289344b: Updated line plot to show clonotype frequency
+
 ## 2.1.0
 
 ### Minor Changes

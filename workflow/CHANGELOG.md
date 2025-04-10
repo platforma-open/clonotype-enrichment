@@ -1,5 +1,13 @@
 # @platforma-open/milaboratories.clonotype-enrichment.workflow
 
+## 2.2.1
+
+### Patch Changes
+
+- 289344b: Updated line plot to show clonotype frequency
+- Updated dependencies [289344b]
+  - @platforma-open/milaboratories.clonotype-enrichment.software@2.1.1
+
 ## 2.2.0
 
 ### Minor Changes
