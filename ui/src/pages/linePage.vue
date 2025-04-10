@@ -37,7 +37,7 @@ const defaultOptions: PredefinedGraphOption<'discrete'>[] = [
     inputName: 'y',
     selectedSource: {
       kind: 'PColumn',
-      name: 'pl7.app/vdj/enrichment',
+      name: 'pl7.app/vdj/frequency',
       valueType: 'Double',
       axesSpec: [
         {
@@ -58,7 +58,7 @@ const defaultOptions: PredefinedGraphOption<'discrete'>[] = [
 <template>
   <GraphMaker
     v-model="app.model.ui.lineState" chartType="discrete"
-    :p-frame="app.model.outputs.bubblePf"
+    :p-frame="app.model.outputs.linePf"
     :default-options="defaultOptions"
   />
 </template>

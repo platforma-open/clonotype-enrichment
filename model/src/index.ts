@@ -184,10 +184,19 @@ export const model = BlockModel.create()
     return ctx.createPFrame(pCols);
   })
 
+  .output('linePf', (ctx): PFrameHandle | undefined => {
+    const pCols = ctx.outputs?.resolve('linePf')?.getPColumns();
+    if (pCols === undefined) {
+      return undefined;
+    }
+
+    return ctx.createPFrame(pCols);
+  })
+
   .sections((_ctx) => ([
     { type: 'link', href: '/', label: 'Main' },
     { type: 'link', href: '/buble', label: 'Enriched bubble plot' },
-    { type: 'link', href: '/line', label: 'Enrichment line plot' },
+    { type: 'link', href: '/line', label: 'Frequency line plot' },
     { type: 'link', href: '/stacked', label: 'Frequency bar plot' },
   ]))
 
