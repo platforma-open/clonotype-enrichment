@@ -57,6 +57,7 @@ wf.body(func(args) {
 		arg("--bubble").arg("bubble_data.csv").
 		arg("--top_enriched").arg("top_enriched.csv").
 		arg("--clonotype_map").arg("clonotype_map.csv").
+		arg("--top_20").arg("top_20.csv").
 		arg("--min_enrichment").arg(string(enrichmentThreshold)).
 		// arg("--top_n_volcano").arg("1000").
 		// arg("--top_n_bubble").arg("20").
@@ -66,6 +67,7 @@ wf.body(func(args) {
 		saveFile("bubble_data.csv").
 		saveFile("top_enriched.csv").
 		saveFile("clonotype_map.csv").
+		saveFile("top_20.csv").
 		printErrStreamToStdout().
 		saveStdoutContent().
 		cache(24 * 60 * 60 * 1000).
@@ -82,6 +84,9 @@ wf.body(func(args) {
 
 	stackedImportParams := pfStackedConv.getColumns(countsSpec)
 	stackedPf := xsv.importFile(calculateEnrichment.getFile("top_enriched.csv"), "csv", stackedImportParams)
+
+	lineImportParams := pfStackedConv.getColumns(countsSpec)
+	linePf := xsv.importFile(calculateEnrichment.getFile("top_20.csv"), "csv", lineImportParams)
 
 	clonotypeMapImportParams := pfClonotypeMapConv.getColumns(countsSpec)
 	clonotypeMapPf := xsv.importFile(calculateEnrichment.getFile("clonotype_map.csv"), "csv", clonotypeMapImportParams)
@@ -103,6 +108,7 @@ wf.body(func(args) {
 			volcanoPf: pframes.exportFrame(volcanoPf),
 			bubblePf: pframes.exportFrame(bubblePf),
 			stackedPf: pframes.exportFrame(stackedPf),
+			linePf: pframes.exportFrame(linePf),
 			clonotypeMapPf: pframes.exportFrame(clonotypeMapPf)
 		},
 		exports: exports

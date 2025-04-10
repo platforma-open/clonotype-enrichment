@@ -11,6 +11,7 @@ def hybrid_enrichment_analysis(
     volcano_csv,
     bubble_csv,
     top_enriched_csv,
+    top_20_csv=None,
     clonotype_map_csv=None,
     use_penalty=True,
     penalty_enrich=2,
@@ -80,7 +81,6 @@ def hybrid_enrichment_analysis(
         for i, clonotype in enumerate(result_df["Clonotype"])
     }
 
-    # Optional: export mapping of clonotype to label
     if clonotype_map_csv:
         pd.DataFrame(list(clonotype_labels.items()), columns=["Clonotype", "Label"]).to_csv(clonotype_map_csv, index=False)
 
@@ -182,6 +182,18 @@ def hybrid_enrichment_analysis(
     top_enriched_freq = freq_long[freq_long["Clonotype"].isin(top_enriched_ids)]
     top_enriched_freq.to_csv(top_enriched_csv, index=False)
 
+    # Top 20 enriched (frequencies only)
+    if top_20_csv:
+        top_20_ids = (
+            bubble_df.groupby("Clonotype")["MaxEnrichment"]
+            .max()
+            .sort_values(ascending=False)
+            .head(20)
+            .index
+        )
+        top_20_freq = freq_long[freq_long["Clonotype"].isin(top_20_ids)]
+        top_20_freq.to_csv(top_20_csv, index=False)
+
 if __name__ == "__main__":
     import argparse
 
@@ -194,6 +206,7 @@ if __name__ == "__main__":
     parser.add_argument("--volcano", required=True)
     parser.add_argument("--bubble", required=True)
     parser.add_argument("--top_enriched", required=True)
+    parser.add_argument("--top_20", required=False)
     parser.add_argument("--clonotype_map", required=False)
     parser.add_argument("--use_penalty", action="store_true")
     parser.add_argument("--penalty_enrich", type=int, default=2)
@@ -214,6 +227,7 @@ if __name__ == "__main__":
         volcano_csv=args.volcano,
         bubble_csv=args.bubble,
         top_enriched_csv=args.top_enriched,
+        top_20_csv=args.top_20,
         clonotype_map_csv=args.clonotype_map,
         use_penalty=args.use_penalty,
         penalty_enrich=args.penalty_enrich,
