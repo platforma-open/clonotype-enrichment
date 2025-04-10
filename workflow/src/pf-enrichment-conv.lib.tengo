@@ -5,14 +5,14 @@ getColumns := func(countsSpec) {
     "axes": [
       {
         "column": "Condition",
-        "id": "round",
+        "id": "condition",
         "allowNA": false,
         "spec": {
-          "name": "pl7.app/vdj/round",
+          "name": "pl7.app/vdj/condition",
           "type": "String",
           "domain": {},
           "annotations": {
-            "pl7.app/label": "Round"
+            "pl7.app/label": "Condition"
           }
         }
       },
@@ -31,7 +31,9 @@ getColumns := func(countsSpec) {
           "valueType": "String",
           "domain": {},
           "annotations": {
-            "pl7.app/label": "Clonotype label"
+            "pl7.app/label": "Clonotype label",
+            "pl7.app/table/orderPriority": "10000",
+            "pl7.app/table/visibility": "default"
           }
         }
       },
@@ -44,7 +46,10 @@ getColumns := func(countsSpec) {
           "valueType": "Double",
           "domain": {},
           "annotations": {
-            "pl7.app/label": "Frequency"
+            "pl7.app/label": "Frequency",
+            "pl7.app/vdj/isScore": "true",
+            "pl7.app/table/orderPriority": "9000",
+            "pl7.app/table/visibility": "default"
           }
         }
       },
@@ -57,7 +62,10 @@ getColumns := func(countsSpec) {
           "valueType": "Double",
           "domain": {},
           "annotations": {
-            "pl7.app/label": "Enrichment"
+            "pl7.app/label": "Enrichment",
+            "pl7.app/vdj/isScore": "true",
+            "pl7.app/table/orderPriority": "8000",
+            "pl7.app/table/visibility": "default"
           }
         }
       }
