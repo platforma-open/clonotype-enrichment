@@ -27,12 +27,12 @@ const defaultOptions = computed((): GraphMakerProps['defaultOptions'] => {
     {
       inputName: 'x',
       selectedSource: bubblePcols[getIndex('pl7.app/vdj/temporarylabel',
-        bubblePcols)].spec.axesSpec[1],
+        bubblePcols)].spec.axesSpec[0],
     },
     {
       inputName: 'y',
       selectedSource: bubblePcols[getIndex('pl7.app/vdj/temporarylabel',
-        bubblePcols)].spec.axesSpec[0],
+        bubblePcols)].spec.axesSpec[1],
     },
     {
       inputName: 'valueColor',
