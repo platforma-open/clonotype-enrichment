@@ -23,7 +23,12 @@ def hybrid_enrichment_analysis(
     counts_df = pd.read_csv(counts_csv)
     metadata_df = pd.read_csv(sample_metadata_csv)
 
-    counts_df = counts_df.rename(columns={"Clonotype key": "Clonotype", "Number Of Reads": "Count"})
+    counts_df = counts_df.rename(columns={"Clonotype key": "Clonotype", 
+                                          "SC Clonotype key": "Clonotype",
+                                          "Clone label": "Clonotype",
+                                          "Number Of Reads": "Count",
+                                          "Number of UMIs": "Count",
+                                          "Number of Cells": "Count"})
     if condition_column not in metadata_df.columns:
         raise ValueError(f"'{condition_column}' not found in metadata CSV columns.")
     metadata_df = metadata_df.rename(columns={condition_column: "Condition"})
