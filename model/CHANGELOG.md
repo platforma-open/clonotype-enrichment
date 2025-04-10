@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.model
 
+## 2.1.0
+
+### Minor Changes
+
+- 8a8b908: Make it work with single-cell
+
 ## 2.0.1
 
 ### Patch Changes
