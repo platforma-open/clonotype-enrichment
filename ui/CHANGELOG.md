@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.ui
 
+## 2.0.4
+
+### Patch Changes
+
+- 0914a49: Updated export specifications
+
 ## 2.0.3
 
 ### Patch Changes
