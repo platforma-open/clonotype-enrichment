@@ -4,6 +4,10 @@ getColumns := func(countsSpec) {
   return {
     "axes": [
       {
+        "column": "Clonotype",
+        "spec": countsSpec.axesSpec[1]
+      },
+      {
         "column": "Condition",
         "id": "condition",
         "allowNA": false,
@@ -15,10 +19,6 @@ getColumns := func(countsSpec) {
             "pl7.app/label": "Condition"
           }
         }
-      },
-      {
-        "column": "Clonotype",
-        "spec": countsSpec.axesSpec[1]
       }
       ],
     "columns": [
@@ -71,7 +71,7 @@ getColumns := func(countsSpec) {
       }
       ],
     "storageFormat": "Binary",
-    "partitionKeyLength": 1
+    "partitionKeyLength": 0
   }
 }
 
