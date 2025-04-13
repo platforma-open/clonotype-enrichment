@@ -10,8 +10,8 @@ catalogs:
       specifier: ^2.28.1
       version: 2.28.1
     '@milaboratories/graph-maker':
-      specifier: ^1.1.66
-      version: 1.1.66
+      specifier: ^1.1.70
+      version: 1.1.71
     '@platforma-open/milaboratories.runenv-python-3':
       specifier: ^1.1.7
       version: 1.1.7
@@ -95,7 +95,7 @@ importers:
     dependencies:
       '@milaboratories/graph-maker':
         specifier: 'catalog:'
-        version: 1.1.66(d3-dispatch@3.0.1)(d3-path@3.1.0)(d3-scale-chromatic@3.1.0)(typescript@5.5.4)
+        version: 1.1.71(d3-dispatch@3.0.1)(d3-path@3.1.0)(d3-scale-chromatic@3.1.0)(typescript@5.5.4)
       '@platforma-sdk/model':
         specifier: 'catalog:'
         version: 1.26.0
@@ -145,7 +145,7 @@ importers:
     dependencies:
       '@milaboratories/graph-maker':
         specifier: 'catalog:'
-        version: 1.1.66(d3-dispatch@3.0.1)(d3-path@3.1.0)(d3-scale-chromatic@3.1.0)(typescript@5.5.4)
+        version: 1.1.71(d3-dispatch@3.0.1)(d3-path@3.1.0)(d3-scale-chromatic@3.1.0)(typescript@5.5.4)
       '@platforma-open/milaboratories.clonotype-enrichment.model':
         specifier: workspace:*
         version: link:../model
@@ -1047,15 +1047,15 @@ packages:
     resolution: {integrity: sha512-84ri00g3+ppejbG8Df1ZsAF1ak6IFtYMWmjcvOLjgyGk+J5ncc37krLEALQyIGdIzhEbbx2v7Bj/OI/0BepU9g==}
     engines: {node: '>=20.0.0'}
 
-  '@milaboratories/graph-maker@1.1.66':
-    resolution: {integrity: sha512-tgwtQBNSj2jx4NQbKNSR3p0TPcWbBSs9Moj+kSdQlwe+k3mmYXUF1m1NrkwgeL8Ir/npFtzy6z0mw36efb/ASg==}
+  '@milaboratories/graph-maker@1.1.71':
+    resolution: {integrity: sha512-vjWTmotzRa479ldNkTFc41qsGGGntgLrev7VbLSJ5BPPIam73nkC20eTtpEO0njP1HsZ86yfoSjNV1B6ZF/N8Q==}
 
   '@milaboratories/helpers@1.6.11':
     resolution: {integrity: sha512-TyERmUULB8hvbwqnMOQ14YAPQzVBGpBSLkByYpl3/5vCkf4OndBg+V8XqITHEZkca9y82LVm5IDU0hP7KOCQ9Q==}
     engines: {node: '>=20.10.0'}
 
-  '@milaboratories/miplots4@1.0.77':
-    resolution: {integrity: sha512-PwIy7xgiVM2MwjEGQkcTHdnb6+47n6zYX2/9fBgXH2bQJzREmJXs8VoocePp/pG38QtVrXloxLOh3zsXPwsQ9g==}
+  '@milaboratories/miplots4@1.0.80':
+    resolution: {integrity: sha512-xgpUI5Bdg4ZdqXYiPIG9ALo6J5rm94zQWYd0cWYdX7mUDX1Sgl45Qda4zeaydukxMQRhC7aY1yFE7FvySLRsHQ==}
 
   '@milaboratories/pf-plots@1.0.94':
     resolution: {integrity: sha512-7krY/arA/qSqCRF2wZHIqNKdh6Q20395PY6mmi4dQhrRO5pKjGjvCk7JsTecEO+sx9NVjvKtNFbd9MmWynucfQ==}
@@ -1085,6 +1085,9 @@ packages:
     resolution: {integrity: sha512-Cu2uJu0MF3Mcc3uRC/3BOE7tb7rccqFzoq/UDStZcY5LEyJ+JOOMWtKHK33Z5e/ojD6e71jQBG5sivZEbwiYNQ==}
     engines: {node: '>=20'}
 
+  '@milaboratories/pl-error-like@1.12.0':
+    resolution: {integrity: sha512-UNA1/oTUG9Qb2mvRWQnlJlXWjVluXSvq989TvktufRISPznulT0rTwOBqF31pPM9TRfSIRS20HzgSgu5IuXx1w==}
+
   '@milaboratories/pl-errors@1.0.3':
     resolution: {integrity: sha512-YpKHIO+8qGJPIPnOFKZpFrdz3MMEwClgPonnwP9ri8vfBydCFMXR0Kk9zjZMZCbptYex93x68cl/aeavV3eLFA==}
 
@@ -1100,6 +1103,9 @@ packages:
 
   '@milaboratories/pl-model-common@1.13.0':
     resolution: {integrity: sha512-V6l9eRrM3/hgMoF7QfGPVGukuepKdKvOf+Ijj4drr3bTLd/J4O2YY4GJTekvTmHAkrwUFztboMBMj9uw4SUSZA==}
+
+  '@milaboratories/pl-model-common@1.13.5':
+    resolution: {integrity: sha512-NF1Z+YuBdkqQHVGqHLDmfiYB0JPSY4ElJ45eAbRsZ2Se3MFD9L1JjdEg/v6dTsnG81BOy2K3eNb6BUOq0tmc3Q==}
 
   '@milaboratories/pl-model-middle-layer@1.7.11':
     resolution: {integrity: sha512-nfaBRS+4XjjgmMvNfJry9uGkYEycxc+xlGBurg0vPG9qUKlEJMqx/y+Rkrm7SwpOeXzl6SCZ4Xqb2p/ySsiE6A==}
@@ -1131,6 +1137,9 @@ packages:
 
   '@milaboratories/uikit@2.2.61':
     resolution: {integrity: sha512-pPR5SmhA0EB77lP97xUfgSr89/yW11BnI6xgUZWX2H0voHSrubagGAr08YPWigk8QPtM2FxfLs55s05ytKF7Bw==}
+
+  '@milaboratories/uikit@2.2.66':
+    resolution: {integrity: sha512-d5ORguwFkOiqC6BXplXMXoSiLsbL4sEGJl000E70lUXKdszkWuM8VA9tllmPuLKWberP+6cO7tRkLIxqSBl9ww==}
 
   '@nodelib/fs.scandir@2.1.5':
     resolution: {integrity: sha512-vq24Bq3ym5HEQm2NKCr3yXDwjc7vTsEThRDnkp2DK9p1uqLR+DHurm/NOTo0KG7HYHU7eppKZj3MyqYuMBf62g==}
@@ -1213,6 +1222,9 @@ packages:
   '@platforma-sdk/model@1.26.0':
     resolution: {integrity: sha512-sA+Q7x4a0T7gAJalI6GgJf548t8AHYWGXP/JGVBG/wyv0xa/54kPbURPPzc+IXKuJtf8X0frmGixpoOx8MaXmg==}
 
+  '@platforma-sdk/model@1.29.2':
+    resolution: {integrity: sha512-z+XdBbputpAwYqEvZ8umeDfAH7u+VWBk/Wg+oaSVtgYxvNcGCjjrVlJoP39igzpl407/FNYPs4LH3qLwWkcmtw==}
+
   '@platforma-sdk/package-builder@2.15.6':
     resolution: {integrity: sha512-myp5TLKufmPeXckYG3HAUNfaE8+qTknogSjtISjoBof6KTDQTHy4oxBx7//Efq7wXJaFC0qDQh8tP6UGzqCU3A==}
     hasBin: true
@@ -1227,6 +1239,9 @@ packages:
 
   '@platforma-sdk/ui-vue@1.26.1':
     resolution: {integrity: sha512-19YtCWvD9hSYbkCblpPRvxlJkNl/C7rQyppXD8+ka7eNvDU+0OLBDe2ywuXlwFVAz/AzEwTf21NK6MFeX9qE0A==}
+
+  '@platforma-sdk/ui-vue@1.29.2':
+    resolution: {integrity: sha512-gxXcdhXj0pEfpIa0sLuCCLU4ehIN3iEbw441vv3ISqIjTZxyFO2jf29EHjry9/A5LsZTi4k4L1DKWzADlzeT5Q==}
 
   '@platforma-sdk/workflow-tengo@3.2.0':
     resolution: {integrity: sha512-0JovNFyd5w4GQnNAy4ps+8v5MDXb7T9KLi0DSGm0Ti2hYtCfXd1WAEZ9hgnV7fnfFc8wdR7M1f0vC7pg/asTOA==}
@@ -4220,6 +4235,9 @@ packages:
   json-stable-stringify-without-jsonify@1.0.1:
     resolution: {integrity: sha512-Bdboy+l7tA3OGW6FjyFHWkP5LuByj1Tk33Ljyq0axyzdk9//JSi2u3fP1QSmd1KNwq6VOKYGlAu87CisVir6Pw==}
 
+  json-stringify-safe@5.0.1:
+    resolution: {integrity: sha512-ZClg6AaYvamvYEE82d3Iyd3vSSIjQ+odgjaTzRuO3s7toCdFKczob2i0zCh7JE8kWn17yvAWhUVxvqGwUalsRA==}
+
   jsonfile@4.0.0:
     resolution: {integrity: sha512-m6F1R3z8jjlf2imQHS2Qez5sjKWQzbuuhuJ/FKYFRZvPE3PuHcSMVZzfsLhGVOkfd20obL5SWEBew5ShlquNxg==}
 
@@ -6328,14 +6346,14 @@ snapshots:
       '@types/node': 20.16.15
       utility-types: 3.11.0
 
-  '@milaboratories/graph-maker@1.1.66(d3-dispatch@3.0.1)(d3-path@3.1.0)(d3-scale-chromatic@3.1.0)(typescript@5.5.4)':
+  '@milaboratories/graph-maker@1.1.71(d3-dispatch@3.0.1)(d3-path@3.1.0)(d3-scale-chromatic@3.1.0)(typescript@5.5.4)':
     dependencies:
       '@ag-grid-community/core': 32.3.4
       '@milaboratories/helpers': 1.6.11
-      '@milaboratories/miplots4': 1.0.77(d3-dispatch@3.0.1)(d3-path@3.1.0)(d3-scale-chromatic@3.1.0)
+      '@milaboratories/miplots4': 1.0.80(d3-dispatch@3.0.1)(d3-path@3.1.0)(d3-scale-chromatic@3.1.0)
       '@milaboratories/pf-plots': 1.0.94
       '@platforma-sdk/model': 1.26.0
-      '@platforma-sdk/ui-vue': 1.26.1(typescript@5.5.4)
+      '@platforma-sdk/ui-vue': 1.29.2(typescript@5.5.4)
       '@types/d3-hierarchy': 3.1.7
       ag-grid-vue3: 33.1.0(vue@3.5.13(typescript@5.5.4))
       d3-hierarchy: 3.1.2
@@ -6350,7 +6368,7 @@ snapshots:
 
   '@milaboratories/helpers@1.6.11': {}
 
-  '@milaboratories/miplots4@1.0.77(d3-dispatch@3.0.1)(d3-path@3.1.0)(d3-scale-chromatic@3.1.0)':
+  '@milaboratories/miplots4@1.0.80(d3-dispatch@3.0.1)(d3-path@3.1.0)(d3-scale-chromatic@3.1.0)':
     dependencies:
       '@d3fc/d3fc-chart': 5.1.9(d3-array@3.2.4)(d3-path@3.1.0)(d3-scale-chromatic@3.1.0)(d3-scale@4.0.2)(d3-selection@3.0.0)(d3-shape@3.2.0)
       '@d3fc/d3fc-pointer': 3.0.3(d3-dispatch@3.0.1)(d3-selection@3.0.0)
@@ -6469,6 +6487,12 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  '@milaboratories/pl-error-like@1.12.0':
+    dependencies:
+      canonicalize: 2.1.0
+      json-stringify-safe: 5.0.1
+      zod: 3.23.8
+
   '@milaboratories/pl-errors@1.0.3':
     dependencies:
       '@milaboratories/pl-client': 2.7.14
@@ -6528,6 +6552,12 @@ snapshots:
       canonicalize: 2.1.0
       zod: 3.23.8
 
+  '@milaboratories/pl-model-common@1.13.5':
+    dependencies:
+      '@milaboratories/pl-error-like': 1.12.0
+      canonicalize: 2.1.0
+      zod: 3.23.8
+
   '@milaboratories/pl-model-middle-layer@1.7.11':
     dependencies:
       '@milaboratories/pl-model-common': 1.13.0
@@ -6570,6 +6600,13 @@ snapshots:
       denque: 2.1.0
 
   '@milaboratories/uikit@2.2.61(typescript@5.5.4)':
+    dependencies:
+      d3: 7.9.0
+      vue: 3.5.13(typescript@5.5.4)
+    transitivePeerDependencies:
+      - typescript
+
+  '@milaboratories/uikit@2.2.66(typescript@5.5.4)':
     dependencies:
       d3: 7.9.0
       vue: 3.5.13(typescript@5.5.4)
@@ -6691,6 +6728,14 @@ snapshots:
       utility-types: 3.11.0
       zod: 3.23.8
 
+  '@platforma-sdk/model@1.29.2':
+    dependencies:
+      '@milaboratories/pl-error-like': 1.12.0
+      '@milaboratories/pl-model-common': 1.13.5
+      canonicalize: 2.1.0
+      utility-types: 3.11.0
+      zod: 3.23.8
+
   '@platforma-sdk/package-builder@2.15.6':
     dependencies:
       '@aws-sdk/client-s3': 3.775.0
@@ -6748,6 +6793,18 @@ snapshots:
     dependencies:
       '@milaboratories/uikit': 2.2.61(typescript@5.5.4)
       '@platforma-sdk/model': 1.26.0
+      ag-grid-enterprise: 33.1.0
+      ag-grid-vue3: 33.1.0(vue@3.5.13(typescript@5.5.4))
+      canonicalize: 2.1.0
+      lru-cache: 11.1.0
+      vue: 3.5.13(typescript@5.5.4)
+    transitivePeerDependencies:
+      - typescript
+
+  '@platforma-sdk/ui-vue@1.29.2(typescript@5.5.4)':
+    dependencies:
+      '@milaboratories/uikit': 2.2.66(typescript@5.5.4)
+      '@platforma-sdk/model': 1.29.2
       ag-grid-enterprise: 33.1.0
       ag-grid-vue3: 33.1.0(vue@3.5.13(typescript@5.5.4))
       canonicalize: 2.1.0
@@ -10584,6 +10641,8 @@ snapshots:
   json-schema-traverse@0.4.1: {}
 
   json-stable-stringify-without-jsonify@1.0.1: {}
+
+  json-stringify-safe@5.0.1: {}
 
   jsonfile@4.0.0:
     optionalDependencies:
