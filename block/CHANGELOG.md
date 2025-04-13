@@ -1,5 +1,15 @@
 # @platforma-open/milaboratories.clonotype-enrichment
 
+## 2.0.7
+
+### Patch Changes
+
+- 011007d: Ordered categorical axis values
+- Updated dependencies [011007d]
+  - @platforma-open/milaboratories.clonotype-enrichment.model@2.1.2
+  - @platforma-open/milaboratories.clonotype-enrichment.ui@2.0.5
+  - @platforma-open/milaboratories.clonotype-enrichment.workflow@2.2.3
+
 ## 2.0.6
 
 ### Patch Changes

@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.test
 
+## 2.0.2
+
+### Patch Changes
+
+- 011007d: Ordered categorical axis values
+
 ## 2.0.1
 
 ### Patch Changes
