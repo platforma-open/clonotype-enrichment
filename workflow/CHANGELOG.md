@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.workflow
 
+## 2.2.4
+
+### Patch Changes
+
+- a6123ff: Switched clonotype labels to CDR3 sequences
+
 ## 2.2.3
 
 ### Patch Changes
