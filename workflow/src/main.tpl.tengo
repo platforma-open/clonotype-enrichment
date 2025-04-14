@@ -88,8 +88,8 @@ wf.body(func(args) {
 	lineImportParams := pfStackedConv.getColumns(countsSpec)
 	linePf := xsv.importFile(calculateEnrichment.getFile("top_20.csv"), "csv", lineImportParams)
 
-	clonotypeMapImportParams := pfClonotypeMapConv.getColumns(countsSpec)
-	clonotypeMapPf := xsv.importFile(calculateEnrichment.getFile("clonotype_map.csv"), "csv", clonotypeMapImportParams)
+	// clonotypeMapImportParams := pfClonotypeMapConv.getColumns(countsSpec)
+	// clonotypeMapPf := xsv.importFile(calculateEnrichment.getFile("clonotype_map.csv"), "csv", clonotypeMapImportParams)
 
 	exports := {
 		enrichment: {
@@ -108,8 +108,8 @@ wf.body(func(args) {
 			volcanoPf: pframes.exportFrame(volcanoPf),
 			bubblePf: pframes.exportFrame(bubblePf),
 			stackedPf: pframes.exportFrame(stackedPf),
-			linePf: pframes.exportFrame(linePf),
-			clonotypeMapPf: pframes.exportFrame(clonotypeMapPf)
+			linePf: pframes.exportFrame(linePf)//,
+			// clonotypeMapPf: pframes.exportFrame(clonotypeMapPf)
 		},
 		exports: exports
 	}

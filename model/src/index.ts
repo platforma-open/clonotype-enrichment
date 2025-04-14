@@ -149,14 +149,16 @@ export const model = BlockModel.create()
       return undefined;
     }
 
-    const labelPCol = ctx.outputs?.resolve('clonotypeMapPf')?.getPColumns();
-    if (labelPCol === undefined) {
-      return undefined;
-    }
+    // const labelPCol = ctx.outputs?.resolve('clonotypeMapPf')?.getPColumns();
+    // if (labelPCol === undefined) {
+    //   return undefined;
+    // }
 
-    const pColsWithLabel = [...pCols, ...labelPCol];
+    // const pColsWithLabel = [...pCols, ...labelPCol];
 
-    return ctx.createPFrame(pColsWithLabel);
+    // return ctx.createPFrame(pColsWithLabel);
+
+    return createPFrameForGraphs(ctx, pCols);
   })
 
   // Returns a list pof Pcols for plot defaults
