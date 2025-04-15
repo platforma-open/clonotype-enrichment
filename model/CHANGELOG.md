@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.model
 
+## 2.2.0
+
+### Minor Changes
+
+- 919ae72: Updated clonotype labels
+
 ## 2.1.3
 
 ### Patch Changes
