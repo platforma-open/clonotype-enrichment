@@ -17,21 +17,14 @@ const defaultOptions = computed((): GraphMakerProps['defaultOptions'] => {
     return pcols.findIndex((p) => p.spec.name === name);
   }
   const defaults: PredefinedGraphOption<'bubble'>[] = [
-    // first axis as x label (not possible yet)
-    // {
-    //   inputName: 'x',
-    //   selectedSource: bubblePcols[getIndex('pl7.app/vdj/temporarylabel',
-    //     bubblePcols)].spec,
-    // },
-    // second axis as x label (clonotype key)
     {
       inputName: 'x',
-      selectedSource: bubblePcols[getIndex('pl7.app/vdj/temporarylabel',
+      selectedSource: bubblePcols[getIndex('pl7.app/vdj/enrichment',
         bubblePcols)].spec.axesSpec[0],
     },
     {
       inputName: 'y',
-      selectedSource: bubblePcols[getIndex('pl7.app/vdj/temporarylabel',
+      selectedSource: bubblePcols[getIndex('pl7.app/vdj/enrichment',
         bubblePcols)].spec.axesSpec[1],
     },
     {
@@ -46,15 +39,9 @@ const defaultOptions = computed((): GraphMakerProps['defaultOptions'] => {
     },
     {
       inputName: 'tooltipContent',
-      selectedSource: bubblePcols[getIndex('pl7.app/vdj/temporarylabel',
-        bubblePcols)].spec,
+      selectedSource: bubblePcols[getIndex('pl7.app/vdj/enrichment',
+        bubblePcols)].spec.axesSpec[0],
     },
-    // Tab by axis containing groups
-    // {
-    //   inputName: 'tabBy',
-    //   selectedSource: bubblePcols[getIndex('pl7.app/vdj/frequency',
-    //     bubblePcols)].spec.axesSpec[0],
-    // },
   ];
   return defaults;
 });

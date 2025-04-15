@@ -18,19 +18,8 @@ const defaultOptions: PredefinedGraphOption<'discrete'>[] = [
   {
     inputName: 'secondaryGrouping',
     selectedSource: {
-      kind: 'PColumn',
-      name: 'pl7.app/vdj/temporarylabel',
-      valueType: 'String',
-      axesSpec: [
-        {
-          name: 'pl7.app/vdj/round',
-          type: 'String',
-        },
-        {
-          name: 'pl7.app/vdj/clonotypeKey',
-          type: 'String',
-        },
-      ],
+      name: 'pl7.app/vdj/clonotypeKey',
+      type: 'String',
     },
   },
   {

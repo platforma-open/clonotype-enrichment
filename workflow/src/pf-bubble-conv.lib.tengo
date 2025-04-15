@@ -22,19 +22,19 @@ getColumns := func(countsSpec) {
       }
       ],
     "columns": [
-      {
-        "column": "Label",
-        "id": "label",
-        "allowNA": false,
-        "spec": {
-          "name": "pl7.app/vdj/temporarylabel",
-          "valueType": "String",
-          "domain": {},
-          "annotations": {
-            "pl7.app/label": "Clonotype label"
-          }
-        }
-      },
+      // {
+      //   "column": "Label",
+      //   "id": "label",
+      //   "allowNA": false,
+      //   "spec": {
+      //     "name": "pl7.app/vdj/temporarylabel",
+      //     "valueType": "String",
+      //     "domain": {},
+      //     "annotations": {
+      //       "pl7.app/label": "Clonotype label"
+      //     }
+      //   }
+      // },
       {
         "column": "Frequency",
         "id": "frequency",

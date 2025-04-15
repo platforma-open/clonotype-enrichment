@@ -4,7 +4,6 @@ import { BlockModel, createPFrameForGraphs, createPlDataTable, isPColumnSpec } f
 
 export type UiState = {
   tableState: PlDataTableState;
-  volcanoState: GraphMakerState;
   bubbleState: GraphMakerState;
   lineState: GraphMakerState;
   stackedState: GraphMakerState;
@@ -33,13 +32,14 @@ export const model = BlockModel.create()
         filters: [],
       },
     },
-    volcanoState: {
-      title: 'Clonotype enrichment',
-      template: 'dots',
-    },
     bubbleState: {
       title: 'Clonotype enrichment',
       template: 'bubble',
+      layersSettings: {
+        bubble: {
+          normalizationDirection: null,
+        },
+      },
     },
     lineState: {
       title: 'Clonotype enrichment',
@@ -183,7 +183,7 @@ export const model = BlockModel.create()
       return undefined;
     }
 
-    return ctx.createPFrame(pCols);
+    return createPFrameForGraphs(ctx, pCols);
   })
 
   .output('linePf', (ctx): PFrameHandle | undefined => {
@@ -192,7 +192,7 @@ export const model = BlockModel.create()
       return undefined;
     }
 
-    return ctx.createPFrame(pCols);
+    return createPFrameForGraphs(ctx, pCols);
   })
 
   .sections((_ctx) => ([
