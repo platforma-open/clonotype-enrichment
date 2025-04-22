@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.workflow
 
+## 2.4.0
+
+### Minor Changes
+
+- 75a9217: Clean code
+
 ## 2.3.0
 
 ### Minor Changes
