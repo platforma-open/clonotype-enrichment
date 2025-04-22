@@ -24,20 +24,8 @@ wf.body(func(args) {
 
 	allCounts := args.resolvedInput
 	countsSpec := allCounts.spec
-
-	// Check for retro compatibility
-	// @TODO: Remove when old versions of MiXCR are no longer used
-	if countsSpec.axesSpec[1].domain["pl7.app/vdj/clonotypingRunId"] == undefined {
-		countsSpec.axesSpec[1].domain["pl7.app/vdj/clonotypingRunId"] = countsSpec.domain["pl7.app/vdj/clonotypingRunId"]
-	}
-	// Only bulk data has chain info
-	if countsSpec.domain["pl7.app/vdj/chain"] != undefined {
-		countsSpec.axesSpec[1].domain["pl7.app/vdj/chain"] = countsSpec.domain["pl7.app/vdj/chain"]
-	}
-	
 	roundColumn := args.resolvedRoundColumn
 	roundOrder := args.roundOrder
-
 	enrichmentThreshold := args.enrichmentThreshold
 	
 	// convert PColumns to csv
