@@ -6,6 +6,7 @@ xsv := import("@platforma-sdk/workflow-tengo:pframes.xsv")
 pframes := import("@platforma-sdk/workflow-tengo:pframes")
 
 pfEnrichmentConv := import(":pf-enrichment-conv")
+pfEnrichmentConv2 := import(":pf-enrichment-conv-2")
 pfBubbleConv := import(":pf-bubble-conv")
 pfStackedConv := import(":pf-stacked-conv")
 pfClonotypeMapConv := import(":pf-clonotype-map-conv")
@@ -79,16 +80,49 @@ wf.body(func(args) {
 	// clonotypeMapImportParams := pfClonotypeMapConv.getColumns(countsSpec)
 	// clonotypeMapPf := xsv.importFile(calculateEnrichment.getFile("clonotype_map.csv"), "csv", clonotypeMapImportParams)
 
-	exports := {
-		enrichment: {
+	// Prepare enrichment and frequency exports for clonotype-browser
+	
+
+	exports := {}
+	enrichCsv := calculateEnrichment.getFile("enrichment_results.csv")
+	for condition in roundOrder {
+
+		filterer := exec.builder().
+		software(assets.importSoftware("@platforma-open/milaboratories.clonotype-enrichment.software:filter-data")).
+		addFile("enrichment_results.csv", enrichCsv).
+		arg("--enrichment_file").arg("enrichment_results.csv").
+		arg("--condition").arg(string(condition)).
+		saveFile("filtered.csv").
+		cache(24 * 60 * 60 * 1000).
+		run()
+		
+		// filterer := exec.builder().cmd("awk -F, 'NR==1{print;next;} $3==" + condition + "' top_enriched.csv > filtered.csv").
+		// 	addFile("top_enriched.csv", calculateEnrichment.getFile("top_enriched.csv")).
+		// 	saveFile("filtered.csv").run()
+		// file := filterer.getFile("filtered.csv")
+
+		EnrichmentImportParams2 := pfEnrichmentConv2.getColumns(countsSpec, string(condition))
+		secondExport := xsv.importFile(filterer.getFile("filtered.csv"), "csv", EnrichmentImportParams2)
+
+		exports["Enrichment - " + condition] = {
+			spec: secondExport["enrichment.spec"],
+			data: secondExport["enrichment.data"]
+	 	}
+		exports["Frequency - " + condition] = {
+			spec: secondExport["frequency.spec"],
+			data: secondExport["frequency.data"]
+	 	}
+	}
+
+	exports["enrichment"] = {
 			spec: enrichmentPf["enrichment.spec"],
 			data: enrichmentPf["enrichment.data"]
-	 	},
-		frequency: {
+	 	}
+	exports["frequency"] = {
 			spec: enrichmentPf["frequency.spec"],
 			data: enrichmentPf["frequency.data"]
 	 	}
-	}
+
 
 	return {
 		outputs: {

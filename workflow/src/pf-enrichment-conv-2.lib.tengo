@@ -1,0 +1,54 @@
+ll := import("@platforma-sdk/workflow-tengo:ll")
+
+getColumns := func(countsSpec, condition) {
+  return {
+    "axes": [
+      {
+        "column": "Clonotype",
+        "spec": countsSpec.axesSpec[1]
+      }
+      ],
+    "columns": [
+      {
+        "column": "Frequency",
+        "id": "frequency",
+        "allowNA": false,
+        "spec": {
+          "name": "pl7.app/vdj/frequency",
+          "valueType": "Double",
+          "domain": {},
+          "annotations": {
+            "pl7.app/label": "Frequency",
+            "pl7.app/vdj/condition": condition,
+            "pl7.app/vdj/isScore": "true",
+            "pl7.app/table/orderPriority": "9000",
+            "pl7.app/table/visibility": "default"
+          }
+        }
+      },
+      {
+        "column": "Enrichment",
+        "id": "enrichment",
+        "allowNA": true,
+        "spec": {
+          "name": "pl7.app/vdj/enrichment",
+          "valueType": "Double",
+          "domain": {},
+          "annotations": {
+            "pl7.app/label": "Enrichment",
+            "pl7.app/vdj/condition": condition,
+            "pl7.app/vdj/isScore": "true",
+            "pl7.app/table/orderPriority": "8000",
+            "pl7.app/table/visibility": "default"
+          }
+        }
+      }
+      ],
+    "storageFormat": "Binary",
+    "partitionKeyLength": 0
+  }
+}
+
+export ll.toStrict({
+	getColumns: getColumns
+})
