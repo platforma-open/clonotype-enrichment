@@ -16,10 +16,9 @@ getColumns := func(countsSpec, condition) {
         "spec": {
           "name": "pl7.app/vdj/frequency",
           "valueType": "Double",
-          "domain": {},
+          "domain": {"pl7.app/vdj/condition": condition},
           "annotations": {
-            "pl7.app/label": "Frequency",
-            "pl7.app/vdj/condition": condition,
+            "pl7.app/label": "Frequency - " + condition,
             "pl7.app/vdj/isScore": "true",
             "pl7.app/table/orderPriority": "9000",
             "pl7.app/table/visibility": "default"
@@ -33,10 +32,9 @@ getColumns := func(countsSpec, condition) {
         "spec": {
           "name": "pl7.app/vdj/enrichment",
           "valueType": "Double",
-          "domain": {},
+          "domain": {"pl7.app/vdj/condition": condition},
           "annotations": {
-            "pl7.app/label": "Enrichment",
-            "pl7.app/vdj/condition": condition,
+            "pl7.app/label": "Enrichment - " + condition,
             "pl7.app/vdj/isScore": "true",
             "pl7.app/table/orderPriority": "8000",
             "pl7.app/table/visibility": "default"
