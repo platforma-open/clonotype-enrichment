@@ -13,9 +13,10 @@ import {
   PlNumberField,
   PlSlideModal,
   PlTableFilters,
+  PlAccordionSection,
 } from '@platforma-sdk/ui-vue';
 import { useApp } from '../app';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import type { PTableColumnSpec } from '@platforma-sdk/model';
 
 const app = useApp();
@@ -85,8 +86,8 @@ const columns = ref<PTableColumnSpec[]>([]);
         v-model="app.model.args.countsRef" :options="app.model.outputs.countsOptions"
         label="Select dataset"
       />
-      <PlDropdown v-model="app.model.args.roundColumn" :options="roundColumnOptions" label="Round column" />
-      <PlDropdownMulti v-model="app.model.args.roundOrder" :options="roundOptions" label="Round order" >
+      <PlDropdown v-model="app.model.args.roundColumn" :options="roundColumnOptions" label="Condition column" />
+      <PlDropdownMulti v-model="app.model.args.roundOrder" :options="roundOptions" label="Condition order" >
         <template #tooltip>
           Order aware selection. Calculate a contrast between first element (denominator) and each of the other selected options (numerators).
         </template>
@@ -99,6 +100,14 @@ const columns = ref<PTableColumnSpec[]>([]);
           Select enrichment threshold to consider a clonotype enriched.
         </template>
       </PlNumberField>
+      <!-- Content hidden until you click -->
+      <PlAccordionSection label="ADVANCED SETTINGS">
+        <PlDropdown v-model="app.model.args.roundExport" :options="roundOptions" label="Stored condition column" >
+          <template #tooltip>
+            Select the round for exporting clonotype enrichment or frequency values. The last round is selected by default.
+          </template>
+        </PlDropdown>
+      </PlAccordionSection>
     </PlSlideModal>
   </PlBlockPage>
 </template>

@@ -32,7 +32,8 @@ getColumns := func(countsSpec) {
           "domain": {},
           "annotations": {
             "pl7.app/label": "Frequency",
-            "pl7.app/vdj/isScore": "true",
+            // add isScore only in exports to ease plots
+            // "pl7.app/vdj/isScore": "true",
             "pl7.app/table/orderPriority": "9000",
             "pl7.app/table/visibility": "default"
           }
@@ -48,7 +49,8 @@ getColumns := func(countsSpec) {
           "domain": {},
           "annotations": {
             "pl7.app/label": "Enrichment",
-            "pl7.app/vdj/isScore": "true",
+            // add isScore only in exports to ease plots
+            // "pl7.app/vdj/isScore": "true",
             "pl7.app/table/orderPriority": "8000",
             "pl7.app/table/visibility": "default"
           }
