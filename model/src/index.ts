@@ -1,6 +1,6 @@
 import type { GraphMakerState } from '@milaboratories/graph-maker';
 import type { InferOutputsType, PColumnIdAndSpec, PFrameHandle, PlDataTableState, PlRef, PlTableFiltersModel } from '@platforma-sdk/model';
-import { BlockModel, createPFrameForGraphs, createPlDataTable, isPColumnSpec } from '@platforma-sdk/model';
+import { BlockModel, createPFrameForGraphs, createPlDataTable, isPColumnSpec, PColumnCollection } from '@platforma-sdk/model';
 
 export type UiState = {
   tableState: PlDataTableState;
@@ -40,14 +40,17 @@ export const model = BlockModel.create()
           normalizationDirection: null,
         },
       },
+      currentTab: null,
     },
     lineState: {
       title: 'Clonotype enrichment',
       template: 'line',
+      currentTab: null,
     },
     stackedState: {
       title: 'Top clonotype frequencies',
       template: 'stackedBar',
+      currentTab: null,
     },
     filterModel: {},
   })
@@ -107,11 +110,21 @@ export const model = BlockModel.create()
   // Returns a map of results for main table
   .output('pt', (ctx) => {
     const pCols = ctx.outputs?.resolve('enrichmentPf')?.getPColumns();
+
     if (pCols === undefined) {
       return undefined;
     }
 
-    return createPlDataTable(ctx, pCols, ctx.uiState.tableState, {
+    const splitByCondition = new PColumnCollection()
+      .addAxisLabelProvider(ctx.resultPool)
+      .addColumns(pCols)
+      .getColumns({ axes: [{ split: true }, { }] });
+
+    if (splitByCondition === undefined) {
+      return undefined;
+    }
+
+    return createPlDataTable(ctx, splitByCondition, ctx.uiState.tableState, {
       filters: ctx.uiState.filterModel?.filters,
     });
   })
