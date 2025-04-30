@@ -32,7 +32,7 @@ wf.body(func(args) {
 	enrichmentThreshold := args.enrichmentThreshold
 	condition := args.roundExport
 	if condition == undefined {
-		condition = roundOrder[roundOrder.length - 1]
+		condition = roundOrder[len(roundOrder) - 1]
 	}
 	
 	// convert PColumns to csv

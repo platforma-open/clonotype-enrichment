@@ -3,6 +3,7 @@ import type { InferOutputsType, PColumnIdAndSpec, PColumnSpec, PFrameHandle, PlD
 import { BlockModel, createPFrameForGraphs, createPlDataTable, isPColumnSpec, PColumnCollection } from '@platforma-sdk/model';
 
 export type UiState = {
+  title?: string;
   tableState: PlDataTableState;
   bubbleState: GraphMakerState;
   lineState: GraphMakerState;
@@ -30,6 +31,7 @@ export const model = BlockModel.create()
   })
 
   .withUiState<UiState>({
+    title: 'Clonotype enrichment',
     tableState: {
       gridState: {},
       pTableParams: {
@@ -184,6 +186,8 @@ export const model = BlockModel.create()
 
     return createPFrameForGraphs(ctx, pCols);
   })
+
+  .output('isRunning', (ctx) => ctx.outputs?.getIsReadyOrError() === false)
 
   .sections((_ctx) => ([
     { type: 'link', href: '/', label: 'Main' },
