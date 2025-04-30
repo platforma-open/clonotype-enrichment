@@ -72,9 +72,6 @@ wf.body(func(args) {
 	EnrichmentImportParams := pfEnrichmentConv.getColumns(countsSpec)
 	enrichmentPf := xsv.importFile(enrichCsv, "csv", EnrichmentImportParams)
 
-	// volcano and enrichment have same columns
-	volcanoPf := xsv.importFile(calculateEnrichment.getFile("volcano_data.csv"), "csv", EnrichmentImportParams)
-
 	bubbleImportParams := pfBubbleConv.getColumns(countsSpec)
 	bubblePf := xsv.importFile(calculateEnrichment.getFile("bubble_data.csv"), "csv", bubbleImportParams)
 
@@ -128,7 +125,6 @@ wf.body(func(args) {
 	return {
 		outputs: {
 			enrichmentPf: pframes.exportFrame(enrichmentPf),
-			volcanoPf: pframes.exportFrame(volcanoPf),
 			bubblePf: pframes.exportFrame(bubblePf),
 			stackedPf: pframes.exportFrame(stackedPf),
 			linePf: pframes.exportFrame(linePf)//,

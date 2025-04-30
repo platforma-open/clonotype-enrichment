@@ -16,7 +16,7 @@ import {
   PlAccordionSection,
 } from '@platforma-sdk/ui-vue';
 import { useApp } from '../app';
-import { computed, ref, watch } from 'vue';
+import { computed, ref } from 'vue';
 import type { PTableColumnSpec } from '@platforma-sdk/model';
 
 const app = useApp();

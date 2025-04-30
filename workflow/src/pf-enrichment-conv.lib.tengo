@@ -1,12 +1,9 @@
 ll := import("@platforma-sdk/workflow-tengo:ll")
+maps := import("@platforma-sdk/workflow-tengo:maps")
 
 getColumns := func(countsSpec) {
   return {
     "axes": [
-      {
-        "column": "Clonotype",
-        "spec": countsSpec.axesSpec[1]
-      },
       {
         "column": "Condition",
         "id": "condition",
@@ -19,8 +16,16 @@ getColumns := func(countsSpec) {
             "pl7.app/label": "Condition"
           }
         }
+      },
+      {
+        "column": "Clonotype",
+        "spec": maps.deepMerge(countsSpec.axesSpec[1], {
+          "annotations": {
+            "pl7.app/table/visibility": "default"
+          }
+        })
       }
-      ],
+    ],
     "columns": [
       {
         "column": "Frequency",
@@ -58,7 +63,7 @@ getColumns := func(countsSpec) {
       }
       ],
     "storageFormat": "Binary",
-    "partitionKeyLength": 0
+    "partitionKeyLength": 1
   }
 }
 
