@@ -54,6 +54,9 @@ wf.body(func(args) {
 		arg("--clonotype_map").arg("clonotype_map.csv").
 		arg("--top_20").arg("top_20.csv").
 		arg("--min_enrichment").arg(string(enrichmentThreshold)).
+		arg("--count_column").arg(string(countsSpec.annotations["pl7.app/label"])).
+		arg("--clonotype_column").arg(string(countsSpec.axesSpec[1].annotations["pl7.app/label"])).
+		arg("--sample_column").arg(string(countsSpec.axesSpec[0].annotations["pl7.app/label"])).
 		// arg("--top_n_volcano").arg("1000").
 		// arg("--top_n_bubble").arg("20").
 		// arg("--top_n_enriched").arg("5").

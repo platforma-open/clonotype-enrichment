@@ -19,17 +19,18 @@ def hybrid_enrichment_analysis(
     top_n_volcano=1000,
     top_n_bubble=20,
     top_n_enriched=5,
-    min_enrichment=3
+    min_enrichment=3,
+    count_column="Number of UMIs",
+    clonotype_column="Clonotype key",
+    sample_column="Sample"
 ):
     counts_df = pd.read_csv(counts_csv)
     metadata_df = pd.read_csv(sample_metadata_csv)
 
-    counts_df = counts_df.rename(columns={"Clonotype key": "Clonotype", 
-                                          "SC Clonotype key": "Clonotype",
-                                          "Clone label": "Clonotype",
-                                          "Number Of Reads": "Count",
-                                          "Number of UMIs": "Count",
-                                          "Number of Cells": "Count"})
+    counts_df = counts_df.rename(columns={count_column: "Count",
+                                          clonotype_column: "Clonotype", 
+                                          sample_column: "Sample"
+                                          })
     if condition_column not in metadata_df.columns:
         raise ValueError(f"'{condition_column}' not found in metadata CSV columns.")
     metadata_df = metadata_df.rename(columns={condition_column: "Condition"})
@@ -215,6 +216,9 @@ if __name__ == "__main__":
     parser.add_argument("--top_n_bubble", type=int, default=20)
     parser.add_argument("--top_n_enriched", type=int, default=5)
     parser.add_argument("--min_enrichment", type=float, default=3)
+    parser.add_argument("--count_column", type=str, default="Number of UMIs")
+    parser.add_argument("--clonotype_column", type=str, default="Clonotype key")
+    parser.add_argument("--sample_column", type=str, default="Sample")
 
     args = parser.parse_args()
 
@@ -235,5 +239,8 @@ if __name__ == "__main__":
         top_n_volcano=args.top_n_volcano,
         top_n_bubble=args.top_n_bubble,
         top_n_enriched=args.top_n_enriched,
-        min_enrichment=args.min_enrichment
+        min_enrichment=args.min_enrichment,
+        count_column=args.count_column,
+        clonotype_column=args.clonotype_column,
+        sample_column=args.sample_column
     )
