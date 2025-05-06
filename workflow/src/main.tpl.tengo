@@ -8,7 +8,7 @@ ptransformSw := assets.importSoftware("@platforma-open/milaboratories.software-p
 json := import("json")
 
 pfEnrichmentConv := import(":pf-enrichment-conv")
-pfEnrichmentConv2 := import(":pf-enrichment-conv-2")
+pfEnrichmentConv2 := import(":pf-enrichment-conv-export")
 pfBubbleConv := import(":pf-bubble-conv")
 pfStackedConv := import(":pf-stacked-conv")
 pfClonotypeMapConv := import(":pf-clonotype-map-conv")
@@ -33,6 +33,14 @@ wf.body(func(args) {
 	condition := args.roundExport
 	if condition == undefined {
 		condition = roundOrder[len(roundOrder) - 1]
+	}
+
+	// Check if inputs are individual clonotypes or clusters
+	inputType := "Unknown"
+	if countsSpec.axesSpec[1].name == "pl7.app/vdj/clusterId" {
+		inputType = "Cluster"
+	} else if countsSpec.axesSpec[1].name == "pl7.app/vdj/clonotypeKey" {
+		inputType = "Clonotype"
 	}
 	
 	// convert PColumns to csv
@@ -113,7 +121,7 @@ wf.body(func(args) {
 		arg("output.tsv").saveFile("output.tsv").
 		run()
 
-	EnrichmentImportParams2 := pfEnrichmentConv2.getColumns(countsSpec, string(condition))
+	EnrichmentImportParams2 := pfEnrichmentConv2.getColumns(countsSpec, string(condition), inputType)
 	secondExport := xsv.importFile(filterCmd.getFile("output.tsv"), "tsv", EnrichmentImportParams2)
 
 	exports["Enrichment - " + condition] = {
