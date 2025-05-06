@@ -14,7 +14,9 @@ const defaultOptions = computed((): GraphMakerProps['defaultOptions'] => {
 
   const bubblePcols = app.model.outputs.bubblePcols;
   function getIndex(name: string, pcols: PColumnIdAndSpec[]): number {
-    return pcols.findIndex((p) => p.spec.name === name);
+    return pcols.findIndex((p) => (p.spec.name === name
+      && p.spec.annotations?.['pl7.app/vdj/isScore'] === undefined
+    ));
   }
   const defaults: PredefinedGraphOption<'bubble'>[] = [
     {

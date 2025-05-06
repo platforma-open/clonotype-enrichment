@@ -1,8 +1,9 @@
 import type { GraphMakerState } from '@milaboratories/graph-maker';
-import type { InferOutputsType, PColumnIdAndSpec, PFrameHandle, PlDataTableState, PlRef, PlTableFiltersModel } from '@platforma-sdk/model';
-import { BlockModel, createPFrameForGraphs, createPlDataTable, isPColumnSpec } from '@platforma-sdk/model';
+import type { InferOutputsType, PColumnIdAndSpec, PColumnSpec, PFrameHandle, PlDataTableState, PlRef, PlTableFiltersModel } from '@platforma-sdk/model';
+import { BlockModel, createPFrameForGraphs, createPlDataTable, isPColumnSpec, PColumnCollection } from '@platforma-sdk/model';
 
 export type UiState = {
+  title?: string;
   tableState: PlDataTableState;
   bubbleState: GraphMakerState;
   lineState: GraphMakerState;
@@ -15,7 +16,12 @@ export type BlockArgs = {
   roundColumn?: PlRef;
   roundOrder: string[];
   enrichmentThreshold: number;
+  roundExport?: string;
 };
+
+function isNumericType(c: PColumnSpec): boolean {
+  return c.valueType === 'Double' || c.valueType === 'Int' || c.valueType === 'Float' || c.valueType === 'Long';
+}
 
 export const model = BlockModel.create()
 
@@ -25,6 +31,7 @@ export const model = BlockModel.create()
   })
 
   .withUiState<UiState>({
+    title: 'Clonotype enrichment',
     tableState: {
       gridState: {},
       pTableParams: {
@@ -40,46 +47,47 @@ export const model = BlockModel.create()
           normalizationDirection: null,
         },
       },
+      currentTab: null,
     },
     lineState: {
       title: 'Clonotype enrichment',
       template: 'line',
+      currentTab: null,
     },
     stackedState: {
       title: 'Top clonotype frequencies',
       template: 'stackedBar',
+      currentTab: null,
     },
     filterModel: {},
   })
 
-  // User can only select as input UMI count matrices or read count matrices
+  // User can only select as input UMI/cell count matrices or read count matrices
   // for cases where we don't have UMI counts
   // includeNativeLabel and addLabelAsSuffix makes visible the data source dataset
   // Result: [dataID] / input
   .output('countsOptions', (ctx) => {
-    // First get all UMI count dataset and their block IDs
-    const validUmiOptions = ctx.resultPool.getOptions((spec) => isPColumnSpec(spec)
-      && (spec.name === 'pl7.app/vdj/uniqueMoleculeCount')
-      && (spec.annotations?.['pl7.app/abundance/normalized'] === 'false')
-    , { includeNativeLabel: true, addLabelAsSuffix: true });
-    const umiBlockIds: string[] = validUmiOptions.map((item) => item.ref.blockId);
+    // First get all molecule/cell count datasets and their block IDs
+    const mainOptions = ctx.resultPool.getOptions((c) =>
+      isPColumnSpec(c) && isNumericType(c)
+      && c.annotations?.['pl7.app/isAbundance'] === 'true'
+      && c.annotations?.['pl7.app/abundance/normalized'] === 'false'
+      && ['molecules', 'cells'].includes(c.annotations?.['pl7.app/abundance/unit']),
+    { includeNativeLabel: true, addLabelAsSuffix: true });
+    const umiBlockIds: string[] = mainOptions.map((item) => item.ref.blockId);
 
-    // Then get all read count datasets that don't match blockIDs from UMI counts
-    let validCountOptions = ctx.resultPool.getOptions((spec) => isPColumnSpec(spec)
-      && (spec.name === 'pl7.app/vdj/readCount')
-      && (spec.annotations?.['pl7.app/abundance/normalized'] === 'false')
-    , { includeNativeLabel: true, addLabelAsSuffix: true });
-    validCountOptions = validCountOptions.filter((item) =>
+    // Then get all read count datasets that don't match blockIDs from molecule/cell counts
+    let extraOptions = ctx.resultPool.getOptions((c) =>
+      isPColumnSpec(c) && isNumericType(c)
+      && c.annotations?.['pl7.app/isAbundance'] === 'true'
+      && c.annotations?.['pl7.app/abundance/normalized'] === 'false'
+      && c.annotations?.['pl7.app/abundance/unit'] === 'reads',
+    { includeNativeLabel: true, addLabelAsSuffix: true });
+    extraOptions = extraOptions.filter((item) =>
       !umiBlockIds.includes(item.ref.blockId));
 
-    // Add single cell da
-    const validScOptions = ctx.resultPool.getOptions((spec) => isPColumnSpec(spec)
-      && (spec.name === 'pl7.app/vdj/uniqueCellCount')
-      && (spec.annotations?.['pl7.app/abundance/normalized'] === 'false')
-    , { includeNativeLabel: true, addLabelAsSuffix: true });
-
     // Combine all valid options
-    const validOptions = [...validUmiOptions, ...validCountOptions, ...validScOptions];
+    const validOptions = [...mainOptions, ...extraOptions];
     return validOptions;
   })
 
@@ -107,39 +115,23 @@ export const model = BlockModel.create()
   // Returns a map of results for main table
   .output('pt', (ctx) => {
     const pCols = ctx.outputs?.resolve('enrichmentPf')?.getPColumns();
+
     if (pCols === undefined) {
       return undefined;
     }
 
-    return createPlDataTable(ctx, pCols, ctx.uiState.tableState, {
+    const splitByCondition = new PColumnCollection()
+      .addAxisLabelProvider(ctx.resultPool)
+      .addColumns(pCols)
+      .getColumns({ axes: [{ split: true }, { }] });
+
+    if (splitByCondition === undefined) {
+      return undefined;
+    }
+
+    return createPlDataTable(ctx, splitByCondition, ctx.uiState.tableState, {
       filters: ctx.uiState.filterModel?.filters,
     });
-  })
-
-  // Returns a map of results for volcano plot
-  .output('volcanoPf', (ctx): PFrameHandle | undefined => {
-    const pCols = ctx.outputs?.resolve('volcanoPf')?.getPColumns();
-    if (pCols === undefined) {
-      return undefined;
-    }
-
-    return createPFrameForGraphs(ctx, pCols);
-  })
-
-  // Returns a list pof Pcols for volcano plot defaults
-  .output('volcanoPcols', (ctx) => {
-    const pCols = ctx.outputs?.resolve('volcanoPf')?.getPColumns();
-    if (pCols === undefined) {
-      return undefined;
-    }
-
-    return pCols.map(
-      (c) =>
-        ({
-          columnId: c.id,
-          spec: c.spec,
-        } satisfies PColumnIdAndSpec),
-    );
   })
 
   // Returns a map of results for plot
@@ -194,6 +186,8 @@ export const model = BlockModel.create()
 
     return createPFrameForGraphs(ctx, pCols);
   })
+
+  .output('isRunning', (ctx) => ctx.outputs?.getIsReadyOrError() === false)
 
   .sections((_ctx) => ([
     { type: 'link', href: '/', label: 'Main' },

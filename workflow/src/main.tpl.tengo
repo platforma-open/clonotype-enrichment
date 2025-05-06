@@ -4,8 +4,11 @@ exec := import("@platforma-sdk/workflow-tengo:exec")
 assets:= import("@platforma-sdk/workflow-tengo:assets")
 xsv := import("@platforma-sdk/workflow-tengo:pframes.xsv")
 pframes := import("@platforma-sdk/workflow-tengo:pframes")
+ptransformSw := assets.importSoftware("@platforma-open/milaboratories.software-ptransform:main")
+json := import("json")
 
 pfEnrichmentConv := import(":pf-enrichment-conv")
+pfEnrichmentConv2 := import(":pf-enrichment-conv-export")
 pfBubbleConv := import(":pf-bubble-conv")
 pfStackedConv := import(":pf-stacked-conv")
 pfClonotypeMapConv := import(":pf-clonotype-map-conv")
@@ -27,6 +30,18 @@ wf.body(func(args) {
 	roundColumn := args.resolvedRoundColumn
 	roundOrder := args.roundOrder
 	enrichmentThreshold := args.enrichmentThreshold
+	condition := args.roundExport
+	if condition == undefined {
+		condition = roundOrder[len(roundOrder) - 1]
+	}
+
+	// Check if inputs are individual clonotypes or clusters
+	inputType := "Unknown"
+	if countsSpec.axesSpec[1].name == "pl7.app/vdj/clusterId" {
+		inputType = "Cluster"
+	} else if countsSpec.axesSpec[1].name == "pl7.app/vdj/clonotypeKey" {
+		inputType = "Clonotype"
+	}
 	
 	// convert PColumns to csv
 	csvCounts := xsv.exportFrame([allCounts], "csv", {})
@@ -47,6 +62,9 @@ wf.body(func(args) {
 		arg("--clonotype_map").arg("clonotype_map.csv").
 		arg("--top_20").arg("top_20.csv").
 		arg("--min_enrichment").arg(string(enrichmentThreshold)).
+		arg("--count_column").arg(string(countsSpec.annotations["pl7.app/label"])).
+		arg("--clonotype_column").arg(string(countsSpec.axesSpec[1].annotations["pl7.app/label"])).
+		arg("--sample_column").arg(string(countsSpec.axesSpec[0].annotations["pl7.app/label"])).
 		// arg("--top_n_volcano").arg("1000").
 		// arg("--top_n_bubble").arg("20").
 		// arg("--top_n_enriched").arg("5").
@@ -61,11 +79,9 @@ wf.body(func(args) {
 		cache(24 * 60 * 60 * 1000).
 		run()
 
+	enrichCsv := calculateEnrichment.getFile("enrichment_results.csv")
 	EnrichmentImportParams := pfEnrichmentConv.getColumns(countsSpec)
-	enrichmentPf := xsv.importFile(calculateEnrichment.getFile("enrichment_results.csv"), "csv", EnrichmentImportParams)
-
-	// volcano and enrichment have same columns
-	volcanoPf := xsv.importFile(calculateEnrichment.getFile("volcano_data.csv"), "csv", EnrichmentImportParams)
+	enrichmentPf := xsv.importFile(enrichCsv, "csv", EnrichmentImportParams)
 
 	bubbleImportParams := pfBubbleConv.getColumns(countsSpec)
 	bubblePf := xsv.importFile(calculateEnrichment.getFile("bubble_data.csv"), "csv", bubbleImportParams)
@@ -79,21 +95,47 @@ wf.body(func(args) {
 	// clonotypeMapImportParams := pfClonotypeMapConv.getColumns(countsSpec)
 	// clonotypeMapPf := xsv.importFile(calculateEnrichment.getFile("clonotype_map.csv"), "csv", clonotypeMapImportParams)
 
-	exports := {
-		enrichment: {
-			spec: enrichmentPf["enrichment.spec"],
-			data: enrichmentPf["enrichment.data"]
-	 	},
-		frequency: {
-			spec: enrichmentPf["frequency.spec"],
-			data: enrichmentPf["frequency.data"]
-	 	}
+	exports := {}
+
+	// Prepare selected enrichment and frequency export for clonotype-browser
+	enrichTsv := xsv.exportFrame(enrichmentPf, "tsv", {})
+	filterWorkflow := { steps: [
+		{
+			type: "filter",
+			predicate: {
+				type: "eq",
+				value: condition,
+				column: "Condition"
+				}
+			}
+		]
+	}
+
+	// ptransform only accepts tsv as input
+	filterCmd := exec.builder().
+		printErrStreamToStdout().
+		software(ptransformSw).
+		arg("--workflow").arg("wf.json").
+		writeFile("wf.json", json.encode(filterWorkflow)).
+		arg("input.tsv").addFile("input.tsv", enrichTsv).
+		arg("output.tsv").saveFile("output.tsv").
+		run()
+
+	EnrichmentImportParams2 := pfEnrichmentConv2.getColumns(countsSpec, string(condition), inputType)
+	secondExport := xsv.importFile(filterCmd.getFile("output.tsv"), "tsv", EnrichmentImportParams2)
+
+	exports["Enrichment - " + condition] = {
+		spec: secondExport["enrichment.spec"],
+		data: secondExport["enrichment.data"]
+	}
+	exports["Frequency - " + condition] = {
+		spec: secondExport["frequency.spec"],
+		data: secondExport["frequency.data"]
 	}
 
 	return {
 		outputs: {
 			enrichmentPf: pframes.exportFrame(enrichmentPf),
-			volcanoPf: pframes.exportFrame(volcanoPf),
 			bubblePf: pframes.exportFrame(bubblePf),
 			stackedPf: pframes.exportFrame(stackedPf),
 			linePf: pframes.exportFrame(linePf)//,

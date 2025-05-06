@@ -1,0 +1,55 @@
+ll := import("@platforma-sdk/workflow-tengo:ll")
+
+getColumns := func(countsSpec, condition, inputType) {
+  return {
+    "axes": [
+      {
+        "column": countsSpec.axesSpec[1].annotations["pl7.app/label"],
+        // "column": "Clonotype or cluster",
+        "spec": countsSpec.axesSpec[1]
+      }
+      ],
+    "columns": [
+      {
+        "column": "Frequency",
+        "id": "frequency",
+        "allowNA": false,
+        "spec": {
+          "name": "pl7.app/vdj/frequency",
+          "valueType": "Double",
+          "domain": {"pl7.app/vdj/condition": condition,
+                    "pl7.app/vdj/source": inputType},
+          "annotations": {
+            "pl7.app/label": inputType + " Frequency - " + condition,
+            "pl7.app/vdj/isScore": "true",
+            "pl7.app/table/orderPriority": "9000",
+            "pl7.app/table/visibility": "default"
+          }
+        }
+      },
+      {
+        "column": "Enrichment",
+        "id": "enrichment",
+        "allowNA": true,
+        "spec": {
+          "name": "pl7.app/vdj/enrichment",
+          "valueType": "Double",
+          "domain": {"pl7.app/vdj/condition": condition,
+                    "pl7.app/vdj/source": inputType},
+          "annotations": {
+            "pl7.app/label": inputType + " Enrichment - " + condition,
+            "pl7.app/vdj/isScore": "true",
+            "pl7.app/table/orderPriority": "8000",
+            "pl7.app/table/visibility": "default"
+          }
+        }
+      }
+      ],
+    "storageFormat": "Binary",
+    "partitionKeyLength": 0
+  }
+}
+
+export ll.toStrict({
+	getColumns: getColumns
+})
