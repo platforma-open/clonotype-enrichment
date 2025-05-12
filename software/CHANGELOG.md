@@ -1,5 +1,12 @@
 # @platforma-open/milaboratories.clonotype-enrichment.software
 
+## 2.2.0
+
+### Minor Changes
+
+- 23c6345: FixExports
+- 83e1670: Make it work with clonotype-clusters
+
 ## 2.1.2
 
 ### Patch Changes

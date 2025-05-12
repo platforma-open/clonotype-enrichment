@@ -1,5 +1,12 @@
 # @platforma-open/milaboratories.clonotype-enrichment.model
 
+## 2.3.0
+
+### Minor Changes
+
+- 23c6345: FixExports
+- 83e1670: Make it work with clonotype-clusters
+
 ## 2.2.0
 
 ### Minor Changes

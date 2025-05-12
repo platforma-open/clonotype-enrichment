@@ -1,5 +1,18 @@
 # @platforma-open/milaboratories.clonotype-enrichment.workflow
 
+## 2.5.0
+
+### Minor Changes
+
+- 23c6345: FixExports
+- 83e1670: Make it work with clonotype-clusters
+
+### Patch Changes
+
+- Updated dependencies [23c6345]
+- Updated dependencies [83e1670]
+  - @platforma-open/milaboratories.clonotype-enrichment.software@2.2.0
+
 ## 2.4.0
 
 ### Minor Changes
