@@ -23,6 +23,8 @@ wf.prepare(func(args){
 })
 
 wf.body(func(args) {
+
+	// Load input parameters and related variables
 	blockId := wf.blockId().getDataAsJson()
 
 	allCounts := args.resolvedInput
@@ -35,6 +37,9 @@ wf.body(func(args) {
 		condition = roundOrder[len(roundOrder) - 1]
 	}
 
+	// Define output variables
+	exports := {}
+
 	// Check if inputs are individual clonotypes or clusters
 	inputType := "Unknown"
 	if countsSpec.axesSpec[1].name == "pl7.app/vdj/clusterId" {
@@ -44,10 +49,12 @@ wf.body(func(args) {
 		inputType = "Clonotype"
 	}
 	
+	//////////// Enrichment analysis ////////////
 	// convert PColumns to csv
 	csvCounts := xsv.exportFrame([allCounts], "csv", {})
 	csvCovariates := xsv.exportFrame([roundColumn], "csv", {})
 
+	// Run enrichment script
 	calculateEnrichment := exec.builder().
 		software(assets.importSoftware("@platforma-open/milaboratories.clonotype-enrichment.software:calculate-enrichment")).
 		addFile("rawCounts.csv", csvCounts).
@@ -80,6 +87,7 @@ wf.body(func(args) {
 		cache(24 * 60 * 60 * 1000).
 		run()
 
+	// Convert script outputs to Pframes
 	enrichCsv := calculateEnrichment.getFile("enrichment_results.csv")
 	EnrichmentImportParams := pfEnrichmentConv.getColumns(countsSpec)
 	enrichmentPf := xsv.importFile(enrichCsv, "csv", EnrichmentImportParams)
@@ -96,9 +104,7 @@ wf.body(func(args) {
 	// clonotypeMapImportParams := pfClonotypeMapConv.getColumns(countsSpec)
 	// clonotypeMapPf := xsv.importFile(calculateEnrichment.getFile("clonotype_map.csv"), "csv", clonotypeMapImportParams)
 
-	exports := {}
-
-	// Prepare selected enrichment and frequency export for clonotype-browser
+	//////////// Prepare selected enrichment and frequency exports ////////////
 	enrichTsv := xsv.exportFrame(enrichmentPf, "tsv", {})
 	filterWorkflow := { steps: [
 		{
@@ -112,6 +118,7 @@ wf.body(func(args) {
 		]
 	}
 
+	// Get all rows where condition column is equal to condition variable
 	// ptransform only accepts tsv as input
 	filterCmd := exec.builder().
 		printErrStreamToStdout().
@@ -122,9 +129,11 @@ wf.body(func(args) {
 		arg("output.tsv").saveFile("output.tsv").
 		run()
 
+	// Convert asset outputs to Pframes
 	EnrichmentImportParams2 := pfEnrichmentConv2.getColumns(countsSpec, string(condition), inputType)
 	secondExport := xsv.importFile(filterCmd.getFile("output.tsv"), "tsv", EnrichmentImportParams2)
 
+	// store data to be exported
 	exports["Enrichment - " + condition] = {
 		spec: secondExport["enrichment.spec"],
 		data: secondExport["enrichment.data"]
