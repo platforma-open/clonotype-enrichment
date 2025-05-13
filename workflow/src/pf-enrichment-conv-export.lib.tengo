@@ -23,7 +23,7 @@ getColumns := func(countsSpec, condition, inputType) {
             "pl7.app/label": inputType + " Frequency - " + condition,
             "pl7.app/vdj/isScore": "true",
             "pl7.app/table/orderPriority": "9000",
-            "pl7.app/table/visibility": "default"
+            "pl7.app/table/visibility": "optional"
           }
         }
       },

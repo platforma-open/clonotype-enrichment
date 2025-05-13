@@ -40,7 +40,7 @@ getColumns := func(countsSpec) {
             // add isScore only in exports to ease plots
             // "pl7.app/vdj/isScore": "true",
             "pl7.app/table/orderPriority": "9000",
-            "pl7.app/table/visibility": "default"
+            "pl7.app/table/visibility": "optional"
           }
         }
       },
