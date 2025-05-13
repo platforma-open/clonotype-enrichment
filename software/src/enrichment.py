@@ -159,8 +159,13 @@ def hybrid_enrichment_analysis(
                     "MaxEnrichment": max_enrich
                 })
 
-    bubble_df = pd.DataFrame(bubble_rows)
-    bubble_df = bubble_df[["Clonotype", "Label"] + [col for col in bubble_df.columns if col not in ["Clonotype", "Label"]]]
+    if len(bubble_rows) > 0:
+        bubble_df = pd.DataFrame(bubble_rows)
+        bubble_df = bubble_df[["Clonotype", "Label"] + [col for col in bubble_df.columns if col not in ["Clonotype", "Label"]]]
+    # If table is empty (no results above threshold) create empty table
+    else:
+        bubble_df = pd.DataFrame(columns=["Clonotype", "Label",  "Condition", "Enrichment", "Frequency",
+                                        "MaxEnrichment"])
 
     top_clonotypes = (
         bubble_df.groupby("Clonotype")["MaxEnrichment"]

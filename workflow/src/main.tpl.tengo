@@ -39,7 +39,8 @@ wf.body(func(args) {
 	inputType := "Unknown"
 	if countsSpec.axesSpec[1].name == "pl7.app/vdj/clusterId" {
 		inputType = "Cluster"
-	} else if countsSpec.axesSpec[1].name == "pl7.app/vdj/clonotypeKey" {
+	} else if countsSpec.axesSpec[1].name == "pl7.app/vdj/clonotypeKey" || 
+				countsSpec.axesSpec[1].name == "pl7.app/vdj/scClonotypeKey" {
 		inputType = "Clonotype"
 	}
 	
