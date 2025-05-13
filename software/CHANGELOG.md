@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.software
 
+## 2.3.0
+
+### Minor Changes
+
+- 2e7dbd6: Fixes for single-cell
+
 ## 2.2.0
 
 ### Minor Changes

@@ -1,5 +1,16 @@
 # @platforma-open/milaboratories.clonotype-enrichment.workflow
 
+## 2.6.0
+
+### Minor Changes
+
+- 2e7dbd6: Fixes for single-cell
+
+### Patch Changes
+
+- Updated dependencies [2e7dbd6]
+  - @platforma-open/milaboratories.clonotype-enrichment.software@2.3.0
+
 ## 2.5.0
 
 ### Minor Changes
