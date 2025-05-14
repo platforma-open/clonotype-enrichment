@@ -5,15 +5,15 @@ getColumns := func(countsSpec) {
   return {
     axes: [
       {
-        "column": "condition",
-        "id": "condition",
+        "column": "Comparison",
+        "id": "Comparison",
         "allowNA": false,
         "spec": {
-          "name": "pl7.app/vdj/condition",
+          "name": "pl7.app/vdj/comparison",
           "type": "String",
           "domain": {},
           "annotations": {
-            "pl7.app/label": "Condition"
+            "pl7.app/label": "Comparison"
           }
         }
       },
@@ -45,7 +45,7 @@ getColumns := func(countsSpec) {
         }
       },
       {
-        "column": "Frequency",
+        "column": "Frequency_Numerator",
         "id": "frequency",
         "allowNA": false,
         "spec": {

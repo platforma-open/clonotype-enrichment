@@ -172,6 +172,21 @@ export const model = BlockModel.create()
     return createPFrameForGraphs(ctx, pCols);
   })
 
+  .output('stackedPcols', (ctx) => {
+    const pCols = ctx.outputs?.resolve('stackedPf')?.getPColumns();
+    if (pCols === undefined) {
+      return undefined;
+    }
+
+    return pCols.map(
+      (c) =>
+        ({
+          columnId: c.id,
+          spec: c.spec,
+        } satisfies PColumnIdAndSpec),
+    );
+  })
+
   .output('linePf', (ctx): PFrameHandle | undefined => {
     const pCols = ctx.outputs?.resolve('linePf')?.getPColumns();
     if (pCols === undefined) {

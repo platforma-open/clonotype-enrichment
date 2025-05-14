@@ -1,10 +1,10 @@
 ll := import("@platforma-sdk/workflow-tengo:ll")
 
-getColumns := func(countsSpec, condition, inputType, reference) {
+getColumns := func(countsSpec, condition, reference, inputType) {
   return {
     axes: [
       {
-        "column": countsSpec.axesSpec[1].annotations["pl7.app/label"],
+        "column": "elementId",
         // "column": "Clonotype or cluster",
         "spec": countsSpec.axesSpec[1]
       }
@@ -17,10 +17,10 @@ getColumns := func(countsSpec, condition, inputType, reference) {
         "spec": {
           "name": "pl7.app/vdj/enrichment",
           "valueType": "Double",
-          "domain": {"pl7.app/vdj/condition": condition + " vs " + reference,
+          "domain": {"pl7.app/vdj/comparison": "highest_enrichment_clonotype",
                     "pl7.app/vdj/source": inputType},
           "annotations": {
-            "pl7.app/label": inputType + " Enrichment - " + condition + " vs " + reference,
+            "pl7.app/label": inputType + " Enrichment - Highest",
             "pl7.app/vdj/isScore": "true",
             "pl7.app/table/orderPriority": "9000",
             "pl7.app/table/visibility": "default"
@@ -28,16 +28,16 @@ getColumns := func(countsSpec, condition, inputType, reference) {
         }
       },
       {
-        "column": "Frequency",
+        "column": "Frequency_Numerator",
         "id": "frequency",
         "allowNA": false,
         "spec": {
           "name": "pl7.app/vdj/frequency",
           "valueType": "Double",
-          "domain": {"pl7.app/vdj/condition": condition + " vs " + reference,
+          "domain": {"pl7.app/vdj/comparison": "highest_enrichment_clonotype",
                     "pl7.app/vdj/source": inputType},
           "annotations": {
-            "pl7.app/label": inputType + " Frequency - " + condition + " vs " + reference,
+            "pl7.app/label": inputType + " Frequency - Highest",
             "pl7.app/vdj/isScore": "true",
             "pl7.app/table/orderPriority": "8000",
             "pl7.app/table/visibility": "optional"

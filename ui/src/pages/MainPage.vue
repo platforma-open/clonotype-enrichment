@@ -4,7 +4,6 @@ import type {
   PlDataTableSettings,
 } from '@platforma-sdk/ui-vue';
 import {
-  PlAccordionSection,
   PlAgDataTable,
   PlAgDataTableToolsPanel,
   PlBlockPage,
@@ -99,7 +98,9 @@ const columns = ref<PTableColumnSpec[]>([]);
       <PlDropdown v-model="app.model.args.conditionColumnRef" :options="app.model.outputs.metadataOptions" label="Condition column" />
       <PlDropdownMulti v-model="app.model.args.conditionOrder" :options="conditionValues" label="Condition order" >
         <template #tooltip>
-          Order aware selection. Calculate a contrast between first element (denominator) and each of the other selected options (numerators).
+          Order aware selection. Calculate contrast between an element (numerator) and each of its preceeding elements (denominators).
+          Example: if you select "Cond 1", "Cond 2" and "Cond 3" as order, the contrasts will be "Cond 2 vs Cond 1", "Cond 3 vs Cond 1" and "Cond 3 vs Cond 2".
+          The block will export the highest Enrichment value from all comparisons
         </template>
       </PlDropdownMulti>
       <PlNumberField
@@ -110,14 +111,6 @@ const columns = ref<PTableColumnSpec[]>([]);
           Select enrichment threshold to consider a clonotype enriched.
         </template>
       </PlNumberField>
-      <!-- Content hidden until you click -->
-      <PlAccordionSection label="ADVANCED SETTINGS">
-        <PlDropdown v-model="app.model.args.conditionExport" :options="conditionValues" label="Stored condition column" >
-          <template #tooltip>
-            Select the round for exporting clonotype enrichment or frequency values. The last round is selected by default.
-          </template>
-        </PlDropdown>
-      </PlAccordionSection>
     </PlSlideModal>
   </PlBlockPage>
 </template>

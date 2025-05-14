@@ -2,9 +2,9 @@
 import type { GraphMakerProps, PredefinedGraphOption } from '@milaboratories/graph-maker';
 import { GraphMaker } from '@milaboratories/graph-maker';
 import '@milaboratories/graph-maker/styles';
-import { useApp } from '../app';
-import { computed } from 'vue';
 import type { PColumnIdAndSpec } from '@platforma-sdk/model';
+import { computed } from 'vue';
+import { useApp } from '../app';
 
 const app = useApp();
 
@@ -30,13 +30,18 @@ const defaultOptions = computed((): GraphMakerProps['defaultOptions'] => {
         bubblePcols)].spec.axesSpec[1],
     },
     {
+      inputName: 'tabBy',
+      selectedSource: bubblePcols[getIndex('pl7.app/vdj/enrichment',
+        bubblePcols)].spec.axesSpec[2],
+    },
+    {
       inputName: 'valueColor',
       selectedSource: bubblePcols[getIndex('pl7.app/vdj/enrichment',
         bubblePcols)].spec,
     },
     {
       inputName: 'valueSize',
-      selectedSource: bubblePcols[getIndex('pl7.app/vdj/frequency',
+      selectedSource: bubblePcols[getIndex('pl7.app/vdj/numerator_frequency',
         bubblePcols)].spec,
     },
     {

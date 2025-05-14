@@ -76,19 +76,16 @@ wf.body(func(args) {
 		arg("--input_data").arg("inputFile.csv").
 		arg("--conditions").arg(string(conditionOrder)).
 		arg("--enrichment").arg("enrichment_results.csv").
-		arg("--volcano").arg("volcano_data.csv").
 		arg("--bubble").arg("bubble_data.csv").
 		arg("--top_enriched").arg("top_enriched.csv").
 		arg("--top_20").arg("top_20.csv").
 		arg("--min_enrichment").arg(string(enrichmentThreshold)).
-		// arg("--top_n_volcano").arg("1000").
-		// arg("--top_n_bubble").arg("20").
-		// arg("--top_n_enriched").arg("5").
+		arg("--highest_enrichment_clonotype").arg("highest_enrichment_clonotype.csv").
 		saveFile("enrichment_results.csv").
-		saveFile("volcano_data.csv").
 		saveFile("bubble_data.csv").
 		saveFile("top_enriched.csv").
 		saveFile("top_20.csv").
+		saveFile("highest_enrichment_clonotype.csv").
 		printErrStreamToStdout().
 		saveStdoutContent().
 		cache(24 * 60 * 60 * 1000).
@@ -102,52 +99,28 @@ wf.body(func(args) {
 	bubbleImportParams := pfBubbleConv.getColumns(abundanceSpec)
 	bubblePf := xsv.importFile(calculateEnrichment.getFile("bubble_data.csv"), "csv", bubbleImportParams)
 
-	stackedImportParams := pfStackedConv.getColumns(abundanceSpec)
-	stackedPf := xsv.importFile(calculateEnrichment.getFile("top_enriched.csv"), "csv", stackedImportParams)
-
 	lineImportParams := pfStackedConv.getColumns(abundanceSpec)
 	linePf := xsv.importFile(calculateEnrichment.getFile("top_20.csv"), "csv", lineImportParams)
 
-	//////////// Prepare selected enrichment and frequency exports ////////////
-	enrichTsv := xsv.exportFrame(enrichmentPf, "tsv", {})
-	filterWorkflow := { steps: [
-		{
-			type: "filter",
-			predicate: {
-				type: "eq",
-				value: condition,
-				column: "Condition"
-				}
-			}
-		]
-	}
+	stackedImportParams := pfStackedConv.getColumns(abundanceSpec)
+	stackedPf := xsv.importFile(calculateEnrichment.getFile("top_enriched.csv"), "csv", stackedImportParams)
 
-	// Get all rows where condition column is equal to condition variable
-	// ptransform only accepts tsv as input
-	filterCmd := exec.builder().
-		printErrStreamToStdout().
-		software(ptransformSw).
-		arg("--workflow").arg("wf.json").
-		writeFile("wf.json", json.encode(filterWorkflow)).
-		arg("input.tsv").addFile("input.tsv", enrichTsv).
-		arg("output.tsv").saveFile("output.tsv").
-		run()
-
-	// Convert asset outputs to Pframes
 	EnrichmentImportParamsExport := pfEnrichmentConvExport.getColumns(abundanceSpec, 
 															string(condition), 
-															inputType,
-															string(reference))
-	secondExport := xsv.importFile(filterCmd.getFile("output.tsv"), "tsv", EnrichmentImportParamsExport)
+															string(reference),
+															inputType)
+	exportFile := xsv.importFile(calculateEnrichment.getFile("highest_enrichment_clonotype.csv"), 
+								"csv",
+								EnrichmentImportParamsExport)
 
 	// store data to be exported
-	exports["Enrichment - " + condition] = {
-		spec: trace.inject(secondExport["enrichment.spec"]),
-		data: secondExport["enrichment.data"]
+	exports["Enrichment - Highest"] = {
+		spec: trace.inject(exportFile["enrichment.spec"]),
+		data: exportFile["enrichment.data"]
 	}
-	exports["Frequency - " + condition] = {
-		spec: trace.inject(secondExport["frequency.spec"]),
-		data: secondExport["frequency.data"]
+	exports["Frequency - Highest"] = {
+		spec: trace.inject(exportFile["frequency.spec"]),
+		data: exportFile["frequency.data"]
 	}
 
 	return {

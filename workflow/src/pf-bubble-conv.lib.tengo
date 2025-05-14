@@ -8,15 +8,28 @@ getColumns := func(countsSpec) {
         "spec": countsSpec.axesSpec[1]
       },
       {
-        "column": "condition",
-        "id": "Condition",
+        "column": "Numerator",
+        "id": "Numerator",
         "allowNA": false,
         "spec": {
-          "name": "pl7.app/vdj/condition",
+          "name": "pl7.app/vdj/numerator",
           "type": "String",
           "domain": {},
           "annotations": {
-            "pl7.app/label": "condition"
+            "pl7.app/label": "Numerator"
+          }
+        }
+      },
+      {
+        "column": "Denominator",
+        "id": "Denominator",
+        "allowNA": false,
+        "spec": {
+          "name": "pl7.app/vdj/denominator",
+          "type": "String",
+          "domain": {},
+          "annotations": {
+            "pl7.app/label": "Denominator"
           }
         }
       }
@@ -36,15 +49,15 @@ getColumns := func(countsSpec) {
       //   }
       // },
       {
-        "column": "Frequency",
-        "id": "frequency",
+        "column": "Frequency_Numerator",
+        "id": "NumeratorFrequency",
         "allowNA": false,
         "spec": {
-          "name": "pl7.app/vdj/frequency",
+          "name": "pl7.app/vdj/numerator_frequency",
           "valueType": "Double",
           "domain": {},
           "annotations": {
-            "pl7.app/label": "Frequency"
+            "pl7.app/label": "Numerator Frequency"
           }
         }
       },
@@ -62,7 +75,7 @@ getColumns := func(countsSpec) {
         }
       },
       {
-        "column": "MaxEnrichment",
+        "column": "MaxPositiveEnrichment",
         "id": "maxenrichment",
         "allowNA": false,
         "spec": {
