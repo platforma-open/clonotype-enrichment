@@ -47,7 +47,7 @@ export const model = BlockModel.create()
       currentTab: null,
     },
     lineState: {
-      title: 'Clonotype enrichment',
+      title: 'Top clonotype frequencies',
       template: 'line',
       currentTab: null,
     },
