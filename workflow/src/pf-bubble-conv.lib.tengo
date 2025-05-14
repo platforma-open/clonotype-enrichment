@@ -2,26 +2,26 @@ ll := import("@platforma-sdk/workflow-tengo:ll")
 
 getColumns := func(countsSpec) {
   return {
-    "axes": [
+    axes: [
       {
-        "column": "Clonotype",
+        "column": "elementId",
         "spec": countsSpec.axesSpec[1]
       },
       {
-        "column": "Condition",
-        "id": "round",
+        "column": "condition",
+        "id": "Condition",
         "allowNA": false,
         "spec": {
-          "name": "pl7.app/vdj/round",
+          "name": "pl7.app/vdj/condition",
           "type": "String",
           "domain": {},
           "annotations": {
-            "pl7.app/label": "Round"
+            "pl7.app/label": "condition"
           }
         }
       }
       ],
-    "columns": [
+    columns: [
       // {
       //   "column": "Label",
       //   "id": "label",

@@ -3,9 +3,9 @@ maps := import("@platforma-sdk/workflow-tengo:maps")
 
 getColumns := func(countsSpec) {
   return {
-    "axes": [
+    axes: [
       {
-        "column": "Condition",
+        "column": "condition",
         "id": "condition",
         "allowNA": false,
         "spec": {
@@ -18,7 +18,7 @@ getColumns := func(countsSpec) {
         }
       },
       {
-        "column": "Clonotype",
+        "column": "elementId",
         "spec": maps.deepMerge(countsSpec.axesSpec[1], {
           "annotations": {
             "pl7.app/table/visibility": "default"
@@ -26,24 +26,7 @@ getColumns := func(countsSpec) {
         })
       }
     ],
-    "columns": [
-      {
-        "column": "Frequency",
-        "id": "frequency",
-        "allowNA": false,
-        "spec": {
-          "name": "pl7.app/vdj/frequency",
-          "valueType": "Double",
-          "domain": {},
-          "annotations": {
-            "pl7.app/label": "Frequency",
-            // add isScore only in exports to ease plots
-            // "pl7.app/vdj/isScore": "true",
-            "pl7.app/table/orderPriority": "9000",
-            "pl7.app/table/visibility": "optional"
-          }
-        }
-      },
+    columns: [
       {
         "column": "Enrichment",
         "id": "enrichment",
@@ -56,8 +39,25 @@ getColumns := func(countsSpec) {
             "pl7.app/label": "Enrichment",
             // add isScore only in exports to ease plots
             // "pl7.app/vdj/isScore": "true",
-            "pl7.app/table/orderPriority": "8000",
+            "pl7.app/table/orderPriority": "9000",
             "pl7.app/table/visibility": "default"
+          }
+        }
+      },
+      {
+        "column": "Frequency",
+        "id": "frequency",
+        "allowNA": false,
+        "spec": {
+          "name": "pl7.app/vdj/frequency",
+          "valueType": "Double",
+          "domain": {},
+          "annotations": {
+            "pl7.app/label": "Frequency",
+            // add isScore only in exports to ease plots
+            // "pl7.app/vdj/isScore": "true",
+            "pl7.app/table/orderPriority": "8000",
+            "pl7.app/table/visibility": "optional"
           }
         }
       }
