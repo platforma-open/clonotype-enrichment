@@ -1,6 +1,9 @@
 import type { GraphMakerState } from '@milaboratories/graph-maker';
-import type { InferOutputsType, PColumnIdAndSpec, PFrameHandle, PlDataTableState, PlRef, PlTableFiltersModel, SUniversalPColumnId, TreeNodeAccessor } from '@platforma-sdk/model';
-import { BlockModel, createPFrameForGraphs, createPlDataTable, PColumnCollection } from '@platforma-sdk/model';
+import type {
+  InferOutputsType, PColumnIdAndSpec, PFrameHandle, PlDataTableState,
+  PlRef, PlTableFiltersModel, SUniversalPColumnId, TreeNodeAccessor,
+} from '@platforma-sdk/model';
+import { BlockModel, createPFrameForGraphs, createPlDataTableV2, PColumnCollection } from '@platforma-sdk/model';
 import type { APColumnSelectorWithSplit } from '@platforma-sdk/model/dist/render/util/split_selectors';
 
 export type UiState = {
@@ -132,9 +135,10 @@ export const model = BlockModel.create()
       return undefined;
     }
 
-    return createPlDataTable(ctx, splitByCondition, ctx.uiState.tableState, {
-      filters: ctx.uiState.filterModel?.filters,
-    });
+    return createPlDataTableV2(ctx, splitByCondition, (_) => true,
+      ctx.uiState.tableState, {
+        filters: ctx.uiState.filterModel?.filters,
+      });
   })
 
   // Returns a map of results for plot
