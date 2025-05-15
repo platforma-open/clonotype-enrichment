@@ -2,39 +2,36 @@
 import type { GraphMakerProps, PredefinedGraphOption } from '@milaboratories/graph-maker';
 import { GraphMaker } from '@milaboratories/graph-maker';
 import '@milaboratories/graph-maker/styles';
-import type { PColumnIdAndSpec } from '@platforma-sdk/model';
 import { computed } from 'vue';
 import { useApp } from '../app';
 
 const app = useApp();
 
 const defaultOptions = computed((): GraphMakerProps['defaultOptions'] => {
-  if (!app.model.outputs.stackedPcols)
+  if (!app.model.outputs.stackedPCols)
     return undefined;
 
-  const stackedPcols = app.model.outputs.stackedPcols;
-  function getIndex(name: string, pcols: PColumnIdAndSpec[]): number {
-    return pcols.findIndex((p) => (p.spec.name === name
+  const stackedPCols = app.model.outputs.stackedPCols;
+  const getColSpec = (name: string) =>
+    stackedPCols[stackedPCols.findIndex((p) => (p.spec.name === name
       && p.spec.annotations?.['pl7.app/vdj/isScore'] === undefined
-    ));
-  }
+    ))].spec;
+
+  const frequencyColSpec = getColSpec('pl7.app/vdj/frequency');
   const defaults: PredefinedGraphOption<'discrete'>[] = [
     {
       inputName: 'y',
-      selectedSource: stackedPcols[getIndex('pl7.app/vdj/frequency',
-        stackedPcols)].spec,
+      selectedSource: frequencyColSpec,
     },
     // pl7.app/vdj/clonotypeKey
     {
       inputName: 'secondaryGrouping',
-      selectedSource: stackedPcols[getIndex('pl7.app/vdj/frequency',
-        stackedPcols)].spec.axesSpec[0],
+      selectedSource: frequencyColSpec.axesSpec[0],
     },
     // pl7.app/vdj/round
     {
       inputName: 'primaryGrouping',
-      selectedSource: stackedPcols[getIndex('pl7.app/vdj/frequency',
-        stackedPcols)].spec.axesSpec[1],
+      selectedSource: frequencyColSpec.axesSpec[1],
     },
   ];
   return defaults;
@@ -44,7 +41,8 @@ const defaultOptions = computed((): GraphMakerProps['defaultOptions'] => {
 
 <template>
   <GraphMaker
-    v-model="app.model.ui.lineState" chartType="discrete"
+    v-model="app.model.ui.lineState"
+    chartType="discrete"
     :p-frame="app.model.outputs.linePf"
     :default-options="defaultOptions"
   />

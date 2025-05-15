@@ -152,7 +152,7 @@ export const model = BlockModel.create()
   })
 
   // Returns a list pof Pcols for plot defaults
-  .output('bubblePcols', (ctx) => {
+  .output('bubblePCols', (ctx) => {
     const pCols = ctx.outputs?.resolve('bubblePf')?.getPColumns();
     if (pCols === undefined) {
       return undefined;
@@ -176,7 +176,7 @@ export const model = BlockModel.create()
     return createPFrameForGraphs(ctx, pCols);
   })
 
-  .output('stackedPcols', (ctx) => {
+  .output('stackedPCols', (ctx) => {
     const pCols = ctx.outputs?.resolve('stackedPf')?.getPColumns();
     if (pCols === undefined) {
       return undefined;

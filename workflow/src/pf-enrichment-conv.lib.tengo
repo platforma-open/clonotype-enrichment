@@ -5,22 +5,22 @@ getColumns := func(countsSpec) {
   return {
     axes: [
       {
-        "column": "Comparison",
-        "id": "Comparison",
-        "allowNA": false,
-        "spec": {
-          "name": "pl7.app/vdj/comparison",
-          "type": "String",
-          "domain": {},
-          "annotations": {
+        column: "Comparison",
+        id: "Comparison",
+        allowNA: false,
+        spec: {
+          name: "pl7.app/vdj/comparison",
+          type: "String",
+          domain: {},
+          annotations: {
             "pl7.app/label": "Comparison"
           }
         }
       },
       {
-        "column": "elementId",
-        "spec": maps.deepMerge(countsSpec.axesSpec[1], {
-          "annotations": {
+        column: "elementId",
+        spec: maps.deepMerge(countsSpec.axesSpec[1], {
+          annotations: {
             "pl7.app/table/visibility": "default"
           }
         })
@@ -28,14 +28,14 @@ getColumns := func(countsSpec) {
     ],
     columns: [
       {
-        "column": "Enrichment",
-        "id": "enrichment",
-        "allowNA": true,
-        "spec": {
-          "name": "pl7.app/vdj/enrichment",
-          "valueType": "Double",
-          "domain": {},
-          "annotations": {
+        column: "Enrichment",
+        id: "enrichment",
+        allowNA: true,
+        spec: {
+          name: "pl7.app/vdj/enrichment",
+          valueType: "Double",
+          domain: {},
+          annotations: {
             "pl7.app/label": "Enrichment",
             // add isScore only in exports to ease plots
             // "pl7.app/vdj/isScore": "true",
@@ -45,14 +45,14 @@ getColumns := func(countsSpec) {
         }
       },
       {
-        "column": "Frequency_Numerator",
-        "id": "frequency",
-        "allowNA": false,
-        "spec": {
-          "name": "pl7.app/vdj/frequency",
-          "valueType": "Double",
-          "domain": {},
-          "annotations": {
+        column: "Frequency_Numerator",
+        id: "frequency",
+        allowNA: false,
+        spec: {
+          name: "pl7.app/vdj/frequency",
+          valueType: "Double",
+          domain: {},
+          annotations: {
             "pl7.app/label": "Frequency",
             // add isScore only in exports to ease plots
             // "pl7.app/vdj/isScore": "true",
@@ -62,8 +62,8 @@ getColumns := func(countsSpec) {
         }
       }
       ],
-    "storageFormat": "Binary",
-    "partitionKeyLength": 1
+    storageFormat: "Binary",
+    partitionKeyLength: 1
   }
 }
 

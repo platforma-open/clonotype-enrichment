@@ -54,7 +54,7 @@ const showSettings = () => {
   settingsAreShown.value = true;
 };
 
-// Get list of availables values within round column
+// Get list of available values within round column
 // we will select them in list, being the first one denominator and rest numerators
 const conditionValues = computed(() => {
   return app.model.outputs.conditionValues?.map((v) => ({

@@ -4,14 +4,10 @@ exec := import("@platforma-sdk/workflow-tengo:exec")
 assets:= import("@platforma-sdk/workflow-tengo:assets")
 xsv := import("@platforma-sdk/workflow-tengo:pframes.xsv")
 pframes := import("@platforma-sdk/workflow-tengo:pframes")
-ptransformSw := assets.importSoftware("@platforma-open/milaboratories.software-ptransform:main")
-pSpec := import("@platforma-sdk/workflow-tengo:pframes.spec")
 render := import("@platforma-sdk/workflow-tengo:render")
-json := import("json")
 buildExportsTpl := assets.importTemplate(":build-exports")
 
 pfEnrichmentConv := import(":pf-enrichment-conv")
-pfEnrichmentConvExport := import(":pf-enrichment-conv-export")
 pfBubbleConv := import(":pf-bubble-conv")
 pfStackedConv := import(":pf-stacked-conv")
 
@@ -20,7 +16,6 @@ wf.prepare(func(args){
 
 	bundleBuilder := wf.createPBundleBuilder()
 	bundleBuilder.addAnchor("main", args.abundanceRef) 
-
 	bundleBuilder.addSingle(args.conditionColumnRef)
 
 	return {
@@ -36,12 +31,12 @@ wf.body(func(args) {
 
 	abundanceSpec := columns.getSpec(args.abundanceRef)
 
-	clonoTable := columns.xsvTableBuilder()
-	clonoTable.add(args.abundanceRef, {header: "abundance"})
-	clonoTable.add(args.conditionColumnRef, {header: "condition"})
-	clonoTable.setAxisHeader(abundanceSpec.axesSpec[0].name, "sampleId")
-	clonoTable.setAxisHeader(abundanceSpec.axesSpec[1].name, "elementId")
-	clonoTable = clonoTable.build("csv")
+	cloneTable := columns.xsvTableBuilder()
+	cloneTable.add(args.abundanceRef, {header: "abundance"})
+	cloneTable.add(args.conditionColumnRef, {header: "condition"})
+	cloneTable.setAxisHeader(abundanceSpec.axesSpec[0].name, "sampleId")
+	cloneTable.setAxisHeader(abundanceSpec.axesSpec[1].name, "elementId")
+	cloneTable = cloneTable.build("csv")
 
 	conditionOrder := args.conditionOrder
 	enrichmentThreshold := args.enrichmentThreshold
@@ -67,7 +62,7 @@ wf.body(func(args) {
 	// Run enrichment script
 	calculateEnrichment := exec.builder().
 		software(assets.importSoftware("@platforma-open/milaboratories.clonotype-enrichment.software:calculate-enrichment")).
-		addFile("inputFile.csv", clonoTable).
+		addFile("inputFile.csv", cloneTable).
 		arg("--input_data").arg("inputFile.csv").
 		arg("--conditions").arg(string(conditionOrder)).
 		arg("--enrichment").arg("enrichment_results.csv").
@@ -88,8 +83,8 @@ wf.body(func(args) {
 
 	// Convert script outputs to Pframes
 	enrichCsv := calculateEnrichment.getFile("enrichment_results.csv")
-	EnrichmentImportParams := pfEnrichmentConv.getColumns(abundanceSpec)
-	enrichmentPf := xsv.importFile(enrichCsv, "csv", EnrichmentImportParams)
+	enrichmentImportParams := pfEnrichmentConv.getColumns(abundanceSpec)
+	enrichmentPf := xsv.importFile(enrichCsv, "csv", enrichmentImportParams)
 
 	bubbleImportParams := pfBubbleConv.getColumns(abundanceSpec)
 	bubblePf := xsv.importFile(calculateEnrichment.getFile("bubble_data.csv"), "csv", bubbleImportParams)

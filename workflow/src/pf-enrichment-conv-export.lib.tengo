@@ -1,27 +1,27 @@
 ll := import("@platforma-sdk/workflow-tengo:ll")
-self := import("@platforma-sdk/workflow-tengo:tpl")
 
-getColumns := func(countsSpec, inputType, min, max, cutoff) {
+getColumns := func(abundanceSpec, inputType, min, max, cutoff) {
   return {
     axes: [
       {
-        "column": "elementId",
-        // "column": "Clonotype or cluster",
-        "spec": countsSpec.axesSpec[1]
+        column: "elementId",
+        spec: abundanceSpec.axesSpec[1]
       }
       ],
     columns: [
       {
-        "column": "Enrichment",
-        "id": "enrichment",
-        "allowNA": true,
-        "spec": {
-          "name": "pl7.app/vdj/enrichment",
-          "valueType": "Double",
-          "domain": {"pl7.app/vdj/comparison": "highest_enrichment_clonotype",
-                    "pl7.app/vdj/source": inputType},
-          "annotations": {
-            "pl7.app/label": inputType + " Enrichment - Highest",
+        column: "Enrichment",
+        id: "enrichment",
+        allowNA: true,
+        spec: {
+          name: "pl7.app/vdj/enrichment",
+          valueType: "Double",
+          domain: {
+            "pl7.app/vdj/comparison": "highest_enrichment_clonotype",
+            "pl7.app/vdj/source": inputType
+          },
+          annotations: {
+            "pl7.app/label": inputType + " Enrichment Score",
             "pl7.app/vdj/isScore": "true",
             "pl7.app/table/orderPriority": "9000",
             "pl7.app/table/visibility": "default",
@@ -32,16 +32,18 @@ getColumns := func(countsSpec, inputType, min, max, cutoff) {
         }
       },
       {
-        "column": "Frequency_Numerator",
-        "id": "frequency",
-        "allowNA": false,
-        "spec": {
-          "name": "pl7.app/vdj/frequency",
-          "valueType": "Double",
-          "domain": {"pl7.app/vdj/comparison": "highest_enrichment_clonotype",
-                    "pl7.app/vdj/source": inputType},
-          "annotations": {
-            "pl7.app/label": inputType + " Frequency - Highest",
+        column: "Frequency_Numerator",
+        id: "frequency",
+        allowNA: false,
+        spec: {
+          name: "pl7.app/vdj/frequency",
+          valueType: "Double",
+          domain: {
+            "pl7.app/vdj/comparison": "highest_enrichment_clonotype",
+            "pl7.app/vdj/source": inputType
+          },
+          annotations: {
+            "pl7.app/label": inputType + " Enrichment Frequency",
             "pl7.app/vdj/isScore": "true",
             "pl7.app/table/orderPriority": "8000",
             "pl7.app/table/visibility": "optional"
@@ -49,8 +51,8 @@ getColumns := func(countsSpec, inputType, min, max, cutoff) {
         }
       }
       ],
-    "storageFormat": "Binary",
-    "partitionKeyLength": 0
+    storageFormat: "Binary",
+    partitionKeyLength: 0
   }
 }
 

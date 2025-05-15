@@ -2,62 +2,63 @@
 import type { GraphMakerProps, PredefinedGraphOption } from '@milaboratories/graph-maker';
 import { GraphMaker } from '@milaboratories/graph-maker';
 import '@milaboratories/graph-maker/styles';
-import type { PColumnIdAndSpec } from '@platforma-sdk/model';
 import { computed } from 'vue';
 import { useApp } from '../app';
 
 const app = useApp();
 
 const defaultOptions = computed((): GraphMakerProps['defaultOptions'] => {
-  if (!app.model.outputs.bubblePcols)
+  if (!app.model.outputs.bubblePCols)
     return undefined;
 
-  const bubblePcols = app.model.outputs.bubblePcols;
-  function getIndex(name: string, pcols: PColumnIdAndSpec[]): number {
-    return pcols.findIndex((p) => (p.spec.name === name
+  const bubblePCols = app.model.outputs.bubblePCols;
+
+  const getColSpec = (name: string) =>
+    bubblePCols[bubblePCols.findIndex((p) => (p.spec.name === name
       && p.spec.annotations?.['pl7.app/vdj/isScore'] === undefined
-    ));
-  }
+    ))].spec;
+
+  const enrichmentCol = getColSpec('pl7.app/vdj/enrichment');
+  const frequencyCol = getColSpec('pl7.app/vdj/numerator-frequency');
+
   const defaults: PredefinedGraphOption<'bubble'>[] = [
     {
       inputName: 'x',
-      selectedSource: bubblePcols[getIndex('pl7.app/vdj/enrichment',
-        bubblePcols)].spec.axesSpec[0],
+      selectedSource: enrichmentCol.axesSpec[0],
     },
     {
       inputName: 'y',
-      selectedSource: bubblePcols[getIndex('pl7.app/vdj/enrichment',
-        bubblePcols)].spec.axesSpec[1],
+      selectedSource: enrichmentCol.axesSpec[1],
     },
     {
       inputName: 'tabBy',
-      selectedSource: bubblePcols[getIndex('pl7.app/vdj/enrichment',
-        bubblePcols)].spec.axesSpec[2],
+      selectedSource: enrichmentCol.axesSpec[2],
     },
     {
       inputName: 'valueColor',
-      selectedSource: bubblePcols[getIndex('pl7.app/vdj/enrichment',
-        bubblePcols)].spec,
+      selectedSource: enrichmentCol,
     },
     {
       inputName: 'valueSize',
-      selectedSource: bubblePcols[getIndex('pl7.app/vdj/numerator-frequency',
-        bubblePcols)].spec,
+      selectedSource: frequencyCol,
     },
     {
       inputName: 'tooltipContent',
-      selectedSource: bubblePcols[getIndex('pl7.app/vdj/enrichment',
-        bubblePcols)].spec.axesSpec[0],
+      selectedSource: enrichmentCol.axesSpec[0],
     },
   ];
   return defaults;
 });
 
+// @TODO: add data-state-key to GraphMaker once it's fixed
+// :data-state-key="app.model.args.abundanceRef"
 </script>
 
 <template>
   <GraphMaker
-    v-model="app.model.ui.bubbleState" chartType="bubble"
-    :p-frame="app.model.outputs.bubblePf" :defaultOptions="defaultOptions"
+    v-model="app.model.ui.bubbleState"
+    chartType="bubble"
+    :p-frame="app.model.outputs.bubblePf"
+    :defaultOptions="defaultOptions"
   />
 </template>
