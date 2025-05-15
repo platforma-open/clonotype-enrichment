@@ -1,6 +1,7 @@
 ll := import("@platforma-sdk/workflow-tengo:ll")
+self := import("@platforma-sdk/workflow-tengo:tpl")
 
-getColumns := func(countsSpec, condition, reference, inputType) {
+getColumns := func(countsSpec, inputType, min, max, cutoff) {
   return {
     axes: [
       {
@@ -23,7 +24,10 @@ getColumns := func(countsSpec, condition, reference, inputType) {
             "pl7.app/label": inputType + " Enrichment - Highest",
             "pl7.app/vdj/isScore": "true",
             "pl7.app/table/orderPriority": "9000",
-            "pl7.app/table/visibility": "default"
+            "pl7.app/table/visibility": "default",
+            "pl7.app/rangeValues": "[" + min + "," + max + "]",
+            "pl7.app/rankValues": "increasing",
+            "pl7.app/filterValues": cutoff
           }
         }
       },

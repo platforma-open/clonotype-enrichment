@@ -6,12 +6,15 @@ xsv := import("@platforma-sdk/workflow-tengo:pframes.xsv")
 pframes := import("@platforma-sdk/workflow-tengo:pframes")
 ptransformSw := assets.importSoftware("@platforma-open/milaboratories.software-ptransform:main")
 pSpec := import("@platforma-sdk/workflow-tengo:pframes.spec")
+render := import("@platforma-sdk/workflow-tengo:render")
 json := import("json")
+buildExportsTpl := assets.importTemplate(":build-exports")
 
 pfEnrichmentConv := import(":pf-enrichment-conv")
 pfEnrichmentConvExport := import(":pf-enrichment-conv-export")
 pfBubbleConv := import(":pf-bubble-conv")
 pfStackedConv := import(":pf-stacked-conv")
+
 
 wf.prepare(func(args){
 
@@ -48,16 +51,8 @@ wf.body(func(args) {
 	}
 	reference := conditionOrder[0]
 
-	// Define output variables
-	exports := {}
 
-	// Make trace
-	trace := pSpec.makeTrace(abundanceSpec,
-		{
-			type: "milaboratories.clonotype-enrichment",
-		 	importance: 30,
-		 	label: "Clonotype enrichment"
-		})
+
 
 	// Check if inputs are individual clonotypes or clusters
 	inputType := "Unknown"
@@ -105,23 +100,35 @@ wf.body(func(args) {
 	stackedImportParams := pfStackedConv.getColumns(abundanceSpec)
 	stackedPf := xsv.importFile(calculateEnrichment.getFile("top_enriched.csv"), "csv", stackedImportParams)
 
-	EnrichmentImportParamsExport := pfEnrichmentConvExport.getColumns(abundanceSpec, 
-															string(condition), 
-															string(reference),
-															inputType)
-	exportFile := xsv.importFile(calculateEnrichment.getFile("highest_enrichment_clonotype.csv"), 
-								"csv",
-								EnrichmentImportParamsExport)
+	// Calculate annotation values
+	topEnrichedColCsv := calculateEnrichment.getFile("highest_enrichment_clonotype.csv")
 
-	// store data to be exported
-	exports["Enrichment - Highest"] = {
-		spec: trace.inject(exportFile["enrichment.spec"]),
-		data: exportFile["enrichment.data"]
-	}
-	exports["Frequency - Highest"] = {
-		spec: trace.inject(exportFile["frequency.spec"]),
-		data: exportFile["frequency.data"]
-	}
+	annotationValues := exec.builder().
+		software(assets.importSoftware("@platforma-open/milaboratories.clonotype-enrichment.software:calculate-annotations")).
+		addFile("inputFile.csv", topEnrichedColCsv).
+		arg("inputFile.csv").
+		saveFileContent("enrichment_min.txt"). 
+		saveFileContent("enrichment_max.txt").
+		saveFileContent("enrichment_75.txt").
+		printErrStreamToStdout().
+		saveStdoutContent().
+		cache(24 * 60 * 60 * 1000).
+		run()
+
+	min := annotationValues.getFileContent("enrichment_min.txt")
+	max := annotationValues.getFileContent("enrichment_max.txt")
+	cutoff := annotationValues.getFileContent("enrichment_75.txt")
+
+	buildExports := render.create(buildExportsTpl, {
+		abundanceSpec: abundanceSpec,
+		inputType: inputType,
+		topEnrichedColCsv: topEnrichedColCsv,
+		min: min,
+		max: max,
+		cutoff: cutoff
+	})
+
+	exports := buildExports.output("exports")
 
 	return {
 		outputs: {
@@ -131,7 +138,9 @@ wf.body(func(args) {
 			linePf: pframes.exportFrame(linePf)//,
 			// clonotypeMapPf: pframes.exportFrame(clonotypeMapPf)
 		},
-		exports: exports
+		exports: {
+			pf: exports
+		}
 	}
 	
 })

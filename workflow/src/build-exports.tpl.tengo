@@ -1,0 +1,53 @@
+self := import("@platforma-sdk/workflow-tengo:tpl")
+ll := import("@platforma-sdk/workflow-tengo:ll")
+xsv := import("@platforma-sdk/workflow-tengo:pframes.xsv")
+pSpec := import("@platforma-sdk/workflow-tengo:pframes.spec")
+pframes := import("@platforma-sdk/workflow-tengo:pframes")
+
+pfEnrichmentConvExport := import(":pf-enrichment-conv-export")
+
+self.defineOutputs(
+	"exports"
+)
+
+self.body(func(args) {
+
+    min := args.min.getDataAsJson()
+    max := args.max.getDataAsJson()
+    cutoff := args.cutoff.getDataAsJson()
+
+    abundanceSpec := args.abundanceSpec
+    inputType := args.inputType
+    topEnrichedColCsv := args.topEnrichedColCsv
+
+    EnrichmentImportParamsExport := pfEnrichmentConvExport.getColumns(abundanceSpec, 
+                                                            inputType,
+                                                            string(min),
+                                                            string(max),
+                                                            string(cutoff))
+    exportFile := xsv.importFile(topEnrichedColCsv, 
+                                "csv",
+                                EnrichmentImportParamsExport)
+
+    // Make trace
+    trace := pSpec.makeTrace(abundanceSpec,
+        {
+            type: "milaboratories.clonotype-enrichment",
+            importance: 30,
+            label: "Clonotype enrichment"
+        })
+
+    // Define output variables
+    exports := pframes.pFrameBuilder()
+    // store data to be exported
+    exports.add("Enrichment - Highest", 
+        trace.inject(exportFile["enrichment.spec"]), 
+        exportFile["enrichment.data"])
+    exports.add("Frequency - Highest", 
+        trace.inject(exportFile["frequency.spec"]), 
+        exportFile["frequency.data"])
+
+    return {
+        exports: exports.build()    
+    }
+})
