@@ -41,7 +41,7 @@ const defaultOptions = computed((): GraphMakerProps['defaultOptions'] => {
     },
     {
       inputName: 'valueSize',
-      selectedSource: bubblePcols[getIndex('pl7.app/vdj/numerator_frequency',
+      selectedSource: bubblePcols[getIndex('pl7.app/vdj/numerator-frequency',
         bubblePcols)].spec,
     },
     {

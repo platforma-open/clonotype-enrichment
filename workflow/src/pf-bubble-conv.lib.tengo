@@ -9,27 +9,27 @@ getColumns := func(countsSpec) {
       },
       {
         "column": "Numerator",
-        "id": "Numerator",
+        "id": "Condition",
         "allowNA": false,
         "spec": {
-          "name": "pl7.app/vdj/numerator",
+          "name": "pl7.app/vdj/condition",
           "type": "String",
           "domain": {},
           "annotations": {
-            "pl7.app/label": "Numerator"
+            "pl7.app/label": "Condition"
           }
         }
       },
       {
         "column": "Denominator",
-        "id": "Denominator",
+        "id": "BaselineCondition",
         "allowNA": false,
         "spec": {
-          "name": "pl7.app/vdj/denominator",
+          "name": "pl7.app/vdj/Baseline-condition",
           "type": "String",
           "domain": {},
           "annotations": {
-            "pl7.app/label": "Denominator"
+            "pl7.app/label": "Baseline Condition"
           }
         }
       }
@@ -53,7 +53,7 @@ getColumns := func(countsSpec) {
         "id": "NumeratorFrequency",
         "allowNA": false,
         "spec": {
-          "name": "pl7.app/vdj/numerator_frequency",
+          "name": "pl7.app/vdj/numerator-frequency",
           "valueType": "Double",
           "domain": {},
           "annotations": {
