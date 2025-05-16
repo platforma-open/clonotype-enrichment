@@ -40,14 +40,6 @@ wf.body(func(args) {
 
 	conditionOrder := args.conditionOrder
 	enrichmentThreshold := args.enrichmentThreshold
-	condition := args.roundExport
-	if condition == undefined {
-		condition = conditionOrder[len(conditionOrder) - 1]
-	}
-	reference := conditionOrder[0]
-
-
-
 
 	// Check if inputs are individual clonotypes or clusters
 	inputType := "Unknown"
@@ -83,7 +75,7 @@ wf.body(func(args) {
 
 	// Convert script outputs to Pframes
 	enrichCsv := calculateEnrichment.getFile("enrichment_results.csv")
-	enrichmentImportParams := pfEnrichmentConv.getColumns(abundanceSpec)
+	enrichmentImportParams := pfEnrichmentConv.getColumns(abundanceSpec, conditionOrder)
 	enrichmentPf := xsv.importFile(enrichCsv, "csv", enrichmentImportParams)
 
 	bubbleImportParams := pfBubbleConv.getColumns(abundanceSpec)

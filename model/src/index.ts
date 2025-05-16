@@ -3,7 +3,7 @@ import type {
   InferOutputsType, PColumnIdAndSpec, PFrameHandle, PlDataTableState,
   PlRef, PlTableFiltersModel, SUniversalPColumnId, TreeNodeAccessor,
 } from '@platforma-sdk/model';
-import { BlockModel, createPFrameForGraphs, createPlDataTableV2, PColumnCollection } from '@platforma-sdk/model';
+import { BlockModel, createPFrameForGraphs, createPlDataTableV2 } from '@platforma-sdk/model';
 import type { APColumnSelectorWithSplit } from '@platforma-sdk/model/dist/render/util/split_selectors';
 
 export type UiState = {
@@ -126,16 +126,16 @@ export const model = BlockModel.create()
       return undefined;
     }
 
-    const splitByCondition = new PColumnCollection()
-      .addAxisLabelProvider(ctx.resultPool)
-      .addColumns(pCols)
-      .getColumns({ axes: [{ split: true }, { }] });
+    // const splitByCondition = new PColumnCollection()
+    //   .addAxisLabelProvider(ctx.resultPool)
+    //   .addColumns(pCols)
+    //   .getColumns({ });
 
-    if (splitByCondition === undefined) {
-      return undefined;
-    }
+    // if (splitByCondition === undefined) {
+    //   return undefined;
+    // }
 
-    return createPlDataTableV2(ctx, splitByCondition, (_) => true,
+    return createPlDataTableV2(ctx, pCols, (_) => true,
       ctx.uiState.tableState, {
         filters: ctx.uiState.filterModel?.filters,
       });

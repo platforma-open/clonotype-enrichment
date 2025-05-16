@@ -130,7 +130,7 @@ def hybrid_enrichment_analysis(
     else: # result_df is empty or no enrich_cols (e.g. only one condition)
          enrichment_df_final = pd.DataFrame(columns=["elementId", "Label", "Comparison", "Numerator", "Denominator", "Enrichment", "Frequency_Numerator"])
     
-    enrichment_df_final.to_csv(enrichment_csv, index=False)
+    result_df.to_csv(enrichment_csv, index=False)
 
     if highest_enrichment_csv: # Check if the argument was provided
         if not enrichment_df_final.empty:
