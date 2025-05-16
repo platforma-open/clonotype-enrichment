@@ -44,7 +44,6 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff) {
           },
           annotations: {
             "pl7.app/label": inputType + " Enrichment Frequency",
-            "pl7.app/vdj/isScore": "true",
             "pl7.app/table/orderPriority": "8000",
             "pl7.app/table/visibility": "optional"
           }
