@@ -39,7 +39,7 @@ wf.body(func(args) {
 	cloneTable = cloneTable.build("csv")
 
 	conditionOrder := args.conditionOrder
-	enrichmentThreshold := args.enrichmentThreshold
+	// enrichmentThreshold := args.enrichmentThreshold
 
 	// Check if inputs are individual clonotypes or clusters
 	inputType := "Unknown"
@@ -61,7 +61,7 @@ wf.body(func(args) {
 		arg("--bubble").arg("bubble_data.csv").
 		arg("--top_enriched").arg("top_enriched.csv").
 		arg("--top_20").arg("top_20.csv").
-		arg("--min_enrichment").arg(string(enrichmentThreshold)).
+		// arg("--min_enrichment").arg(string(enrichmentThreshold)).
 		arg("--highest_enrichment_clonotype").arg("highest_enrichment_clonotype.csv").
 		saveFile("enrichment_results.csv").
 		saveFile("bubble_data.csv").

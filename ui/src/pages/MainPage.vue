@@ -12,7 +12,6 @@ import {
   PlDropdownMulti,
   PlDropdownRef,
   PlMaskIcon24,
-  PlNumberField,
   PlSlideModal,
   PlTableFilters,
 } from '@platforma-sdk/ui-vue';
@@ -106,14 +105,6 @@ const columns = ref<PTableColumnSpec[]>([]);
           The block will export the highest Enrichment value from all comparisons
         </template>
       </PlDropdownMulti>
-      <PlNumberField
-        v-model="app.model.args.enrichmentThreshold"
-        label="Enrichment threshold" :minValue="1" :step="0.1"
-      >
-        <template #tooltip>
-          Select enrichment threshold to consider a clonotype enriched.
-        </template>
-      </PlNumberField>
     </PlSlideModal>
   </PlBlockPage>
 </template>

@@ -271,7 +271,7 @@ if __name__ == "__main__":
     parser.add_argument("--penalty_deplete", type=int, default=10)
     parser.add_argument("--top_n_bubble", type=int, default=20)
     parser.add_argument("--top_n_enriched", type=int, default=5)
-    parser.add_argument("--min_enrichment", type=float, default=3)
+    parser.add_argument("--min_enrichment", required=False, type=float, default=3)
 
     args = parser.parse_args()
 
