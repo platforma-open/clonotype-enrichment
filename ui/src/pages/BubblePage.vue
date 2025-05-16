@@ -58,6 +58,7 @@ const defaultOptions = computed((): GraphMakerProps['defaultOptions'] => {
   <GraphMaker
     v-model="app.model.ui.bubbleState"
     chartType="bubble"
+    :data-state-key="app.model.args.abundanceRef"
     :p-frame="app.model.outputs.bubblePf"
     :defaultOptions="defaultOptions"
   />

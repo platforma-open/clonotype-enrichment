@@ -43,6 +43,7 @@ const defaultOptions = computed((): GraphMakerProps['defaultOptions'] => {
   <GraphMaker
     v-model="app.model.ui.lineState"
     chartType="discrete"
+    :data-state-key="app.model.args.abundanceRef"
     :p-frame="app.model.outputs.linePf"
     :default-options="defaultOptions"
   />

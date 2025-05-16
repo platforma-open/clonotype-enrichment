@@ -128,7 +128,5 @@ wf.body(func(args) {
 		exports: {
 			pf: exports
 		}
-	}
-	
+	}	
 })
-
