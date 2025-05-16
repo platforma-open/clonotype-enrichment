@@ -2,41 +2,36 @@
 import type { GraphMakerProps, PredefinedGraphOption } from '@milaboratories/graph-maker';
 import { GraphMaker } from '@milaboratories/graph-maker';
 import '@milaboratories/graph-maker/styles';
-import { useApp } from '../app';
-import type { PColumnIdAndSpec } from '@platforma-sdk/model';
 import { computed } from 'vue';
-// import { computed } from 'vue';
-// import type { PColumnIdAndSpec } from '@platforma-sdk/model';
+import { useApp } from '../app';
 
 const app = useApp();
 
 const defaultOptions = computed((): GraphMakerProps['defaultOptions'] => {
-  if (!app.model.outputs.bubblePcols)
+  if (!app.model.outputs.stackedPCols)
     return undefined;
 
-  const bubblePcols = app.model.outputs.bubblePcols;
-  function getIndex(name: string, pcols: PColumnIdAndSpec[]): number {
-    return pcols.findIndex((p) => (p.spec.name === name
+  const stackedPCols = app.model.outputs.stackedPCols;
+  const getColSpec = (name: string) =>
+    stackedPCols[stackedPCols.findIndex((p) => (p.spec.name === name
       && p.spec.annotations?.['pl7.app/vdj/isScore'] === undefined
-    ));
-  }
+    ))].spec;
+
+  const frequencyColSpec = getColSpec('pl7.app/vdj/frequency');
   const defaults: PredefinedGraphOption<'discrete'>[] = [
     {
       inputName: 'y',
-      selectedSource: bubblePcols[getIndex('pl7.app/vdj/frequency',
-        bubblePcols)].spec,
+      selectedSource: frequencyColSpec,
     },
     // pl7.app/vdj/clonotypeKey
     {
       inputName: 'secondaryGrouping',
-      selectedSource: bubblePcols[getIndex('pl7.app/vdj/frequency',
-        bubblePcols)].spec.axesSpec[0],
+      selectedSource: frequencyColSpec.axesSpec[0],
     },
     // pl7.app/vdj/round
     {
       inputName: 'primaryGrouping',
-      selectedSource: bubblePcols[getIndex('pl7.app/vdj/frequency',
-        bubblePcols)].spec.axesSpec[1],
+      selectedSource: frequencyColSpec.axesSpec[1],
     },
   ];
   return defaults;
@@ -46,7 +41,9 @@ const defaultOptions = computed((): GraphMakerProps['defaultOptions'] => {
 
 <template>
   <GraphMaker
-    v-model="app.model.ui.stackedState" chartType="discrete"
+    v-model="app.model.ui.stackedState"
+    chartType="discrete"
+    :data-state-key="app.model.args.abundanceRef"
     :p-frame="app.model.outputs.stackedPf"
     :default-options="defaultOptions"
   />

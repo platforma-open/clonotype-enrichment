@@ -1,56 +1,43 @@
 ll := import("@platforma-sdk/workflow-tengo:ll")
 
-getColumns := func(countsSpec) {
+getColumns := func(abundanceSpec) {
   return {
-    "axes": [
+    axes: [
       {
-        "column": "Clonotype",
-        "spec": countsSpec.axesSpec[1]
+        column: "elementId",
+        spec: abundanceSpec.axesSpec[1]
       },
       {
-        "column": "Condition",
-        "id": "round",
-        "allowNA": false,
-        "spec": {
-          "name": "pl7.app/vdj/round",
-          "type": "String",
-          "domain": {},
-          "annotations": {
-            "pl7.app/label": "Round"
+        column: "Condition",
+        id: "Condition",
+        allowNA: false,
+        spec: {
+          name: "pl7.app/vdj/condition",
+          type: "String",
+          domain: {},
+          annotations: {
+            "pl7.app/label": "Condition"
           }
         }
       }
       ],
-    "columns": [
-      // {
-      //   "column": "Label",
-      //   "id": "label",
-      //   "allowNA": false,
-      //   "spec": {
-      //     "name": "pl7.app/vdj/temporarylabel",
-      //     "valueType": "String",
-      //     "domain": {},
-      //     "annotations": {
-      //       "pl7.app/label": "Clonotype label"
-      //     }
-      //   }
-      // },
+    columns: [
       {
-        "column": "Frequency",
-        "id": "frequency",
-        "allowNA": false,
-        "spec": {
-          "name": "pl7.app/vdj/frequency",
-          "valueType": "Double",
-          "domain": {},
-          "annotations": {
+        column: "Frequency",
+        id: "frequency",
+        allowNA: false,
+        spec: {
+          name: "pl7.app/vdj/frequency",
+          valueType: "Double",
+          domain: {},
+          annotations: {
             "pl7.app/label": "Frequency"
           }
         }
       }
       ],
-    "storageFormat": "Binary",
-    "partitionKeyLength": 0
+    storageFormat: "Binary",
+    partitionKeyLength: 0
   }
 }
 

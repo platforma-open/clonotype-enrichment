@@ -1,6 +1,10 @@
 import type { GraphMakerState } from '@milaboratories/graph-maker';
-import type { InferOutputsType, PColumnIdAndSpec, PColumnSpec, PFrameHandle, PlDataTableState, PlRef, PlTableFiltersModel } from '@platforma-sdk/model';
-import { BlockModel, createPFrameForGraphs, createPlDataTable, isPColumnSpec, PColumnCollection } from '@platforma-sdk/model';
+import type {
+  InferOutputsType, PColumnIdAndSpec, PFrameHandle, PlDataTableState,
+  PlRef, PlTableFiltersModel, SUniversalPColumnId, TreeNodeAccessor,
+} from '@platforma-sdk/model';
+import { BlockModel, createPFrameForGraphs, createPlDataTableV2 } from '@platforma-sdk/model';
+import type { APColumnSelectorWithSplit } from '@platforma-sdk/model/dist/render/util/split_selectors';
 
 export type UiState = {
   title?: string;
@@ -12,21 +16,17 @@ export type UiState = {
 };
 
 export type BlockArgs = {
-  countsRef?: PlRef;
-  roundColumn?: PlRef;
-  roundOrder: string[];
+  abundanceRef?: PlRef;
+  conditionColumnRef?: SUniversalPColumnId;
+  conditionOrder: string[];
   enrichmentThreshold: number;
-  roundExport?: string;
+  conditionExport?: string;
 };
-
-function isNumericType(c: PColumnSpec): boolean {
-  return c.valueType === 'Double' || c.valueType === 'Int' || c.valueType === 'Float' || c.valueType === 'Long';
-}
 
 export const model = BlockModel.create()
 
   .withArgs<BlockArgs>({
-    roundOrder: [],
+    conditionOrder: [],
     enrichmentThreshold: 3,
   })
 
@@ -50,7 +50,7 @@ export const model = BlockModel.create()
       currentTab: null,
     },
     lineState: {
-      title: 'Clonotype enrichment',
+      title: 'Top clonotype frequencies',
       template: 'line',
       currentTab: null,
     },
@@ -62,48 +62,54 @@ export const model = BlockModel.create()
     filterModel: {},
   })
 
-  // User can only select as input UMI/cell count matrices or read count matrices
-  // for cases where we don't have UMI counts
-  // includeNativeLabel and addLabelAsSuffix makes visible the data source dataset
-  // Result: [dataID] / input
-  .output('countsOptions', (ctx) => {
-    // First get all molecule/cell count datasets and their block IDs
-    const mainOptions = ctx.resultPool.getOptions((c) =>
-      isPColumnSpec(c) && isNumericType(c)
-      && c.annotations?.['pl7.app/isAbundance'] === 'true'
-      && c.annotations?.['pl7.app/abundance/normalized'] === 'false'
-      && ['molecules', 'cells'].includes(c.annotations?.['pl7.app/abundance/unit']),
-    { includeNativeLabel: true, addLabelAsSuffix: true });
-    const umiBlockIds: string[] = mainOptions.map((item) => item.ref.blockId);
+  .argsValid((ctx) => ctx.args.abundanceRef !== undefined
+    && ctx.args.conditionColumnRef !== undefined
+    && ctx.args.conditionOrder.length > 0)
 
-    // Then get all read count datasets that don't match blockIDs from molecule/cell counts
-    let extraOptions = ctx.resultPool.getOptions((c) =>
-      isPColumnSpec(c) && isNumericType(c)
-      && c.annotations?.['pl7.app/isAbundance'] === 'true'
-      && c.annotations?.['pl7.app/abundance/normalized'] === 'false'
-      && c.annotations?.['pl7.app/abundance/unit'] === 'reads',
-    { includeNativeLabel: true, addLabelAsSuffix: true });
-    extraOptions = extraOptions.filter((item) =>
-      !umiBlockIds.includes(item.ref.blockId));
-
-    // Combine all valid options
-    const validOptions = [...mainOptions, ...extraOptions];
-    return validOptions;
-  })
-
-  .output('metadataOptions', (ctx) =>
-    ctx.resultPool.getOptions((spec) => isPColumnSpec(spec) && spec.name === 'pl7.app/metadata'),
+  .output('abundanceOptions', (ctx) =>
+    ctx.resultPool.getOptions([{
+      axes: [
+        { name: 'pl7.app/sampleId' },
+        { },
+      ],
+      annotations: {
+        'pl7.app/isAbundance': 'true',
+        'pl7.app/abundance/normalized': 'false',
+        'pl7.app/abundance/isPrimary': 'true',
+      },
+    },
+    ]),
   )
 
+  .output('metadataOptions', (ctx) => {
+    const anchor = ctx.args.abundanceRef;
+    if (anchor === undefined) return undefined;
+    return ctx.resultPool.getCanonicalOptions({ main: anchor },
+      [{
+        axes: [
+          { anchor: 'main', idx: 0 },
+        ],
+        name: 'pl7.app/metadata',
+      }],
+    );
+  })
+
   .output('datasetSpec', (ctx) => {
-    if (ctx.args.countsRef) return ctx.resultPool.getSpecByRef(ctx.args.countsRef);
+    if (ctx.args.abundanceRef) return ctx.resultPool.getSpecByRef(ctx.args.abundanceRef);
     else return undefined;
   })
 
-  .output('roundOptions', (ctx) => {
-    if (!ctx.args.roundColumn) return undefined;
+  .output('conditionValues', (ctx) => {
+    const conditionColumnRef = ctx.args.conditionColumnRef;
+    if (!conditionColumnRef) return undefined;
 
-    const data = ctx.resultPool.getDataByRef(ctx.args.roundColumn)?.data;
+    const anchor = ctx.args.abundanceRef;
+    if (anchor === undefined) return undefined;
+
+    const pCols = ctx.resultPool.getAnchoredPColumns({ main: anchor },
+      JSON.parse(conditionColumnRef) as APColumnSelectorWithSplit,
+    );
+    const data = pCols?.[0]?.data as TreeNodeAccessor | undefined;
 
     // @TODO need a convenient method in API
     const values = data?.getDataAsJson<Record<string, string>>()?.['data'];
@@ -120,18 +126,19 @@ export const model = BlockModel.create()
       return undefined;
     }
 
-    const splitByCondition = new PColumnCollection()
-      .addAxisLabelProvider(ctx.resultPool)
-      .addColumns(pCols)
-      .getColumns({ axes: [{ split: true }, { }] });
+    // const splitByCondition = new PColumnCollection()
+    //   .addAxisLabelProvider(ctx.resultPool)
+    //   .addColumns(pCols)
+    //   .getColumns({ });
 
-    if (splitByCondition === undefined) {
-      return undefined;
-    }
+    // if (splitByCondition === undefined) {
+    //   return undefined;
+    // }
 
-    return createPlDataTable(ctx, splitByCondition, ctx.uiState.tableState, {
-      filters: ctx.uiState.filterModel?.filters,
-    });
+    return createPlDataTableV2(ctx, pCols, (_) => true,
+      ctx.uiState.tableState, {
+        filters: ctx.uiState.filterModel?.filters,
+      });
   })
 
   // Returns a map of results for plot
@@ -141,20 +148,11 @@ export const model = BlockModel.create()
       return undefined;
     }
 
-    // const labelPCol = ctx.outputs?.resolve('clonotypeMapPf')?.getPColumns();
-    // if (labelPCol === undefined) {
-    //   return undefined;
-    // }
-
-    // const pColsWithLabel = [...pCols, ...labelPCol];
-
-    // return ctx.createPFrame(pColsWithLabel);
-
     return createPFrameForGraphs(ctx, pCols);
   })
 
   // Returns a list pof Pcols for plot defaults
-  .output('bubblePcols', (ctx) => {
+  .output('bubblePCols', (ctx) => {
     const pCols = ctx.outputs?.resolve('bubblePf')?.getPColumns();
     if (pCols === undefined) {
       return undefined;
@@ -176,6 +174,21 @@ export const model = BlockModel.create()
     }
 
     return createPFrameForGraphs(ctx, pCols);
+  })
+
+  .output('stackedPCols', (ctx) => {
+    const pCols = ctx.outputs?.resolve('stackedPf')?.getPColumns();
+    if (pCols === undefined) {
+      return undefined;
+    }
+
+    return pCols.map(
+      (c) =>
+        ({
+          columnId: c.id,
+          spec: c.spec,
+        } satisfies PColumnIdAndSpec),
+    );
   })
 
   .output('linePf', (ctx): PFrameHandle | undefined => {

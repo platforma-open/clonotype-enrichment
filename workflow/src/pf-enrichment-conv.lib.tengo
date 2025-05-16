@@ -1,69 +1,63 @@
 ll := import("@platforma-sdk/workflow-tengo:ll")
 maps := import("@platforma-sdk/workflow-tengo:maps")
 
-getColumns := func(countsSpec) {
+getColumns := func(countsSpec, conditionOrder) {
+  columns := []
+  for idx, condition in conditionOrder {
+    columns = columns + [{
+                          column: "Frequency " + condition,
+                          id: "frequency_" + condition,
+                          allowNA: true,
+                          spec: {
+                            name: "pl7.app/vdj/frequency",
+                            valueType: "Double",
+                            domain: {},
+                            annotations: {
+                              "pl7.app/label": "Frequency " + condition,
+                              // add isScore only in exports to ease plots
+                              // "pl7.app/vdj/isScore": "true",
+                              "pl7.app/table/orderPriority": "8000",
+                              "pl7.app/table/visibility": "optional"
+                            }
+                          }
+                        }]
+    if idx != 0 {
+      for conditionBaseline in conditionOrder[0:idx] {
+        columns = columns + [{
+                            column: "Enrichment " + condition + " vs " + conditionBaseline,
+                            id: "enrichment_" + condition + "_" + conditionBaseline,
+                            allowNA: true,
+                            spec: {
+                              name: "pl7.app/vdj/enrichment",
+                              valueType: "Double",
+                              domain: {},
+                              annotations: {
+                                "pl7.app/label": "Enrichment " + condition + " vs " + conditionBaseline,
+                                // add isScore only in exports to ease plots
+                                // "pl7.app/vdj/isScore": "true",
+                                "pl7.app/table/orderPriority": "9000",
+                                "pl7.app/table/visibility": "default"
+                              }
+                            }
+                          }]
+      }
+    }
+  }
+    
   return {
-    "axes": [
+    axes: [
       {
-        "column": "Condition",
-        "id": "condition",
-        "allowNA": false,
-        "spec": {
-          "name": "pl7.app/vdj/condition",
-          "type": "String",
-          "domain": {},
-          "annotations": {
-            "pl7.app/label": "Condition"
-          }
-        }
-      },
-      {
-        "column": "Clonotype",
-        "spec": maps.deepMerge(countsSpec.axesSpec[1], {
-          "annotations": {
+        column: "elementId",
+        spec: maps.deepMerge(countsSpec.axesSpec[1], {
+          annotations: {
             "pl7.app/table/visibility": "default"
           }
         })
       }
     ],
-    "columns": [
-      {
-        "column": "Frequency",
-        "id": "frequency",
-        "allowNA": false,
-        "spec": {
-          "name": "pl7.app/vdj/frequency",
-          "valueType": "Double",
-          "domain": {},
-          "annotations": {
-            "pl7.app/label": "Frequency",
-            // add isScore only in exports to ease plots
-            // "pl7.app/vdj/isScore": "true",
-            "pl7.app/table/orderPriority": "9000",
-            "pl7.app/table/visibility": "default"
-          }
-        }
-      },
-      {
-        "column": "Enrichment",
-        "id": "enrichment",
-        "allowNA": true,
-        "spec": {
-          "name": "pl7.app/vdj/enrichment",
-          "valueType": "Double",
-          "domain": {},
-          "annotations": {
-            "pl7.app/label": "Enrichment",
-            // add isScore only in exports to ease plots
-            // "pl7.app/vdj/isScore": "true",
-            "pl7.app/table/orderPriority": "8000",
-            "pl7.app/table/visibility": "default"
-          }
-        }
-      }
-      ],
-    "storageFormat": "Binary",
-    "partitionKeyLength": 1
+    columns: columns,
+    storageFormat: "Binary",
+    partitionKeyLength: 0
   }
 }
 

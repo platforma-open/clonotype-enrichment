@@ -4,135 +4,118 @@ exec := import("@platforma-sdk/workflow-tengo:exec")
 assets:= import("@platforma-sdk/workflow-tengo:assets")
 xsv := import("@platforma-sdk/workflow-tengo:pframes.xsv")
 pframes := import("@platforma-sdk/workflow-tengo:pframes")
-ptransformSw := assets.importSoftware("@platforma-open/milaboratories.software-ptransform:main")
-json := import("json")
+render := import("@platforma-sdk/workflow-tengo:render")
+buildExportsTpl := assets.importTemplate(":build-exports")
 
 pfEnrichmentConv := import(":pf-enrichment-conv")
-pfEnrichmentConv2 := import(":pf-enrichment-conv-export")
 pfBubbleConv := import(":pf-bubble-conv")
 pfStackedConv := import(":pf-stacked-conv")
-pfClonotypeMapConv := import(":pf-clonotype-map-conv")
+
 
 wf.prepare(func(args){
 
+	bundleBuilder := wf.createPBundleBuilder()
+	bundleBuilder.addAnchor("main", args.abundanceRef) 
+	bundleBuilder.addSingle(args.conditionColumnRef)
+
 	return {
-		resolvedInput: wf.resolve(args.countsRef, { errIfMissing: true }),
-		resolvedRoundColumn: wf.resolve(args.roundColumn),
-		metaRefs: args.roundColumn
+		columns: bundleBuilder.build()
 	}
 })
 
 wf.body(func(args) {
-	blockId := wf.blockId().getDataAsJson()
 
-	allCounts := args.resolvedInput
-	countsSpec := allCounts.spec
-	roundColumn := args.resolvedRoundColumn
-	roundOrder := args.roundOrder
-	enrichmentThreshold := args.enrichmentThreshold
-	condition := args.roundExport
-	if condition == undefined {
-		condition = roundOrder[len(roundOrder) - 1]
-	}
+	// Load input parameters and related variables
+	blockId := wf.blockId().getDataAsJson()
+	columns := args.columns
+
+	abundanceSpec := columns.getSpec(args.abundanceRef)
+
+	cloneTable := columns.xsvTableBuilder()
+	cloneTable.add(args.abundanceRef, {header: "abundance"})
+	cloneTable.add(args.conditionColumnRef, {header: "condition"})
+	cloneTable.setAxisHeader(abundanceSpec.axesSpec[0].name, "sampleId")
+	cloneTable.setAxisHeader(abundanceSpec.axesSpec[1].name, "elementId")
+	cloneTable = cloneTable.build("csv")
+
+	conditionOrder := args.conditionOrder
+	// enrichmentThreshold := args.enrichmentThreshold
 
 	// Check if inputs are individual clonotypes or clusters
 	inputType := "Unknown"
-	if countsSpec.axesSpec[1].name == "pl7.app/vdj/clusterId" {
+	if abundanceSpec.axesSpec[1].name == "pl7.app/vdj/clusterId" {
 		inputType = "Cluster"
-	} else if countsSpec.axesSpec[1].name == "pl7.app/vdj/clonotypeKey" || 
-				countsSpec.axesSpec[1].name == "pl7.app/vdj/scClonotypeKey" {
+	} else if abundanceSpec.axesSpec[1].name == "pl7.app/vdj/clonotypeKey" || 
+				abundanceSpec.axesSpec[1].name == "pl7.app/vdj/scClonotypeKey" {
 		inputType = "Clonotype"
 	}
 	
-	// convert PColumns to csv
-	csvCounts := xsv.exportFrame([allCounts], "csv", {})
-	csvCovariates := xsv.exportFrame([roundColumn], "csv", {})
-
+	//////////// Enrichment analysis ////////////
+	// Run enrichment script
 	calculateEnrichment := exec.builder().
 		software(assets.importSoftware("@platforma-open/milaboratories.clonotype-enrichment.software:calculate-enrichment")).
-		addFile("rawCounts.csv", csvCounts).
-		addFile("covariates.csv", csvCovariates).
-		arg("--counts").arg("rawCounts.csv").
-		arg("--metadata").arg("covariates.csv").
-		arg("--condition_column").arg(string(roundColumn.spec.annotations["pl7.app/label"])).
-		arg("--conditions").arg(string(roundOrder)).
+		addFile("inputFile.csv", cloneTable).
+		arg("--input_data").arg("inputFile.csv").
+		arg("--conditions").arg(string(conditionOrder)).
 		arg("--enrichment").arg("enrichment_results.csv").
-		arg("--volcano").arg("volcano_data.csv").
 		arg("--bubble").arg("bubble_data.csv").
 		arg("--top_enriched").arg("top_enriched.csv").
-		arg("--clonotype_map").arg("clonotype_map.csv").
 		arg("--top_20").arg("top_20.csv").
-		arg("--min_enrichment").arg(string(enrichmentThreshold)).
-		arg("--count_column").arg(string(countsSpec.annotations["pl7.app/label"])).
-		arg("--clonotype_column").arg(string(countsSpec.axesSpec[1].annotations["pl7.app/label"])).
-		arg("--sample_column").arg(string(countsSpec.axesSpec[0].annotations["pl7.app/label"])).
-		// arg("--top_n_volcano").arg("1000").
-		// arg("--top_n_bubble").arg("20").
-		// arg("--top_n_enriched").arg("5").
+		// arg("--min_enrichment").arg(string(enrichmentThreshold)).
+		arg("--highest_enrichment_clonotype").arg("highest_enrichment_clonotype.csv").
 		saveFile("enrichment_results.csv").
-		saveFile("volcano_data.csv").
 		saveFile("bubble_data.csv").
 		saveFile("top_enriched.csv").
-		saveFile("clonotype_map.csv").
 		saveFile("top_20.csv").
+		saveFile("highest_enrichment_clonotype.csv").
 		printErrStreamToStdout().
 		saveStdoutContent().
 		cache(24 * 60 * 60 * 1000).
 		run()
 
+	// Convert script outputs to Pframes
 	enrichCsv := calculateEnrichment.getFile("enrichment_results.csv")
-	EnrichmentImportParams := pfEnrichmentConv.getColumns(countsSpec)
-	enrichmentPf := xsv.importFile(enrichCsv, "csv", EnrichmentImportParams)
+	enrichmentImportParams := pfEnrichmentConv.getColumns(abundanceSpec, conditionOrder)
+	enrichmentPf := xsv.importFile(enrichCsv, "csv", enrichmentImportParams)
 
-	bubbleImportParams := pfBubbleConv.getColumns(countsSpec)
+	bubbleImportParams := pfBubbleConv.getColumns(abundanceSpec)
 	bubblePf := xsv.importFile(calculateEnrichment.getFile("bubble_data.csv"), "csv", bubbleImportParams)
 
-	stackedImportParams := pfStackedConv.getColumns(countsSpec)
-	stackedPf := xsv.importFile(calculateEnrichment.getFile("top_enriched.csv"), "csv", stackedImportParams)
-
-	lineImportParams := pfStackedConv.getColumns(countsSpec)
+	lineImportParams := pfStackedConv.getColumns(abundanceSpec)
 	linePf := xsv.importFile(calculateEnrichment.getFile("top_20.csv"), "csv", lineImportParams)
 
-	// clonotypeMapImportParams := pfClonotypeMapConv.getColumns(countsSpec)
-	// clonotypeMapPf := xsv.importFile(calculateEnrichment.getFile("clonotype_map.csv"), "csv", clonotypeMapImportParams)
+	stackedImportParams := pfStackedConv.getColumns(abundanceSpec)
+	stackedPf := xsv.importFile(calculateEnrichment.getFile("top_enriched.csv"), "csv", stackedImportParams)
 
-	exports := {}
+	// Calculate annotation values
+	topEnrichedColCsv := calculateEnrichment.getFile("highest_enrichment_clonotype.csv")
 
-	// Prepare selected enrichment and frequency export for clonotype-browser
-	enrichTsv := xsv.exportFrame(enrichmentPf, "tsv", {})
-	filterWorkflow := { steps: [
-		{
-			type: "filter",
-			predicate: {
-				type: "eq",
-				value: condition,
-				column: "Condition"
-				}
-			}
-		]
-	}
-
-	// ptransform only accepts tsv as input
-	filterCmd := exec.builder().
+	annotationValues := exec.builder().
+		software(assets.importSoftware("@platforma-open/milaboratories.clonotype-enrichment.software:calculate-annotations")).
+		addFile("inputFile.csv", topEnrichedColCsv).
+		arg("inputFile.csv").
+		saveFileContent("enrichment_min.txt"). 
+		saveFileContent("enrichment_max.txt").
+		saveFileContent("enrichment_75.txt").
 		printErrStreamToStdout().
-		software(ptransformSw).
-		arg("--workflow").arg("wf.json").
-		writeFile("wf.json", json.encode(filterWorkflow)).
-		arg("input.tsv").addFile("input.tsv", enrichTsv).
-		arg("output.tsv").saveFile("output.tsv").
+		saveStdoutContent().
+		cache(24 * 60 * 60 * 1000).
 		run()
 
-	EnrichmentImportParams2 := pfEnrichmentConv2.getColumns(countsSpec, string(condition), inputType)
-	secondExport := xsv.importFile(filterCmd.getFile("output.tsv"), "tsv", EnrichmentImportParams2)
+	min := annotationValues.getFileContent("enrichment_min.txt")
+	max := annotationValues.getFileContent("enrichment_max.txt")
+	cutoff := annotationValues.getFileContent("enrichment_75.txt")
 
-	exports["Enrichment - " + condition] = {
-		spec: secondExport["enrichment.spec"],
-		data: secondExport["enrichment.data"]
-	}
-	exports["Frequency - " + condition] = {
-		spec: secondExport["frequency.spec"],
-		data: secondExport["frequency.data"]
-	}
+	buildExports := render.create(buildExportsTpl, {
+		abundanceSpec: abundanceSpec,
+		inputType: inputType,
+		topEnrichedColCsv: topEnrichedColCsv,
+		min: min,
+		max: max,
+		cutoff: cutoff
+	})
+
+	exports := buildExports.output("exports")
 
 	return {
 		outputs: {
@@ -142,8 +125,8 @@ wf.body(func(args) {
 			linePf: pframes.exportFrame(linePf)//,
 			// clonotypeMapPf: pframes.exportFrame(clonotypeMapPf)
 		},
-		exports: exports
-	}
-	
+		exports: {
+			pf: exports
+		}
+	}	
 })
-

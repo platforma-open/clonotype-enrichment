@@ -1,56 +1,51 @@
 <script setup lang="ts">
+import { plRefsEqual, type PlRef, type PTableColumnSpec } from '@platforma-sdk/model';
 import type {
-  PlDataTableSettings } from '@platforma-sdk/ui-vue';
+  PlAgDataTableSettings,
+} from '@platforma-sdk/ui-vue';
 import {
-  PlAgDataTable,
   PlAgDataTableToolsPanel,
+  PlAgDataTableV2,
   PlBlockPage,
   PlBtnGhost,
   PlDropdown,
   PlDropdownMulti,
   PlDropdownRef,
   PlMaskIcon24,
-  PlNumberField,
   PlSlideModal,
   PlTableFilters,
-  PlAccordionSection,
 } from '@platforma-sdk/ui-vue';
-import { useApp } from '../app';
 import { computed, ref } from 'vue';
-import { plRefsEqual, type PlRef, type PTableColumnSpec } from '@platforma-sdk/model';
+import { useApp } from '../app';
 
 const app = useApp();
 
-/** UI state upgrader */ (() => {
-  if ('filtersOpen' in app.model.ui) delete app.model.ui.filtersOpen;
-  if (app.model.ui.filterModel === undefined) app.model.ui.filterModel = {};
-})();
-
 function setInput(inputRef?: PlRef) {
-  app.model.args.countsRef = inputRef;
+  app.model.args.abundanceRef = inputRef;
   if (inputRef) {
-    const datasetLabel = app.model.outputs.countsOptions?.find((o) => plRefsEqual(o.ref, inputRef))?.label;
-    if (datasetLabel)
-      app.model.ui.title = 'Clonotype enrichment - ' + datasetLabel;
+    const abundanceLabel = app.model.outputs.abundanceOptions?.find((o) => plRefsEqual(o.ref, inputRef))?.label;
+    if (abundanceLabel)
+      app.model.ui.title = 'Clonotype enrichment - ' + abundanceLabel;
   }
 }
 
-const tableSettings = computed<PlDataTableSettings | undefined>(() => {
+const tableSettings = computed<PlAgDataTableSettings>(() => {
   const pTable = app.model.outputs.pt;
   if (pTable === undefined) {
-    // when table is not yet calculated
-    if (app.model.outputs.isRunning) {
-      // @TODO: proper "running" message
-      return undefined;
-    } else {
-      // @TODO: proper "not calculated" message
-      return undefined;
-    }
+    // special case: when block is not yet started at all (no table calculated)
+    return undefined;
   }
   return {
     sourceType: 'ptable',
-    pTable: app.model.outputs.pt,
+    model: pTable,
   };
+});
+
+const tableLoadingText = computed(() => {
+  if (app.model.outputs.isRunning) {
+    return 'Running';
+  }
+  return 'Loading';
 });
 
 const settingsAreShown = ref(app.model.outputs.datasetSpec === undefined);
@@ -58,18 +53,10 @@ const showSettings = () => {
   settingsAreShown.value = true;
 };
 
-// Allowed options for contrast Factor (metadata columns)
-const roundColumnOptions = computed(() => {
-  return app.model.outputs.metadataOptions?.map((v) => ({
-    value: v.ref,
-    label: v.label,
-  })) ?? [];
-});
-
-// Get list of availables values within round column
+// Get list of available values within round column
 // we will select them in list, being the first one denominator and rest numerators
-const roundOptions = computed(() => {
-  return app.model.outputs.roundOptions?.map((v) => ({
+const conditionValues = computed(() => {
+  return app.model.outputs.conditionValues?.map((v) => ({
     value: v,
     label: v,
   }));
@@ -93,10 +80,12 @@ const columns = ref<PTableColumnSpec[]>([]);
         </template>
       </PlBtnGhost>
     </template>
-    <PlAgDataTable
+    <PlAgDataTableV2
       ref="tableInstance"
       v-model="app.model.ui.tableState"
       :settings="tableSettings"
+      :loading-text="tableLoadingText"
+      not-ready-text="Block is not started"
       show-columns-panel
       show-export-button
       @columns-changed="(newColumns) => (columns = newColumns)"
@@ -104,32 +93,18 @@ const columns = ref<PTableColumnSpec[]>([]);
     <PlSlideModal v-model="settingsAreShown">
       <template #title>Settings</template>
       <PlDropdownRef
-        v-model="app.model.args.countsRef" :options="app.model.outputs.countsOptions"
-        label="Select dataset" clearable
+        v-model="app.model.args.abundanceRef" :options="app.model.outputs.abundanceOptions"
+        label="Select abundance" clearable
         @update:model-value="setInput"
       />
-      <PlDropdown v-model="app.model.args.roundColumn" :options="roundColumnOptions" label="Condition column" />
-      <PlDropdownMulti v-model="app.model.args.roundOrder" :options="roundOptions" label="Condition order" >
+      <PlDropdown v-model="app.model.args.conditionColumnRef" :options="app.model.outputs.metadataOptions" label="Condition column" />
+      <PlDropdownMulti v-model="app.model.args.conditionOrder" :options="conditionValues" label="Condition order" >
         <template #tooltip>
-          Order aware selection. Calculate a contrast between first element (denominator) and each of the other selected options (numerators).
+          Order aware selection. Calculate contrast between an element (numerator) and each of its preceeding elements (denominators).
+          Example: if you select "Cond 1", "Cond 2" and "Cond 3" as order, the contrasts will be "Cond 2 vs Cond 1", "Cond 3 vs Cond 1" and "Cond 3 vs Cond 2".
+          The block will export the highest Enrichment value from all comparisons
         </template>
       </PlDropdownMulti>
-      <PlNumberField
-        v-model="app.model.args.enrichmentThreshold"
-        label="Enrichment threshold" :minValue="1" :step="0.1"
-      >
-        <template #tooltip>
-          Select enrichment threshold to consider a clonotype enriched.
-        </template>
-      </PlNumberField>
-      <!-- Content hidden until you click -->
-      <PlAccordionSection label="ADVANCED SETTINGS">
-        <PlDropdown v-model="app.model.args.roundExport" :options="roundOptions" label="Stored condition column" >
-          <template #tooltip>
-            Select the round for exporting clonotype enrichment or frequency values. The last round is selected by default.
-          </template>
-        </PlDropdown>
-      </PlAccordionSection>
     </PlSlideModal>
   </PlBlockPage>
 </template>

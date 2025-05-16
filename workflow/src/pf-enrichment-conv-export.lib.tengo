@@ -1,52 +1,58 @@
 ll := import("@platforma-sdk/workflow-tengo:ll")
 
-getColumns := func(countsSpec, condition, inputType) {
+getColumns := func(abundanceSpec, inputType, min, max, cutoff) {
   return {
-    "axes": [
+    axes: [
       {
-        "column": countsSpec.axesSpec[1].annotations["pl7.app/label"],
-        // "column": "Clonotype or cluster",
-        "spec": countsSpec.axesSpec[1]
+        column: "elementId",
+        spec: abundanceSpec.axesSpec[1]
       }
       ],
-    "columns": [
+    columns: [
       {
-        "column": "Frequency",
-        "id": "frequency",
-        "allowNA": false,
-        "spec": {
-          "name": "pl7.app/vdj/frequency",
-          "valueType": "Double",
-          "domain": {"pl7.app/vdj/condition": condition,
-                    "pl7.app/vdj/source": inputType},
-          "annotations": {
-            "pl7.app/label": inputType + " Frequency - " + condition,
+        column: "Enrichment",
+        id: "enrichment",
+        allowNA: true,
+        spec: {
+          name: "pl7.app/vdj/enrichment",
+          valueType: "Double",
+          domain: {
+            "pl7.app/vdj/comparison": "highest_enrichment_clonotype",
+            "pl7.app/vdj/source": inputType
+          },
+          annotations: {
+            "pl7.app/label": inputType + " Enrichment Score",
             "pl7.app/vdj/isScore": "true",
             "pl7.app/table/orderPriority": "9000",
-            "pl7.app/table/visibility": "default"
+            "pl7.app/table/visibility": "default",
+            "pl7.app/rangeValues": "[" + min + "," + max + "]",
+            "pl7.app/rankValues": "increasing",
+            "pl7.app/filterValues": cutoff
           }
         }
       },
       {
-        "column": "Enrichment",
-        "id": "enrichment",
-        "allowNA": true,
-        "spec": {
-          "name": "pl7.app/vdj/enrichment",
-          "valueType": "Double",
-          "domain": {"pl7.app/vdj/condition": condition,
-                    "pl7.app/vdj/source": inputType},
-          "annotations": {
-            "pl7.app/label": inputType + " Enrichment - " + condition,
+        column: "Frequency_Numerator",
+        id: "frequency",
+        allowNA: false,
+        spec: {
+          name: "pl7.app/vdj/frequency",
+          valueType: "Double",
+          domain: {
+            "pl7.app/vdj/comparison": "highest_enrichment_clonotype",
+            "pl7.app/vdj/source": inputType
+          },
+          annotations: {
+            "pl7.app/label": inputType + " Enrichment Frequency",
             "pl7.app/vdj/isScore": "true",
             "pl7.app/table/orderPriority": "8000",
-            "pl7.app/table/visibility": "default"
+            "pl7.app/table/visibility": "optional"
           }
         }
       }
       ],
-    "storageFormat": "Binary",
-    "partitionKeyLength": 0
+    storageFormat: "Binary",
+    partitionKeyLength: 0
   }
 }
 
