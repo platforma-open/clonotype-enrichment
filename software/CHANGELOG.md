@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.software
 
+## 2.5.0
+
+### Minor Changes
+
+- 6aa03bc: Label and threshold changes
+
 ## 2.4.0
 
 ### Minor Changes

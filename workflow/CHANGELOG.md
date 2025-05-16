@@ -1,5 +1,16 @@
 # @platforma-open/milaboratories.clonotype-enrichment.workflow
 
+## 2.8.0
+
+### Minor Changes
+
+- 6aa03bc: Label and threshold changes
+
+### Patch Changes
+
+- Updated dependencies [6aa03bc]
+  - @platforma-open/milaboratories.clonotype-enrichment.software@2.5.0
+
 ## 2.7.0
 
 ### Minor Changes
