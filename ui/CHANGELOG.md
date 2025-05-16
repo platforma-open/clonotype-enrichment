@@ -1,5 +1,16 @@
 # @platforma-open/milaboratories.clonotype-enrichment.ui
 
+## 2.3.0
+
+### Minor Changes
+
+- be02daf: Added overall enrichment calculation
+
+### Patch Changes
+
+- Updated dependencies [be02daf]
+  - @platforma-open/milaboratories.clonotype-enrichment.model@2.4.0
+
 ## 2.2.0
 
 ### Minor Changes

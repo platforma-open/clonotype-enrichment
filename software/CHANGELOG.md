@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.software
 
+## 2.4.0
+
+### Minor Changes
+
+- be02daf: Added overall enrichment calculation
+
 ## 2.3.0
 
 ### Minor Changes
