@@ -31,7 +31,7 @@ function setInput(inputRef?: PlRef) {
 
 const tableSettings = computed<PlAgDataTableSettings>(() => {
   const pTable = app.model.outputs.pt;
-  if (pTable === undefined) {
+  if (pTable === undefined && !app.model.outputs.isRunning) {
     // special case: when block is not yet started at all (no table calculated)
     return undefined;
   }
