@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.model
 
+## 2.4.1
+
+### Patch Changes
+
+- 0296ae9: Update exports
+
 ## 2.4.0
 
 ### Minor Changes
