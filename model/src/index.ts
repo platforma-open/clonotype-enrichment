@@ -6,6 +6,19 @@ import type {
 import { BlockModel, createPFrameForGraphs, createPlDataTableV2 } from '@platforma-sdk/model';
 import type { APColumnSelectorWithSplit } from '@platforma-sdk/model/dist/render/util/split_selectors';
 
+export type DiversityType = 'chao1' | 'd50' | 'efronThisted' |
+  'observed' | 'shannonWienerIndex' | 'shannonWiener' |
+  'normalizedShannonWiener' | 'inverseSimpson' | 'gini';
+
+export type Metric = {
+  type: DiversityType | undefined;
+  downsampling: {
+    type?: 'none' | 'top' | 'cumtop' | 'hypergeometric' ;
+    valueChooser?: 'min' | 'fixed' | 'max' | 'auto';
+    n?: number;
+  };
+};
+
 export type UiState = {
   title?: string;
   tableState: PlDataTableState;
@@ -19,12 +32,20 @@ export type BlockArgs = {
   abundanceRef?: PlRef;
   conditionColumnRef?: SUniversalPColumnId;
   conditionOrder: string[];
+  metric: Metric[];
 };
 
 export const model = BlockModel.create()
 
   .withArgs<BlockArgs>({
     conditionOrder: [],
+    metric: [{
+      type: 'chao1',
+      downsampling: {
+        type: 'hypergeometric',
+        valueChooser: 'auto',
+      },
+    }],
   })
 
   .withUiState<UiState>({

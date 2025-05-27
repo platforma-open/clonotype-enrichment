@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { plRefsEqual, type PlRef, type PTableColumnSpec } from '@platforma-sdk/model';
+import { type PTableColumnSpec } from '@platforma-sdk/model';
 import type {
   PlAgDataTableSettings,
 } from '@platforma-sdk/ui-vue';
@@ -8,26 +8,14 @@ import {
   PlAgDataTableV2,
   PlBlockPage,
   PlBtnGhost,
-  PlDropdown,
-  PlDropdownMulti,
-  PlDropdownRef,
   PlMaskIcon24,
-  PlSlideModal,
   PlTableFilters,
 } from '@platforma-sdk/ui-vue';
 import { computed, ref } from 'vue';
 import { useApp } from '../app';
+import SettingsModal from './SettingsModal.vue';
 
 const app = useApp();
-
-function setInput(inputRef?: PlRef) {
-  app.model.args.abundanceRef = inputRef;
-  if (inputRef) {
-    const abundanceLabel = app.model.outputs.abundanceOptions?.find((o) => plRefsEqual(o.ref, inputRef))?.label;
-    if (abundanceLabel)
-      app.model.ui.title = 'Clonotype enrichment - ' + abundanceLabel;
-  }
-}
 
 const tableSettings = computed<PlAgDataTableSettings>(() => {
   const pTable = app.model.outputs.pt;
@@ -52,15 +40,6 @@ const settingsAreShown = ref(app.model.outputs.datasetSpec === undefined);
 const showSettings = () => {
   settingsAreShown.value = true;
 };
-
-// Get list of available values within round column
-// we will select them in list, being the first one denominator and rest numerators
-const conditionValues = computed(() => {
-  return app.model.outputs.conditionValues?.map((v) => ({
-    value: v,
-    label: v,
-  }));
-});
 
 const columns = ref<PTableColumnSpec[]>([]);
 </script>
@@ -90,21 +69,7 @@ const columns = ref<PTableColumnSpec[]>([]);
       show-export-button
       @columns-changed="(newColumns) => (columns = newColumns)"
     />
-    <PlSlideModal v-model="settingsAreShown">
-      <template #title>Settings</template>
-      <PlDropdownRef
-        v-model="app.model.args.abundanceRef" :options="app.model.outputs.abundanceOptions"
-        label="Select abundance" clearable
-        @update:model-value="setInput"
-      />
-      <PlDropdown v-model="app.model.args.conditionColumnRef" :options="app.model.outputs.metadataOptions" label="Condition column" />
-      <PlDropdownMulti v-model="app.model.args.conditionOrder" :options="conditionValues" label="Condition order" >
-        <template #tooltip>
-          Order aware selection. Calculate contrast between an element (numerator) and each of its preceding elements (denominators).
-          Example: if you select "Cond 1", "Cond 2" and "Cond 3" as order, the contrasts will be "Cond 2 vs Cond 1", "Cond 3 vs Cond 1" and "Cond 3 vs Cond 2".
-          The block will export the highest Enrichment value from all comparisons
-        </template>
-      </PlDropdownMulti>
-    </PlSlideModal>
   </PlBlockPage>
+
+  <SettingsModal v-model="settingsAreShown" />
 </template>
