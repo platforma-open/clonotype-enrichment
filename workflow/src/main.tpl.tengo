@@ -87,9 +87,9 @@ wf.body(func(args) {
 	stackedImportParams := pfStackedConv.getColumns(abundanceSpec)
 	stackedPf := xsv.importFile(calculateEnrichment.getFile("top_enriched.csv"), "csv", stackedImportParams)
 
-	// Calculate annotation values
 	topEnrichedColCsv := calculateEnrichment.getFile("highest_enrichment_clonotype.csv")
 
+	//////////// Calculate annotation values ////////////
 	annotationValues := exec.builder().
 		software(assets.importSoftware("@platforma-open/milaboratories.clonotype-enrichment.software:calculate-annotations")).
 		addFile("inputFile.csv", topEnrichedColCsv).

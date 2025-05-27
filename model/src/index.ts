@@ -19,15 +19,12 @@ export type BlockArgs = {
   abundanceRef?: PlRef;
   conditionColumnRef?: SUniversalPColumnId;
   conditionOrder: string[];
-  enrichmentThreshold: number;
-  conditionExport?: string;
 };
 
 export const model = BlockModel.create()
 
   .withArgs<BlockArgs>({
     conditionOrder: [],
-    enrichmentThreshold: 3,
   })
 
   .withUiState<UiState>({

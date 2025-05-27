@@ -100,7 +100,7 @@ const columns = ref<PTableColumnSpec[]>([]);
       <PlDropdown v-model="app.model.args.conditionColumnRef" :options="app.model.outputs.metadataOptions" label="Condition column" />
       <PlDropdownMulti v-model="app.model.args.conditionOrder" :options="conditionValues" label="Condition order" >
         <template #tooltip>
-          Order aware selection. Calculate contrast between an element (numerator) and each of its preceeding elements (denominators).
+          Order aware selection. Calculate contrast between an element (numerator) and each of its preceding elements (denominators).
           Example: if you select "Cond 1", "Cond 2" and "Cond 3" as order, the contrasts will be "Cond 2 vs Cond 1", "Cond 3 vs Cond 1" and "Cond 3 vs Cond 2".
           The block will export the highest Enrichment value from all comparisons
         </template>
