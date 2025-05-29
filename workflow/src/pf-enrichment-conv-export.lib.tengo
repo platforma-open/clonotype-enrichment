@@ -1,6 +1,7 @@
 ll := import("@platforma-sdk/workflow-tengo:ll")
+canonical := import("@platforma-sdk/workflow-tengo:canonical")
 
-getColumns := func(abundanceSpec, inputType, min, max, cutoff) {
+getColumns := func(abundanceSpec, inputType, min, max, cutoff, metric) {
   return {
     axes: [
       {
@@ -18,7 +19,8 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff) {
           valueType: "Double",
           domain: {
             "pl7.app/vdj/comparison": "highest_enrichment_clonotype",
-            "pl7.app/vdj/source": inputType
+            "pl7.app/vdj/source": inputType,
+            "pl7.app/downsampling": canonical.encode(metric[0].downsampling)
           },
           annotations: {
             "pl7.app/label": inputType + " Enrichment Score",

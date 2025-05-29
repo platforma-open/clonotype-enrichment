@@ -11,7 +11,6 @@ export type DiversityType = 'chao1' | 'd50' | 'efronThisted' |
   'normalizedShannonWiener' | 'inverseSimpson' | 'gini';
 
 export type Metric = {
-  type: DiversityType | undefined;
   downsampling: {
     type?: 'none' | 'top' | 'cumtop' | 'hypergeometric' ;
     valueChooser?: 'min' | 'fixed' | 'max' | 'auto';
@@ -40,7 +39,6 @@ export const model = BlockModel.create()
   .withArgs<BlockArgs>({
     conditionOrder: [],
     metric: [{
-      type: 'chao1',
       downsampling: {
         type: 'hypergeometric',
         valueChooser: 'auto',

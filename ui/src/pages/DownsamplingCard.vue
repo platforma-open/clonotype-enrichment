@@ -3,7 +3,6 @@ import type { Metric } from '@platforma-open/milaboratories.clonotype-enrichment
 import type { ListOption } from '@platforma-sdk/ui-vue';
 import { PlBtnGroup, PlDropdown, PlNumberField } from '@platforma-sdk/ui-vue';
 import './metrics-manager.scss';
-import { metricTypeOptions } from './util';
 
 const downsamplingOptions: ListOption<string | undefined>[] = [
   { label: 'None', value: 'none' },
@@ -13,7 +12,6 @@ const downsamplingOptions: ListOption<string | undefined>[] = [
 ];
 
 const props = defineModel<Metric>({ default: {
-  type: undefined,
   downsampling: {
     type: 'none',
   },
@@ -23,12 +21,6 @@ const props = defineModel<Metric>({ default: {
 
 <template>
   <div class="d-flex flex-column gap-24">
-    <PlDropdown
-      v-model="props.type" :options="metricTypeOptions"
-      label="Type"
-      required
-    />
-
     <PlDropdown
       v-model="props.downsampling.type" :options="downsamplingOptions"
       label="Downsampling"

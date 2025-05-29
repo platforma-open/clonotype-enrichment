@@ -19,6 +19,10 @@ def hybrid_enrichment_analysis(
 ):
     input_df = pd.read_csv(input_data_csv)
 
+    # Rename downsampledAbundance to abundance and run the enrichment with it
+    input_df['abundance'] = input_df['downsampledAbundance'] 
+    input_df.drop(columns=['downsampledAbundance'], inplace=True)
+
     # Validate expected columns
     expected_fixed_cols = {'sampleId', 'elementId', 'abundance', 'condition'}
     if not expected_fixed_cols.issubset(input_df.columns):
@@ -259,7 +263,7 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="Hybrid Enrichment Analysis")
-    parser.add_argument("--input_data", required=True, help="Path to the combined input CSV file. Expected columns: sampleId, elementId, abundance, and the condition column specified by --condition_column.")
+    parser.add_argument("--input_data", required=True, help="Path to the combined input CSV file. Expected columns: sampleId, elementId, abundance, downsampledAbundance, and condition.")
     parser.add_argument("--conditions", type=str, required=True)
     parser.add_argument("--enrichment", required=True)
     parser.add_argument("--bubble", required=True)

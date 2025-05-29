@@ -3,9 +3,8 @@ import { plRefsEqual, type PlRef } from '@platforma-sdk/model';
 import { PlDropdown, PlDropdownMulti, PlDropdownRef, PlMaskIcon16, PlSlideModal } from '@platforma-sdk/ui-vue';
 import { computed, reactive } from 'vue';
 import { useApp } from '../app';
-import DiversityCard from './DiversityCard.vue';
+import DownsamplingCard from './DownsamplingCard.vue';
 import './metrics-manager.scss';
-import { getMetricLabel } from './util';
 
 const app = useApp();
 
@@ -36,18 +35,6 @@ const toggleExpandMetric = () => {
   else delete openState[0];
 };
 
-const addMetric = () => {
-  app.updateArgs((args) => {
-    args.metric = [{
-      type: undefined,
-      downsampling: {
-        type: 'none',
-        valueChooser: 'auto',
-      },
-    }];
-    openState[0] = true;
-  });
-};
 </script>
 
 <template>
@@ -68,7 +55,6 @@ const addMetric = () => {
     </PlDropdownMulti>
 
     <div class="metrics-manager d-flex flex-column gap-6">
-      <div class="text-s-body">Normalisation strategy</div>
       <div
         v-for="(entry, index) in app.model.args.metric"
         :key="index"
@@ -84,12 +70,12 @@ const addMetric = () => {
           </div>
 
           <div class="metrics-manager__title flex-grow-1 text-s-btn">
-            {{ entry.type ? getMetricLabel(entry.type) : 'New Metric' }}
+            {{ 'Downsampling strategy' }}
           </div>
         </div>
 
         <div class="metrics-manager__content d-flex gap-24 p-24 flex-column">
-          <DiversityCard
+          <DownsamplingCard
             v-model="app.model.args.metric[0]"
           />
         </div>
