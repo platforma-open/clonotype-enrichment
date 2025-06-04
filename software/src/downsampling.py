@@ -85,11 +85,10 @@ def downsample(df, downsampling):
 bySample = data.groupby('sampleId')
 
 # We will only have one metric here
-metric = params[0]
 metric_id = 'downsampledAbundance'
 data[metric_id] = None
 for sampleId, df in bySample:
-    downsampled = downsample(df, metric["downsampling"])
+    downsampled = downsample(df, params["downsampling"])
     # downsampled['fraction'] = downsampled['abundance'] / \
     #     downsampled['abundance'].sum()
     data.loc[downsampled.index, metric_id] =\
