@@ -123,7 +123,7 @@ const downsamplingOptions: ListOption<string | undefined>[] = [
     </PlDropdownMulti>
 
     <PlDropdown
-      v-model="app.model.args.metric.downsampling.type" :options="downsamplingOptions"
+      v-model="app.model.args.downsampling.type" :options="downsamplingOptions"
       label="Downsampling"
       required
     >
@@ -133,8 +133,8 @@ const downsamplingOptions: ListOption<string | undefined>[] = [
     </PlDropdown>
 
     <PlNumberField
-      v-if="app.model.args.metric.downsampling.type === 'cumtop'"
-      v-model="app.model.args.metric.downsampling.n"
+      v-if="app.model.args.downsampling.type === 'cumtop'"
+      v-model="app.model.args.downsampling.n"
       label="Select % of the repertoire to include"
       :minValue="0"
       :maxValue="100"
@@ -143,16 +143,16 @@ const downsamplingOptions: ListOption<string | undefined>[] = [
     />
 
     <PlNumberField
-      v-if="app.model.args.metric.downsampling.type === 'top'"
-      v-model="app.model.args.metric.downsampling.n"
+      v-if="app.model.args.downsampling.type === 'top'"
+      v-model="app.model.args.downsampling.n"
       label="Select Top N"
       :minValue="0"
       required
     />
 
     <PlBtnGroup
-      v-if="app.model.args.metric.downsampling.type === 'hypergeometric'"
-      v-model="app.model.args.metric.downsampling.valueChooser"
+      v-if="app.model.args.downsampling.type === 'hypergeometric'"
+      v-model="app.model.args.downsampling.valueChooser"
       :options="[
         { value: 'fixed', label: 'Fixed' },
         { value: 'min', label: 'Min', },
@@ -161,9 +161,9 @@ const downsamplingOptions: ListOption<string | undefined>[] = [
     />
 
     <PlNumberField
-      v-if="app.model.args.metric.downsampling.valueChooser === 'fixed'
-        && app.model.args.metric.downsampling.type === 'hypergeometric'"
-      v-model="app.model.args.metric.downsampling.n"
+      v-if="app.model.args.downsampling.valueChooser === 'fixed'
+        && app.model.args.downsampling.type === 'hypergeometric'"
+      v-model="app.model.args.downsampling.n"
       label="Select N"
       :minValue="0"
       required

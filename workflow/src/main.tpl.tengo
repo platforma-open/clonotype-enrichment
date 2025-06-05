@@ -43,7 +43,7 @@ wf.body(func(args) {
 
 	runDiversity := exec.builder().
 		software(downsamplingSw).
-		writeFile("metrics.json", json.encode(args.metric)).
+		writeFile("downsampling.json", json.encode(args.downsampling)).
 		addFile("input.csv", cloneTable).
 		saveFile("result.csv").
 		run()
@@ -121,7 +121,7 @@ wf.body(func(args) {
 		min: min,
 		max: max,
 		cutoff: cutoff,
-		metric: args.metric
+		downsampling: args.downsampling
 	})
 
 	exports := buildExports.output("exports")

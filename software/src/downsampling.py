@@ -8,24 +8,24 @@ from scipy.special import binom
 # sample cloneKey count
 
 input_file = "input.csv"
-params_file = "metrics.json"
+downsampling_file = "downsampling.json"
 
 
 # Parse the parameters from the JSON file
 def parse_params():
     try:
-        with open(params_file, 'r') as f:
-            params = json.load(f)
-        return params
+        with open(downsampling_file, 'r') as f:
+            downsampling_params = json.load(f)
+        return downsampling_params
     except FileNotFoundError:
-        print(f"Error: Parameters file '{params_file}' not found.")
+        print(f"Error: Parameters file '{downsampling_file}' not found.")
         return {}
     except json.JSONDecodeError:
-        print(f"Error: Could not parse '{params_file}' as valid JSON.")
+        print(f"Error: Could not parse '{downsampling_file}' as valid JSON.")
         return {}
 
 
-params = parse_params()
+downsampling_params = parse_params()
 data = pd.read_csv(input_file, sep=",")
 
 totals = data.groupby('sampleId')['abundance'].sum().reset_index()
@@ -84,14 +84,14 @@ def downsample(df, downsampling):
 
 bySample = data.groupby('sampleId')
 
-# We will only have one metric here
-metric_id = 'downsampledAbundance'
-data[metric_id] = None
+# Store downsampled abundance in table
+downsampled_id = 'downsampledAbundance'
+data[downsampled_id] = None
 for sampleId, df in bySample:
-    downsampled = downsample(df, params["downsampling"])
+    downsampled = downsample(df, downsampling_params)
     # downsampled['fraction'] = downsampled['abundance'] / \
     #     downsampled['abundance'].sum()
-    data.loc[downsampled.index, metric_id] =\
+    data.loc[downsampled.index, downsampled_id] =\
         downsampled.loc[downsampled.index, "abundance"]
 
 # convert Nan values to zero

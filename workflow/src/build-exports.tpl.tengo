@@ -13,7 +13,7 @@ self.body(func(args) {
     min := args.min.getDataAsJson()
     max := args.max.getDataAsJson()
     cutoff := args.cutoff.getDataAsJson()
-    metric := args.metric
+    downsampling := args.downsampling
     abundanceSpec := args.abundanceSpec
     inputType := args.inputType
     topEnrichedColCsv := args.topEnrichedColCsv
@@ -23,7 +23,7 @@ self.body(func(args) {
                                                             string(min),
                                                             string(max),
                                                             string(cutoff),
-                                                            metric)
+                                                            downsampling)
 
     exportFile := xsv.importFile(topEnrichedColCsv, 
                                 "csv",
