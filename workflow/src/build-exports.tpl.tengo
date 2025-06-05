@@ -45,11 +45,6 @@ self.body(func(args) {
         trace.inject(exportFile["enrichment.spec"]), 
         exportFile["enrichment.data"]
     )
-    exports.add(
-        "Frequency - Highest", 
-        trace.inject(exportFile["frequency.spec"]), 
-        exportFile["frequency.data"]
-    )
 
     return {
         exports: exports.build()    

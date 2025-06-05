@@ -23,7 +23,7 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, downsampling) {
             "pl7.app/downsampling": canonical.encode(downsampling)
           },
           annotations: {
-            "pl7.app/label": inputType + " Enrichment Score",
+            "pl7.app/label": "Maximum " + inputType + " Enrichment",
             "pl7.app/table/orderPriority": "9000",
             "pl7.app/table/visibility": "default",
             "pl7.app/min": min,
@@ -33,26 +33,7 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, downsampling) {
             "pl7.app/score/defaultCutoff": cutoff
           }
         }
-      },
-      {
-        column: "Frequency_Numerator",
-        id: "frequency",
-        allowNA: false,
-        spec: {
-          name: "pl7.app/vdj/frequency",
-          valueType: "Double",
-          domain: {
-            "pl7.app/vdj/comparison": "highest_enrichment_clonotype",
-            "pl7.app/vdj/source": inputType
-          },
-          annotations: {
-            "pl7.app/label": inputType + " Enrichment Frequency",
-            // "pl7.app/table/orderPriority": 8000, // do not set order by default
-            "pl7.app/table/visibility": "optional"
-          }
-        }
-      }
-      ],
+      }],
     storageFormat: "Binary",
     partitionKeyLength: 0
   }

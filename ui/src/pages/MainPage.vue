@@ -95,7 +95,6 @@ const downsamplingOptions: ListOption<string | undefined>[] = [
       </PlBtnGhost>
     </template>
     <PlAgDataTableV2
-      ref="tableInstance"
       v-model="app.model.ui.tableState"
       :settings="tableSettings"
       :loading-text="tableLoadingText"

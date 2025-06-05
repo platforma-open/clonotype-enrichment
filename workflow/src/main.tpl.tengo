@@ -5,12 +5,14 @@ assets:= import("@platforma-sdk/workflow-tengo:assets")
 xsv := import("@platforma-sdk/workflow-tengo:pframes.xsv")
 pframes := import("@platforma-sdk/workflow-tengo:pframes")
 render := import("@platforma-sdk/workflow-tengo:render")
+pSpec := import("@platforma-sdk/workflow-tengo:pframes.spec")
 json := import("json")
 
 buildExportsTpl := assets.importTemplate(":build-exports")
 downsamplingSw := assets.importSoftware("@platforma-open/milaboratories.clonotype-enrichment.software:downsampling")
 
 pfEnrichmentConv := import(":pf-enrichment-conv")
+pfFrequencyConv := import(":pf-frequency-conv")
 pfBubbleConv := import(":pf-bubble-conv")
 pfStackedConv := import(":pf-stacked-conv")
 
@@ -31,9 +33,17 @@ wf.body(func(args) {
 	blockId := wf.blockId().getDataAsJson()
 	columns := args.columns
 	conditionOrder := args.conditionOrder
-
 	abundanceSpec := columns.getSpec(args.abundanceRef)
 
+	// Make trace
+    trace := pSpec.makeTrace(abundanceSpec,
+        {
+            type: "milaboratories.clonotype-enrichment",
+            importance: 30,
+            label: "Clonotype enrichment"
+        })
+
+	// Get abundance table
 	cloneTable := columns.xsvTableBuilder()
 	cloneTable.add(args.abundanceRef, {header: "abundance"})
 	cloneTable.add(args.conditionColumnRef, {header: "condition"})
@@ -97,6 +107,20 @@ wf.body(func(args) {
 
 	topEnrichedColCsv := calculateEnrichment.getFile("highest_enrichment_clonotype.csv")
 
+	// Export frequency
+	frequencyImportParams := pfFrequencyConv.getColumns(abundanceSpec, conditionOrder,
+														inputType, args.downsampling)
+	frequencyPf := xsv.importFile(enrichCsv, "csv", frequencyImportParams)
+	// Prepare pFrame to be exported
+    exportsFreq := pframes.pFrameBuilder()
+	for condition in conditionOrder {
+		exportsFreq.add(
+			"Frequency " + condition, 
+			trace.inject(frequencyPf["frequency_" + condition + ".spec"]), 
+			frequencyPf["frequency_" + condition + ".data"]
+		)
+	}
+
 	//////////// Calculate annotation values ////////////
 	annotationValues := exec.builder().
 		software(assets.importSoftware("@platforma-open/milaboratories.clonotype-enrichment.software:calculate-annotations")).
@@ -135,7 +159,8 @@ wf.body(func(args) {
 			// clonotypeMapPf: pframes.exportFrame(clonotypeMapPf)
 		},
 		exports: {
-			pf: exports
+			pf: exports,
+			frequency: exportsFreq.build()    
 		}
 	}	
 })
