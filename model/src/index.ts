@@ -78,7 +78,7 @@ export const model = BlockModel.create()
         'pl7.app/abundance/isPrimary': 'true',
       },
     },
-    ]),
+    ], { includeNativeLabel: true }),
   )
 
   .output('metadataOptions', (ctx) => {
