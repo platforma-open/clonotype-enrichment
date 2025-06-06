@@ -6,6 +6,12 @@ import type {
 import { BlockModel, createPFrameForGraphs, createPlDataTableV2 } from '@platforma-sdk/model';
 import type { APColumnSelectorWithSplit } from '@platforma-sdk/model/dist/render/util/split_selectors';
 
+export type DownsamplingParameters = {
+  type?: 'none' | 'hypergeometric' ;
+  valueChooser?: 'min' | 'fixed' | 'auto';
+  n?: number;
+};
+
 export type UiState = {
   title?: string;
   tableState: PlDataTableState;
@@ -19,15 +25,17 @@ export type BlockArgs = {
   abundanceRef?: PlRef;
   conditionColumnRef?: SUniversalPColumnId;
   conditionOrder: string[];
-  enrichmentThreshold: number;
-  conditionExport?: string;
+  downsampling: DownsamplingParameters;
 };
 
 export const model = BlockModel.create()
 
   .withArgs<BlockArgs>({
     conditionOrder: [],
-    enrichmentThreshold: 3,
+    downsampling: {
+      type: 'hypergeometric',
+      valueChooser: 'auto',
+    },
   })
 
   .withUiState<UiState>({
