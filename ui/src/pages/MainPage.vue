@@ -72,8 +72,6 @@ const conditionValues = computed(() => {
 // Downsampling options
 const downsamplingOptions: ListOption<string | undefined>[] = [
   { label: 'None', value: 'none' },
-  { label: 'Top N', value: 'top' },
-  { label: 'Cumulative Top', value: 'cumtop' },
   { label: 'Random Sampling', value: 'hypergeometric' },
 ];
 
@@ -121,33 +119,14 @@ const downsamplingOptions: ListOption<string | undefined>[] = [
       </template>
     </PlDropdownMulti>
 
-    <PlDropdown
+    <PlBtnGroup
       v-model="app.model.args.downsampling.type" :options="downsamplingOptions"
-      label="Downsampling"
-      required
+      label="Downsampling" :compact="true"
     >
       <template #tooltip>
         Select Downsampling strategy
       </template>
-    </PlDropdown>
-
-    <PlNumberField
-      v-if="app.model.args.downsampling.type === 'cumtop'"
-      v-model="app.model.args.downsampling.n"
-      label="Select % of the repertoire to include"
-      :minValue="0"
-      :maxValue="100"
-      :step="1"
-      required
-    />
-
-    <PlNumberField
-      v-if="app.model.args.downsampling.type === 'top'"
-      v-model="app.model.args.downsampling.n"
-      label="Select Top N"
-      :minValue="0"
-      required
-    />
+    </PlBtnGroup>
 
     <PlBtnGroup
       v-if="app.model.args.downsampling.type === 'hypergeometric'"
@@ -160,8 +139,8 @@ const downsamplingOptions: ListOption<string | undefined>[] = [
     />
 
     <PlNumberField
-      v-if="app.model.args.downsampling.valueChooser === 'fixed'
-        && app.model.args.downsampling.type === 'hypergeometric'"
+      v-if="app.model.args.downsampling.type === 'hypergeometric'
+        && app.model.args.downsampling.valueChooser === 'fixed'"
       v-model="app.model.args.downsampling.n"
       label="Select N"
       :minValue="0"

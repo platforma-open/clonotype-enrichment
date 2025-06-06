@@ -41,24 +41,6 @@ def downsample(df, downsampling):
     if downsampling['type'] == "none":
         return df
 
-    if downsampling['type'] == "top":
-        top_n = downsampling['n']
-        return df.nlargest(top_n, 'abundance')
-
-    if downsampling['type'] == "cumtop":
-        top_fraction = downsampling['n']
-        target_count = top_fraction * df['abundance'].sum()
-
-        sorted = df.sort_values('abundance', ascending=False)
-
-        sorted['cumsum'] = sorted['abundance'].cumsum()
-        selected_rows = sorted[sorted['cumsum'] <= target_count]
-
-        # If no rows meet the criteria (rare case), take at least the top row
-        if selected_rows.empty:
-            selected_rows = sorted.head(1)
-        return selected_rows
-
     elif downsampling['type'] == "hypergeometric":
         if downsampling['valueChooser'] == "min":
             value = totals['abundance'].min()

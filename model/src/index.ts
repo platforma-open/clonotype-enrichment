@@ -7,8 +7,8 @@ import { BlockModel, createPFrameForGraphs, createPlDataTableV2 } from '@platfor
 import type { APColumnSelectorWithSplit } from '@platforma-sdk/model/dist/render/util/split_selectors';
 
 export type DownsamplingParameters = {
-  type?: 'none' | 'top' | 'cumtop' | 'hypergeometric' ;
-  valueChooser?: 'min' | 'fixed' | 'max' | 'auto';
+  type?: 'none' | 'hypergeometric' ;
+  valueChooser?: 'min' | 'fixed' | 'auto';
   n?: number;
 };
 
