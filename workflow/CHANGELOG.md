@@ -1,5 +1,12 @@
 # @platforma-open/milaboratories.clonotype-enrichment.workflow
 
+## 2.8.2
+
+### Patch Changes
+
+- Updated dependencies [6672438]
+  - @platforma-open/milaboratories.clonotype-enrichment.software@2.6.0
+
 ## 2.8.1
 
 ### Patch Changes

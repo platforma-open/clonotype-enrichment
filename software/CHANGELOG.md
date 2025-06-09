@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.software
 
+## 2.6.0
+
+### Minor Changes
+
+- 6672438: Fixed bug showing in results pseudocounts instead of zeroes for frequency values.
+
 ## 2.5.0
 
 ### Minor Changes
