@@ -13,7 +13,8 @@ getColumns := func(abundanceSpec, conditionOrder, inputType, downsampling) {
                             valueType: "Double",
                             domain: {
                               "pl7.app/vdj/source": inputType,
-                              "pl7.app/downsampling": canonical.encode(downsampling)
+                              "pl7.app/downsampling": canonical.encode(downsampling),
+                              "pl7.app/FrequencyType": inputType + " Frequency " + condition
                             },
                             annotations: {
                               "pl7.app/label": inputType + " Frequency " + condition,
