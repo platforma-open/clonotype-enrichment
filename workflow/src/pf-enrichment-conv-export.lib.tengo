@@ -28,7 +28,8 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff) {
             "pl7.app/max": max,
             "pl7.app/isScore": "true",
             "pl7.app/score/rankValues": "increasing",
-            "pl7.app/score/defaultCutoff": cutoff
+            "pl7.app/score/defaultCutoff": cutoff,
+            "pl7.app/format": ".2f"
           }
         }
       },
@@ -46,7 +47,8 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff) {
           annotations: {
             "pl7.app/label": inputType + " Enrichment Frequency",
             // "pl7.app/table/orderPriority": 8000, // do not set order by default
-            "pl7.app/table/visibility": "optional"
+            "pl7.app/table/visibility": "optional",
+            "pl7.app/format": ".2e"
           }
         }
       }
