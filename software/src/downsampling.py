@@ -76,6 +76,4 @@ for sampleId, df in bySample:
     data.loc[downsampled.index, downsampled_id] =\
         downsampled.loc[downsampled.index, "abundance"]
 
-# convert Nan values to zero
-
 data.to_csv('result.csv', sep=',', index=False)
