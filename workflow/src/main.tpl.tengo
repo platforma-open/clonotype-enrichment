@@ -31,12 +31,18 @@ wf.body(func(args) {
 
 	abundanceSpec := columns.getSpec(args.abundanceRef)
 
-	cloneTable := columns.xsvTableBuilder()
-	cloneTable.add(args.abundanceRef, {header: "abundance"})
-	cloneTable.add(args.conditionColumnRef, {header: "condition"})
+	// Migrate to pframes.csvFileBuilder() after latest sdk	update
+	cloneTable := pframes.csvFileBuilder()
+	cloneTable.add(columns.getColumn(args.abundanceRef), {header: "abundance"})
+	cloneTable.add(columns.getColumn(args.conditionColumnRef), {header: "condition"})
+	// cloneTable := columns.xsvTableBuilder()
+	// cloneTable.add(args.abundanceRef, {header: "abundance"})
+	// cloneTable.add(args.conditionColumnRef, {header: "condition"})
 	cloneTable.setAxisHeader(abundanceSpec.axesSpec[0].name, "sampleId")
 	cloneTable.setAxisHeader(abundanceSpec.axesSpec[1].name, "elementId")
-	cloneTable = cloneTable.build("csv")
+	// cloneTable = cloneTable.build("csv")
+	cloneTable = cloneTable.build()
+
 
 	conditionOrder := args.conditionOrder
 	// enrichmentThreshold := args.enrichmentThreshold
