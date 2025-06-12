@@ -25,8 +25,8 @@ catalogs:
       specifier: ^1.0.3
       version: 1.0.3
     '@platforma-sdk/model':
-      specifier: ^1.30.26
-      version: 1.33.14
+      specifier: 1.30.26
+      version: 1.30.26
     '@platforma-sdk/package-builder':
       specifier: ^2.16.0
       version: 2.16.0
@@ -34,11 +34,11 @@ catalogs:
       specifier: ^2.1.7
       version: 2.1.7
     '@platforma-sdk/test':
-      specifier: ^1.30.35
-      version: 1.33.14
+      specifier: 1.30.35
+      version: 1.30.35
     '@platforma-sdk/ui-vue':
-      specifier: ^1.30.26
-      version: 1.33.14
+      specifier: 1.30.26
+      version: 1.30.26
     '@platforma-sdk/workflow-tengo':
       specifier: ^4.7.1
       version: 4.7.1
@@ -107,7 +107,7 @@ importers:
         version: 1.1.109(d3-dispatch@3.0.1)(d3-path@3.1.0)(d3-scale-chromatic@3.1.0)(typescript@5.5.4)
       '@platforma-sdk/model':
         specifier: 'catalog:'
-        version: 1.33.14
+        version: 1.30.26
     devDependencies:
       '@platforma-sdk/block-tools':
         specifier: 'catalog:'
@@ -142,7 +142,7 @@ importers:
     devDependencies:
       '@platforma-sdk/test':
         specifier: 'catalog:'
-        version: 1.33.14(@types/node@22.9.0)
+        version: 1.30.35(@types/node@22.9.0)
       typescript:
         specifier: 'catalog:'
         version: 5.5.4
@@ -160,10 +160,10 @@ importers:
         version: link:../model
       '@platforma-sdk/model':
         specifier: 'catalog:'
-        version: 1.33.14
+        version: 1.30.26
       '@platforma-sdk/ui-vue':
         specifier: 'catalog:'
-        version: 1.33.14(d3-dispatch@3.0.1)(d3-path@3.1.0)(d3-scale-chromatic@3.1.0)(typescript@5.5.4)
+        version: 1.30.26(typescript@5.5.4)
       vue:
         specifier: 'catalog:'
         version: 3.5.13(typescript@5.5.4)
@@ -201,7 +201,7 @@ importers:
         version: 2.1.7
       '@platforma-sdk/test':
         specifier: 'catalog:'
-        version: 1.33.14(@types/node@22.9.0)
+        version: 1.30.35(@types/node@22.9.0)
       vitest:
         specifier: 'catalog:'
         version: 2.1.9(@types/node@22.9.0)
@@ -1229,6 +1229,9 @@ packages:
       typescript: ~5.5.4
       typescript-eslint: ^8.17.0
 
+  '@platforma-sdk/model@1.30.26':
+    resolution: {integrity: sha512-RCEcev/fRUZGN/Z56yKE7dNeXPGCh1Qo3r0q9LICpa1zq3V7SSv3zNJslDqUgcnPApku4cKQ7OonpS8szqlSig==}
+
   '@platforma-sdk/model@1.33.14':
     resolution: {integrity: sha512-itWgW25nzDlrU1Dp3OQwdtptrY6pjpHBf2oAy7aHKnLueSLy5RPW3NyQ97+dJ6kVq8+J8j0BpI8ZzhA2TN1bnQ==}
 
@@ -1241,8 +1244,11 @@ packages:
     engines: {node: '>=20'}
     hasBin: true
 
-  '@platforma-sdk/test@1.33.14':
-    resolution: {integrity: sha512-Hqt6+2GBOfoTXe72I2FC2/guKKo9N1EatA6lhJggb/r0HdhMRHTb6pqUsOtRPnjB/w8eodc48+rcnjYL89jIig==}
+  '@platforma-sdk/test@1.30.35':
+    resolution: {integrity: sha512-ZucbkmB0al8K5r+wuDc9NGsB/fgmN2CRGcE5RZqOwaLh2hrdRIxIs/NYtS/462TKZoAzBVJKWKTT6kupWA91gQ==}
+
+  '@platforma-sdk/ui-vue@1.30.26':
+    resolution: {integrity: sha512-Kq8uBh4PZW9tM3d2XbC1aCmFg0c2jjpEOX7gt9DfDZdoZQaeIx9Gey6JTqY0hWeNAt128l/AqbCaXdxG825jWw==}
 
   '@platforma-sdk/ui-vue@1.33.14':
     resolution: {integrity: sha512-TUynx6BMz1pn7MsY+6GAT9z0tJs9CvIPFmCZnWbtONh7uyUULHd0kDf72csI+7UZshgArr4gv1pQY08mRqj0RA==}
@@ -6731,6 +6737,14 @@ snapshots:
       typescript: 5.5.4
       typescript-eslint: 8.24.0(eslint@9.23.0)(typescript@5.5.4)
 
+  '@platforma-sdk/model@1.30.26':
+    dependencies:
+      '@milaboratories/pl-error-like': 1.12.1
+      '@milaboratories/pl-model-common': 1.15.4
+      canonicalize: 2.1.0
+      utility-types: 3.11.0
+      zod: 3.23.8
+
   '@platforma-sdk/model@1.33.14':
     dependencies:
       '@milaboratories/pl-error-like': 1.12.1
@@ -6765,7 +6779,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@platforma-sdk/test@1.33.14(@types/node@22.9.0)':
+  '@platforma-sdk/test@1.30.35(@types/node@22.9.0)':
     dependencies:
       '@milaboratories/computable': 2.4.11
       '@milaboratories/pl-client': 2.10.1
@@ -6792,6 +6806,18 @@ snapshots:
       - sugarss
       - supports-color
       - terser
+
+  '@platforma-sdk/ui-vue@1.30.26(typescript@5.5.4)':
+    dependencies:
+      '@milaboratories/uikit': 2.2.82(typescript@5.5.4)
+      '@platforma-sdk/model': 1.30.26
+      ag-grid-enterprise: 33.1.0
+      ag-grid-vue3: 33.1.0(vue@3.5.13(typescript@5.5.4))
+      canonicalize: 2.1.0
+      lru-cache: 11.1.0
+      vue: 3.5.13(typescript@5.5.4)
+    transitivePeerDependencies:
+      - typescript
 
   '@platforma-sdk/ui-vue@1.33.14(d3-dispatch@3.0.1)(d3-path@3.1.0)(d3-scale-chromatic@3.1.0)(typescript@5.5.4)':
     dependencies:
