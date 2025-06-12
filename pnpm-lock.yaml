@@ -10,7 +10,7 @@ catalogs:
       specifier: ^2.28.1
       version: 2.28.1
     '@milaboratories/graph-maker':
-      specifier: ^1.1.109
+      specifier: ^1.1.96
       version: 1.1.109
     '@platforma-open/milaboratories.runenv-python-3':
       specifier: ^1.1.14
@@ -25,7 +25,7 @@ catalogs:
       specifier: ^1.0.3
       version: 1.0.3
     '@platforma-sdk/model':
-      specifier: ^1.33.10
+      specifier: ^1.30.26
       version: 1.33.14
     '@platforma-sdk/package-builder':
       specifier: ^2.16.0
@@ -34,10 +34,10 @@ catalogs:
       specifier: ^2.1.7
       version: 2.1.7
     '@platforma-sdk/test':
-      specifier: ^1.33.10
+      specifier: ^1.30.35
       version: 1.33.14
     '@platforma-sdk/ui-vue':
-      specifier: ^1.33.13
+      specifier: ^1.30.26
       version: 1.33.14
     '@platforma-sdk/workflow-tengo':
       specifier: ^4.7.1
