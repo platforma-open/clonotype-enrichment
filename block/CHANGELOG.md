@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment
 
+## 2.1.11
+
+### Patch Changes
+
+- d86e8a9: chore fix version
+
 ## 2.1.10
 
 ### Patch Changes
