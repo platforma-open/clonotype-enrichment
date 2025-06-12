@@ -39,11 +39,14 @@ def hybrid_enrichment_analysis(
     result_rows = []
     for elementId in pivot_df.index:
         freqs = {}
+        original_freqs = {}
         # Calculate frequency for each condition first (handles pseudocounts/penalties)
         for cond in condition_order:
             total = total_reads.get(cond, 1)
             if total == 0: total = 1 # Avoid division by zero if a condition somehow has zero total reads
             abundance = pivot_df.at[elementId, cond]
+
+            original_freqs[cond] = abundance / total
             if abundance > 0:
                 freqs[cond] = abundance / total
             else:
@@ -81,7 +84,7 @@ def hybrid_enrichment_analysis(
         
         row = {'elementId': elementId}
         for cond in condition_order:
-            row[f'Frequency {cond}'] = freqs[cond]
+            row[f'Frequency {cond}'] = original_freqs[cond]
         row.update(all_pairwise_enrichments)
         result_rows.append(row)
 

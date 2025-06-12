@@ -58,12 +58,12 @@ export const model = BlockModel.create()
       currentTab: null,
     },
     lineState: {
-      title: 'Top clonotype frequencies',
+      title: 'Top 20 enriched clonotype frequencies',
       template: 'line',
       currentTab: null,
     },
     stackedState: {
-      title: 'Top clonotype frequencies',
+      title: 'Top 5 enriched clonotype frequencies',
       template: 'stackedBar',
       currentTab: null,
     },
@@ -86,7 +86,7 @@ export const model = BlockModel.create()
         'pl7.app/abundance/isPrimary': 'true',
       },
     },
-    ]),
+    ], { includeNativeLabel: true }),
   )
 
   .output('metadataOptions', (ctx) => {
