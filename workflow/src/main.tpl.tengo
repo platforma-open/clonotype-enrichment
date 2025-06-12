@@ -44,20 +44,20 @@ wf.body(func(args) {
         })
 
 	// Get abundance table
-	cloneTable := columns.xsvTableBuilder()
-	cloneTable.add(args.abundanceRef, {header: "abundance"})
-	cloneTable.add(args.conditionColumnRef, {header: "condition"})
+	cloneTable := pframes.csvFileBuilder() 
+	cloneTable.add(columns.getColumn(args.abundanceRef), {header: "abundance"})
+	cloneTable.add(columns.getColumn(args.conditionColumnRef), {header: "condition"})
 	cloneTable.setAxisHeader(abundanceSpec.axesSpec[0].name, "sampleId")
 	cloneTable.setAxisHeader(abundanceSpec.axesSpec[1].name, "elementId")
-	cloneTable = cloneTable.build("csv")
+	cloneTable = cloneTable.build()
 
-	runDiversity := exec.builder().
+	runDownsampling := exec.builder().
 		software(downsamplingSw).
 		writeFile("downsampling.json", json.encode(args.downsampling)).
 		addFile("input.csv", cloneTable).
 		saveFile("result.csv").
 		run()
-	diversityFile := runDiversity.getFile("result.csv")
+	downsamplingFile := runDownsampling.getFile("result.csv")
 	
 	// Check if inputs are individual clonotypes or clusters
 	inputType := "Unknown"
@@ -72,7 +72,7 @@ wf.body(func(args) {
 	// Run enrichment script
 	calculateEnrichment := exec.builder().
 		software(assets.importSoftware("@platforma-open/milaboratories.clonotype-enrichment.software:calculate-enrichment")).
-		addFile("inputFile.csv", diversityFile).
+		addFile("inputFile.csv", downsamplingFile).
 		arg("--input_data").arg("inputFile.csv").
 		arg("--conditions").arg(string(conditionOrder)).
 		arg("--enrichment").arg("enrichment_results.csv").

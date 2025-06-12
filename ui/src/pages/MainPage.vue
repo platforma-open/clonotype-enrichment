@@ -124,7 +124,7 @@ const downsamplingOptions: ListOption<string | undefined>[] = [
       label="Downsampling" :compact="true"
     >
       <template #tooltip>
-        Select Downsampling strategy
+        Select Downsampling strategy (count-based)
       </template>
     </PlBtnGroup>
 
