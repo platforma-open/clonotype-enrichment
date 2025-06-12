@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.workflow
 
+## 2.9.0
+
+### Minor Changes
+
+- 0cfdc3f: chore: update deps
+
 ## 2.8.2
 
 ### Patch Changes
