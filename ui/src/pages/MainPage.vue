@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { plRefsEqual, type PlRef, type PTableColumnSpec } from '@platforma-sdk/model';
+import type { PlRef, PTableColumnSpec } from '@platforma-sdk/model';
+import { plRefsEqual } from '@platforma-sdk/model';
 import type {
+  ListOption,
   PlAgDataTableSettings,
 } from '@platforma-sdk/ui-vue';
 import {
@@ -8,10 +10,12 @@ import {
   PlAgDataTableV2,
   PlBlockPage,
   PlBtnGhost,
+  PlBtnGroup,
   PlDropdown,
   PlDropdownMulti,
   PlDropdownRef,
   PlMaskIcon24,
+  PlNumberField,
   PlSlideModal,
   PlTableFilters,
 } from '@platforma-sdk/ui-vue';
@@ -20,6 +24,14 @@ import { useApp } from '../app';
 
 const app = useApp();
 
+const settingsAreShown = ref(app.model.outputs.datasetSpec === undefined);
+const showSettings = () => {
+  settingsAreShown.value = true;
+};
+
+const columns = ref<PTableColumnSpec[]>([]);
+
+// Update page title by dataset
 function setInput(inputRef?: PlRef) {
   app.model.args.abundanceRef = inputRef;
   if (inputRef) {
@@ -48,11 +60,6 @@ const tableLoadingText = computed(() => {
   return 'Loading';
 });
 
-const settingsAreShown = ref(app.model.outputs.datasetSpec === undefined);
-const showSettings = () => {
-  settingsAreShown.value = true;
-};
-
 // Get list of available values within round column
 // we will select them in list, being the first one denominator and rest numerators
 const conditionValues = computed(() => {
@@ -62,7 +69,12 @@ const conditionValues = computed(() => {
   }));
 });
 
-const columns = ref<PTableColumnSpec[]>([]);
+// Downsampling options
+const downsamplingOptions: ListOption<string | undefined>[] = [
+  { label: 'None', value: 'none' },
+  { label: 'Random Sampling', value: 'hypergeometric' },
+];
+
 </script>
 
 <template>
@@ -81,7 +93,6 @@ const columns = ref<PTableColumnSpec[]>([]);
       </PlBtnGhost>
     </template>
     <PlAgDataTableV2
-      ref="tableInstance"
       v-model="app.model.ui.tableState"
       :settings="tableSettings"
       :loading-text="tableLoadingText"
@@ -90,21 +101,50 @@ const columns = ref<PTableColumnSpec[]>([]);
       show-export-button
       @columns-changed="(newColumns) => (columns = newColumns)"
     />
-    <PlSlideModal v-model="settingsAreShown">
-      <template #title>Settings</template>
-      <PlDropdownRef
-        v-model="app.model.args.abundanceRef" :options="app.model.outputs.abundanceOptions"
-        label="Select abundance" clearable
-        @update:model-value="setInput"
-      />
-      <PlDropdown v-model="app.model.args.conditionColumnRef" :options="app.model.outputs.metadataOptions" label="Condition column" />
-      <PlDropdownMulti v-model="app.model.args.conditionOrder" :options="conditionValues" label="Condition order" >
-        <template #tooltip>
-          Order aware selection. Calculate contrast between an element (numerator) and each of its preceeding elements (denominators).
-          Example: if you select "Cond 1", "Cond 2" and "Cond 3" as order, the contrasts will be "Cond 2 vs Cond 1", "Cond 3 vs Cond 1" and "Cond 3 vs Cond 2".
-          The block will export the highest Enrichment value from all comparisons
-        </template>
-      </PlDropdownMulti>
-    </PlSlideModal>
   </PlBlockPage>
+
+  <PlSlideModal v-model="settingsAreShown">
+    <template #title>Settings</template>
+    <PlDropdownRef
+      v-model="app.model.args.abundanceRef" :options="app.model.outputs.abundanceOptions"
+      label="Select abundance" clearable
+      @update:model-value="setInput"
+    />
+    <PlDropdown v-model="app.model.args.conditionColumnRef" :options="app.model.outputs.metadataOptions" label="Condition column" />
+    <PlDropdownMulti v-model="app.model.args.conditionOrder" :options="conditionValues" label="Condition order" >
+      <template #tooltip>
+        Order aware selection. Calculate contrast between an element (numerator) and each of its preceding elements (denominators).
+        Example: if you select "Cond 1", "Cond 2" and "Cond 3" as order, the contrasts will be "Cond 2 vs Cond 1", "Cond 3 vs Cond 1" and "Cond 3 vs Cond 2".
+        The block will export the highest Enrichment value from all comparisons
+      </template>
+    </PlDropdownMulti>
+
+    <PlBtnGroup
+      v-model="app.model.args.downsampling.type" :options="downsamplingOptions"
+      label="Downsampling" :compact="true"
+    >
+      <template #tooltip>
+        Select Downsampling strategy (count-based)
+      </template>
+    </PlBtnGroup>
+
+    <PlBtnGroup
+      v-if="app.model.args.downsampling.type === 'hypergeometric'"
+      v-model="app.model.args.downsampling.valueChooser"
+      :options="[
+        { value: 'fixed', label: 'Fixed' },
+        { value: 'min', label: 'Min', },
+        { value: 'auto', label: 'Auto', },
+      ]"
+    />
+
+    <PlNumberField
+      v-if="app.model.args.downsampling.type === 'hypergeometric'
+        && app.model.args.downsampling.valueChooser === 'fixed'"
+      v-model="app.model.args.downsampling.n"
+      label="Select N"
+      :minValue="0"
+      required
+    />
+  </PlSlideModal>
 </template>

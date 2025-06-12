@@ -13,7 +13,7 @@ self.body(func(args) {
     min := args.min.getDataAsJson()
     max := args.max.getDataAsJson()
     cutoff := args.cutoff.getDataAsJson()
-
+    downsampling := args.downsampling
     abundanceSpec := args.abundanceSpec
     inputType := args.inputType
     topEnrichedColCsv := args.topEnrichedColCsv
@@ -22,7 +22,9 @@ self.body(func(args) {
                                                             inputType,
                                                             string(min),
                                                             string(max),
-                                                            string(cutoff))
+                                                            string(cutoff),
+                                                            downsampling)
+
     exportFile := xsv.importFile(topEnrichedColCsv, 
                                 "csv",
                                 enrichmentImportParamsExport)
@@ -42,11 +44,6 @@ self.body(func(args) {
         "Enrichment - Highest", 
         trace.inject(exportFile["enrichment.spec"]), 
         exportFile["enrichment.data"]
-    )
-    exports.add(
-        "Frequency - Highest", 
-        trace.inject(exportFile["frequency.spec"]), 
-        exportFile["frequency.data"]
     )
 
     return {
