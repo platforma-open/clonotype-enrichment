@@ -56,9 +56,7 @@ def downsample(df, downsampling):
 
         df['abundance'] = rng.multivariate_hypergeometric(
             df['abundance'].astype(np.int64), value)
-
-        # Comment for ENRICHMENT pipeline (we just downsample, not normalise)
-        #df = df.loc[df['abundance'] != 0]
+        
         return df
 
     else:
@@ -70,10 +68,11 @@ bySample = data.groupby('sampleId')
 downsampled_id = 'downsampledAbundance'
 data[downsampled_id] = None
 for sampleId, df in bySample:
-    downsampled = downsample(df, downsampling_params)
-    # downsampled['fraction'] = downsampled['abundance'] / \
-    #     downsampled['abundance'].sum()
+    downsampled = downsample(df.copy(), downsampling_params)
     data.loc[downsampled.index, downsampled_id] =\
         downsampled.loc[downsampled.index, "abundance"]
 
+# Remove clonotypes that for a given sample where downsampled to zero counts
+data = data.loc[data[downsampled_id] != 0]
+    
 data.to_csv('result.csv', sep=',', index=False)
