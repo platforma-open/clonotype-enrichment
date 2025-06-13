@@ -38,7 +38,9 @@ def hybrid_enrichment_analysis(
 
     result_rows = []
     for elementId in pivot_df.index:
-        freqs = {}
+        # Create different numerator and denominator frequency dictionaries for cases with use_penalty
+        num_freqs = {}
+        den_freqs = {}
         original_freqs = {}
         # Calculate frequency for each condition first (handles pseudocounts/penalties)
         for cond in condition_order:
@@ -48,7 +50,7 @@ def hybrid_enrichment_analysis(
 
             original_freqs[cond] = abundance / total
             if abundance > 0:
-                freqs[cond] = abundance / total
+                num_freqs[cond] = den_freqs[cond] = abundance / total
             else:
                 # Apply pseudocount / penalty logic
                 pseudocount_val = 1 / total # Base pseudocount
@@ -59,12 +61,12 @@ def hybrid_enrichment_analysis(
                     if pd.isna(min_nonzero_abundance_for_clono):
                         min_nonzero_abundance_for_clono = 1 # Absolute minimum if clonotype is all zeros
 
-                    if cond == condition_order[0]: # Reference for penalty type
-                        freqs[cond] = min_nonzero_abundance_for_clono / (penalty_enrich * total)
-                    else:
-                        freqs[cond] = min_nonzero_abundance_for_clono / (penalty_deplete * total)
+                    if cond != condition_order[-1]: # Reference for penalty type
+                        den_freqs[cond] = min_nonzero_abundance_for_clono / (penalty_enrich * total)
+                    if cond != condition_order[0]:
+                        num_freqs[cond] = min_nonzero_abundance_for_clono / (penalty_deplete * total)
                 else:
-                    freqs[cond] = pseudocount_val # Use simple pseudocount if not using penalty
+                    num_freqs[cond] = den_freqs[cond] = pseudocount_val # Use simple pseudocount if not using penalty
 
         all_pairwise_enrichments = {}
         for num_i in range(1, len(condition_order)):      # Numerator index
@@ -72,8 +74,8 @@ def hybrid_enrichment_analysis(
                 numerator = condition_order[num_i]
                 denominator = condition_order[den_j]
                 
-                freq_num = freqs[numerator]
-                freq_den = freqs[denominator]
+                freq_num = num_freqs[numerator]
+                freq_den = den_freqs[denominator]
                 enrichment_val = np.log2(freq_num / freq_den)
                 
                 # Handle -np.inf resulting from log2(small_number/large_number) if freq_num was from penalty
@@ -137,6 +139,12 @@ def hybrid_enrichment_analysis(
     else: # result_df is empty or no enrich_cols (e.g. only one condition)
          enrichment_df_final = pd.DataFrame(columns=["elementId", "Label", "Comparison", "Numerator", "Denominator", "Enrichment", "Frequency_Numerator"])
     
+    # Store enrichment and frequencies output for main table
+    if not result_df.empty and enrich_cols:
+        # Calculate overall max positive enrichment for each clonotype
+        # Create a temporary df with only positive enrichments, then find max. If all negative/NaN, max will be NaN.
+        positive_enrich_cols = result_df[enrich_cols].clip(lower=0) 
+        result_df["MaxPositiveEnrichment"] = positive_enrich_cols.max(axis=1)
     result_df.to_csv(enrichment_csv, index=False)
 
     if highest_enrichment_csv: # Check if the argument was provided
@@ -167,11 +175,6 @@ def hybrid_enrichment_analysis(
     # Bubble and top enriched
     bubble_rows = []
     if not result_df.empty and enrich_cols:
-        # Calculate overall max positive enrichment for each clonotype
-        # Create a temporary df with only positive enrichments, then find max. If all negative/NaN, max will be NaN.
-        positive_enrich_cols = result_df[enrich_cols].clip(lower=0) 
-        result_df["MaxPositiveEnrichment"] = positive_enrich_cols.max(axis=1)
-
         for _, row in result_df.iterrows():
             elementId_val = row["elementId"]
             label_val = row["Label"]

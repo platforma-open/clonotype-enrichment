@@ -73,6 +73,6 @@ for sampleId, df in bySample:
         downsampled.loc[downsampled.index, "abundance"]
 
 # Remove clonotypes that for a given sample where downsampled to zero counts
-data = data.loc[data[downsampled_id] != 0]
+# data = data.loc[data[downsampled_id] != 0]
     
 data.to_csv('result.csv', sep=',', index=False)
