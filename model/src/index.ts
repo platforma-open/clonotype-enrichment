@@ -134,17 +134,29 @@ export const model = BlockModel.create()
       return undefined;
     }
 
-    // const splitByCondition = new PColumnCollection()
-    //   .addAxisLabelProvider(ctx.resultPool)
-    //   .addColumns(pCols)
-    //   .getColumns({ });
+    const maxEnrichPcol = pCols.filter((col) => (
+      col.spec.name === 'pl7.app/vdj/maxEnrichment'),
+    );
 
-    // if (splitByCondition === undefined) {
-    //   return undefined;
-    // }
+    // Clone tableState and add sorting
+    const tableState = {
+      ...ctx.uiState.tableState,
+      pTableParams: {
+        ...ctx.uiState.tableState.pTableParams,
+        sorting: [{
+          ...(ctx.uiState.tableState.pTableParams?.sorting ?? []),
+          column: {
+            id: maxEnrichPcol[0].id,
+            type: 'column' as const,
+          },
+          ascending: false,
+          naAndAbsentAreLeastValues: false,
+        }],
+      },
+    };
 
     return createPlDataTableV2(ctx, pCols, (_) => true,
-      ctx.uiState.tableState, {
+      tableState, {
         filters: ctx.uiState.filterModel?.filters,
       });
   })
