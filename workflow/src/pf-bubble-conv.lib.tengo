@@ -44,7 +44,8 @@ getColumns := func(countsSpec) {
           valueType: "Double",
           domain: {},
           annotations: {
-            "pl7.app/label": "Numerator Frequency"
+            "pl7.app/label": "Numerator Frequency",
+            "pl7.app/format": ".2e"
           }
         }
       },
@@ -57,7 +58,8 @@ getColumns := func(countsSpec) {
           valueType: "Double",
           domain: {},
           annotations: {
-            "pl7.app/label": "Enrichment"
+            "pl7.app/label": "Enrichment",
+            "pl7.app/format": ".2f"
           }
         }
       },

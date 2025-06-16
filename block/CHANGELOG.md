@@ -1,5 +1,31 @@
 # @platforma-open/milaboratories.clonotype-enrichment
 
+## 2.1.11
+
+### Patch Changes
+
+- d86e8a9: chore fix version
+
+## 2.1.10
+
+### Patch Changes
+
+- cdc9968: chore: revert for MSA
+
+## 2.1.9
+
+### Patch Changes
+
+- Updated dependencies [b1f7a29]
+  - @platforma-open/milaboratories.clonotype-enrichment.workflow@2.10.0
+
+## 2.1.8
+
+### Patch Changes
+
+- Updated dependencies [0cfdc3f]
+  - @platforma-open/milaboratories.clonotype-enrichment.workflow@2.9.0
+
 ## 2.1.7
 
 ### Patch Changes

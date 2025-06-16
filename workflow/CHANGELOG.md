@@ -1,5 +1,17 @@
 # @platforma-open/milaboratories.clonotype-enrichment.workflow
 
+## 2.10.0
+
+### Minor Changes
+
+- b1f7a29: Add annotations for number formatting, update sdk deps and migrate to csvFileBuilder() accordingly
+
+## 2.9.0
+
+### Minor Changes
+
+- 0cfdc3f: chore: update deps
+
 ## 2.8.2
 
 ### Patch Changes
