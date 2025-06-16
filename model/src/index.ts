@@ -6,6 +6,12 @@ import type {
 import { BlockModel, createPFrameForGraphs, createPlDataTableV2 } from '@platforma-sdk/model';
 import type { APColumnSelectorWithSplit } from '@platforma-sdk/model/dist/render/util/split_selectors';
 
+export type DownsamplingParameters = {
+  type?: 'none' | 'hypergeometric' ;
+  valueChooser?: 'min' | 'fixed' | 'auto';
+  n?: number;
+};
+
 export type UiState = {
   title?: string;
   tableState: PlDataTableState;
@@ -19,15 +25,17 @@ export type BlockArgs = {
   abundanceRef?: PlRef;
   conditionColumnRef?: SUniversalPColumnId;
   conditionOrder: string[];
-  enrichmentThreshold: number;
-  conditionExport?: string;
+  downsampling: DownsamplingParameters;
 };
 
 export const model = BlockModel.create()
 
   .withArgs<BlockArgs>({
     conditionOrder: [],
-    enrichmentThreshold: 3,
+    downsampling: {
+      type: 'hypergeometric',
+      valueChooser: 'auto',
+    },
   })
 
   .withUiState<UiState>({
@@ -126,17 +134,29 @@ export const model = BlockModel.create()
       return undefined;
     }
 
-    // const splitByCondition = new PColumnCollection()
-    //   .addAxisLabelProvider(ctx.resultPool)
-    //   .addColumns(pCols)
-    //   .getColumns({ });
+    const maxEnrichPcol = pCols.filter((col) => (
+      col.spec.name === 'pl7.app/vdj/maxEnrichment'),
+    );
 
-    // if (splitByCondition === undefined) {
-    //   return undefined;
-    // }
+    // Clone tableState and add sorting
+    const tableState = {
+      ...ctx.uiState.tableState,
+      pTableParams: {
+        ...ctx.uiState.tableState.pTableParams,
+        sorting: [{
+          ...(ctx.uiState.tableState.pTableParams?.sorting ?? []),
+          column: {
+            id: maxEnrichPcol[0].id,
+            type: 'column' as const,
+          },
+          ascending: false,
+          naAndAbsentAreLeastValues: false,
+        }],
+      },
+    };
 
     return createPlDataTableV2(ctx, pCols, (_) => true,
-      ctx.uiState.tableState, {
+      tableState, {
         filters: ctx.uiState.filterModel?.filters,
       });
   })

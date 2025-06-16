@@ -1,0 +1,42 @@
+ll := import("@platforma-sdk/workflow-tengo:ll")
+canonical := import("@platforma-sdk/workflow-tengo:canonical")
+
+getColumns := func(abundanceSpec, conditionOrder, inputType, downsampling) {
+  columns := []
+  for condition in conditionOrder {
+    columns = columns + [{
+                          column: "Frequency " + condition,
+                          id: "frequency_" + condition,
+                          allowNA: true,
+                          spec: {
+                            name: "pl7.app/vdj/frequency",
+                            valueType: "Double",
+                            domain: {
+                              "pl7.app/vdj/source": inputType,
+                              "pl7.app/downsampling": canonical.encode(downsampling),
+                              "pl7.app/FrequencyType": inputType + " Frequency " + condition
+                            },
+                            annotations: {
+                              "pl7.app/label": inputType + " Frequency " + condition,
+                              "pl7.app/table/visibility": "optional"
+                            }
+                          }
+                        }]
+  }
+    
+  return {
+    axes: [
+      {
+        column: "elementId",
+        spec: abundanceSpec.axesSpec[1]
+      }
+    ],
+    columns: columns,
+    storageFormat: "Binary",
+    partitionKeyLength: 0
+  }
+}
+
+export ll.toStrict({
+	getColumns: getColumns
+})
