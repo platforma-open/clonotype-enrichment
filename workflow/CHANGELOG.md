@@ -1,5 +1,16 @@
 # @platforma-open/milaboratories.clonotype-enrichment.workflow
 
+## 2.11.0
+
+### Minor Changes
+
+- 3e10431: Add downsampling
+
+### Patch Changes
+
+- Updated dependencies [3e10431]
+  - @platforma-open/milaboratories.clonotype-enrichment.software@2.7.0
+
 ## 2.10.0
 
 ### Minor Changes

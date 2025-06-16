@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.software
 
+## 2.7.0
+
+### Minor Changes
+
+- 3e10431: Add downsampling
+
 ## 2.6.0
 
 ### Minor Changes
