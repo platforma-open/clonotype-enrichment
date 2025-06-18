@@ -27,7 +27,8 @@ self.body(func(args) {
 
     exportFile := xsv.importFile(topEnrichedColCsv, 
                                 "csv",
-                                enrichmentImportParamsExport)
+                                enrichmentImportParamsExport,
+                                { cpu: 1, mem: "16GiB" })
 
     // Make trace
     trace := pSpec.makeTrace(abundanceSpec,
