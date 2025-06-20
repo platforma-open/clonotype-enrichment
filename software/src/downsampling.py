@@ -55,7 +55,7 @@ def downsample(df, downsampling):
         rng = default_rng(31415)  # always fix seed for reproducibility
 
         df['abundance'] = rng.multivariate_hypergeometric(
-            df['abundance'].astype(np.int64), value)
+            df['abundance'].astype(np.int64), int(value))
         
         return df
 
