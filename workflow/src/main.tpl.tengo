@@ -49,8 +49,8 @@ wf.body(func(args) {
 	cloneTable.add(columns.getColumn(args.conditionColumnRef), {header: "condition"})
 	cloneTable.setAxisHeader(abundanceSpec.axesSpec[0].name, "sampleId")
 	cloneTable.setAxisHeader(abundanceSpec.axesSpec[1].name, "elementId")
-	umapTable.mem("32GiB")
-	umapTable.cpu(1)
+	cloneTable.mem("32GiB")
+	cloneTable.cpu(1)
 	cloneTable = cloneTable.build()
 
 	runDownsampling := exec.builder().
