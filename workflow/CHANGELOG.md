@@ -1,5 +1,16 @@
 # @platforma-open/milaboratories.clonotype-enrichment.workflow
 
+## 2.12.0
+
+### Minor Changes
+
+- 9f96153: title bath and fix
+
+### Patch Changes
+
+- Updated dependencies [9f96153]
+  - @platforma-open/milaboratories.clonotype-enrichment.software@2.8.0
+
 ## 2.11.0
 
 ### Minor Changes

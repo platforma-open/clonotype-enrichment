@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.software
 
+## 2.8.0
+
+### Minor Changes
+
+- 9f96153: title bath and fix
+
 ## 2.7.0
 
 ### Minor Changes

@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.model
 
+## 2.6.0
+
+### Minor Changes
+
+- 9f96153: title bath and fix
+
 ## 2.5.0
 
 ### Minor Changes
