@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.workflow
 
+## 2.13.0
+
+### Minor Changes
+
+- ba39f6b: Increase allocated memory
+
 ## 2.12.0
 
 ### Minor Changes
