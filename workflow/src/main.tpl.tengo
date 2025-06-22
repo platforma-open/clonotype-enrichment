@@ -101,19 +101,19 @@ wf.body(func(args) {
 	enrichCsv := calculateEnrichment.getFile("enrichment_results.csv")
 	enrichmentImportParams := pfEnrichmentConv.getColumns(abundanceSpec, conditionOrder)
 	enrichmentPf := xsv.importFile(enrichCsv, "csv", enrichmentImportParams,
-									{ cpu: 1, mem: "16GiB" })
+									{ cpu: 1, mem: "32GiB" })
 
 	bubbleImportParams := pfBubbleConv.getColumns(abundanceSpec)
 	bubblePf := xsv.importFile(calculateEnrichment.getFile("bubble_data.csv"), "csv", bubbleImportParams,
-							{ cpu: 1, mem: "16GiB" })
+							{ cpu: 1, mem: "32GiB" })
 
 	lineImportParams := pfStackedConv.getColumns(abundanceSpec)
 	linePf := xsv.importFile(calculateEnrichment.getFile("top_20.csv"), "csv", lineImportParams,
-							{ cpu: 1, mem: "16GiB" })
+							{ cpu: 1, mem: "32GiB" })
 
 	stackedImportParams := pfStackedConv.getColumns(abundanceSpec)
 	stackedPf := xsv.importFile(calculateEnrichment.getFile("top_enriched.csv"), "csv", stackedImportParams,
-								{ cpu: 1, mem: "16GiB" })
+								{ cpu: 1, mem: "32GiB" })
 
 	topEnrichedColCsv := calculateEnrichment.getFile("highest_enrichment_clonotype.csv")
 
@@ -121,7 +121,7 @@ wf.body(func(args) {
 	frequencyImportParams := pfFrequencyConv.getColumns(abundanceSpec, conditionOrder,
 														inputType, args.downsampling)
 	frequencyPf := xsv.importFile(enrichCsv, "csv", frequencyImportParams,
-								{ cpu: 1, mem: "16GiB" })
+								{ cpu: 1, mem: "32GiB" })
 	// Prepare pFrame to be exported
     exportsFreq := pframes.pFrameBuilder()
 	for condition in conditionOrder {
