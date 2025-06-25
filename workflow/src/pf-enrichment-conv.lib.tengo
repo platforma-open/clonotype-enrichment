@@ -1,12 +1,13 @@
 ll := import("@platforma-sdk/workflow-tengo:ll")
 maps := import("@platforma-sdk/workflow-tengo:maps")
+strings := import("@platforma-sdk/workflow-tengo:strings")
 
 getColumns := func(countsSpec, conditionOrder) {
   columns := []
   for idx, condition in conditionOrder {
     columns = columns + [{
                           column: "Frequency " + condition,
-                          id: "frequency_" + condition,
+                          id: strings.substituteSpecialCharacters("frequency_" + condition),
                           allowNA: true,
                           spec: {
                             name: "pl7.app/vdj/frequency",
@@ -26,7 +27,7 @@ getColumns := func(countsSpec, conditionOrder) {
       for conditionBaseline in conditionOrder[0:idx] {
         columns = columns + [{
                             column: "Enrichment " + condition + " vs " + conditionBaseline,
-                            id: "enrichment_" + condition + "_" + conditionBaseline,
+                            id: strings.substituteSpecialCharacters("enrichment_" + condition + "_" + conditionBaseline),
                             allowNA: true,
                             spec: {
                               name: "pl7.app/vdj/enrichment",
