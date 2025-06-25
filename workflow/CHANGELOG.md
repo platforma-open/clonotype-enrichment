@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.workflow
 
+## 2.13.2
+
+### Patch Changes
+
+- 43d0b54: further char fix
+
 ## 2.13.1
 
 ### Patch Changes
