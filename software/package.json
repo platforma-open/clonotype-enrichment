@@ -1,6 +1,6 @@
 {
   "name": "@platforma-open/milaboratories.clonotype-enrichment.software",
-  "version": "2.6.0",
+  "version": "2.8.0",
   "scripts": {
     "build": "pl-pkg build",
     "prepublishOnly": "pl-pkg publish packages",
@@ -69,6 +69,24 @@
           "cmd": [
             "python",
             "{pkg}/enrichment_annotations.py"
+          ]
+        }
+      },
+      "downsampling": {
+        "binary": {
+          "artifact": {
+            "type": "python",
+            "registry": "platforma-open",
+            "environment": "@platforma-open/milaboratories.runenv-python-3:3.12.6",
+            "dependencies": {
+              "toolset": "pip",
+              "requirements": "requirements.txt"
+            },
+            "root": "./src"
+          },
+          "cmd": [
+            "python",
+            "{pkg}/downsampling.py"
           ]
         }
       }

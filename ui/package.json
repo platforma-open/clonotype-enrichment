@@ -1,6 +1,6 @@
 {
   "name": "@platforma-open/milaboratories.clonotype-enrichment.ui",
-  "version": "2.3.1",
+  "version": "2.4.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -21,6 +21,7 @@
     "typescript": "catalog:",
     "vite": "catalog:",
     "vue-tsc": "catalog:",
-    "@platforma-sdk/eslint-config": "catalog:"
+    "@platforma-sdk/eslint-config": "catalog:",
+    "sass-embedded": "catalog:"
   }
 }

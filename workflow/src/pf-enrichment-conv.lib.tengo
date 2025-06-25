@@ -46,6 +46,23 @@ getColumns := func(countsSpec, conditionOrder) {
       }
     }
   }
+
+  // Add remaining fixed-name columns
+  columns = columns + [{
+        column: "MaxPositiveEnrichment",
+        id: "maxenrichment",
+        allowNA: false,
+        spec: {
+          name: "pl7.app/vdj/maxEnrichment",
+          valueType: "Double",
+          domain: {},
+          annotations: {
+            "pl7.app/label": "Maximum Enrichment",
+            "pl7.app/table/visibility": "optional",
+            "pl7.app/format": ".2e"
+          }
+        }
+      }]
     
   return {
     axes: [
