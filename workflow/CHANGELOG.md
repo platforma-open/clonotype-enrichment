@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.workflow
 
+## 2.13.1
+
+### Patch Changes
+
+- 550da5a: Replace special chars for column ids
+
 ## 2.13.0
 
 ### Minor Changes
