@@ -1,12 +1,13 @@
 ll := import("@platforma-sdk/workflow-tengo:ll")
 canonical := import("@platforma-sdk/workflow-tengo:canonical")
+strings := import("@platforma-sdk/workflow-tengo:strings")
 
 getColumns := func(abundanceSpec, conditionOrder, inputType, downsampling) {
   columns := []
   for condition in conditionOrder {
     columns = columns + [{
                           column: "Frequency " + condition,
-                          id: "frequency_" + condition,
+                          id: strings.substituteSpecialCharacters("frequency_" + condition),
                           allowNA: true,
                           spec: {
                             name: "pl7.app/vdj/frequency",
