@@ -7,6 +7,7 @@ pframes := import("@platforma-sdk/workflow-tengo:pframes")
 render := import("@platforma-sdk/workflow-tengo:render")
 pSpec := import("@platforma-sdk/workflow-tengo:pframes.spec")
 json := import("json")
+strings := import("@platforma-sdk/workflow-tengo:strings")
 
 buildExportsTpl := assets.importTemplate(":build-exports")
 downsamplingSw := assets.importSoftware("@platforma-open/milaboratories.clonotype-enrichment.software:downsampling")
@@ -125,10 +126,11 @@ wf.body(func(args) {
 	// Prepare pFrame to be exported
     exportsFreq := pframes.pFrameBuilder()
 	for condition in conditionOrder {
+		colId := strings.substituteSpecialCharacters("frequency_" + condition)
 		exportsFreq.add(
 			"Frequency " + condition, 
-			trace.inject(frequencyPf["frequency_" + condition + ".spec"]), 
-			frequencyPf["frequency_" + condition + ".data"]
+			trace.inject(frequencyPf[colId + ".spec"]), 
+			frequencyPf[colId + ".data"]
 		)
 	}
 
