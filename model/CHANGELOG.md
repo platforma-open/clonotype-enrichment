@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.model
 
+## 2.6.1
+
+### Patch Changes
+
+- a0a4e02: Migrate to use new PlAgDataTableV2
+
 ## 2.6.0
 
 ### Minor Changes

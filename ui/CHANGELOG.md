@@ -1,5 +1,13 @@
 # @platforma-open/milaboratories.clonotype-enrichment.ui
 
+## 2.4.2
+
+### Patch Changes
+
+- a0a4e02: Migrate to use new PlAgDataTableV2
+- Updated dependencies [a0a4e02]
+  - @platforma-open/milaboratories.clonotype-enrichment.model@2.6.1
+
 ## 2.4.1
 
 ### Patch Changes
