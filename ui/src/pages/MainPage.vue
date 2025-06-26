@@ -3,7 +3,6 @@ import type { PlRef, PTableColumnSpec } from '@platforma-sdk/model';
 import { plRefsEqual } from '@platforma-sdk/model';
 import type {
   ListOption,
-  PlAgDataTableSettings,
 } from '@platforma-sdk/ui-vue';
 import {
   PlAgDataTableToolsPanel,
@@ -18,6 +17,7 @@ import {
   PlNumberField,
   PlSlideModal,
   PlTableFilters,
+  usePlDataTableSettingsV2,
 } from '@platforma-sdk/ui-vue';
 import { computed, ref } from 'vue';
 import { useApp } from '../app';
@@ -41,16 +41,8 @@ function setInput(inputRef?: PlRef) {
   }
 }
 
-const tableSettings = computed<PlAgDataTableSettings>(() => {
-  const pTable = app.model.outputs.pt;
-  if (pTable === undefined && !app.model.outputs.isRunning) {
-    // special case: when block is not yet started at all (no table calculated)
-    return undefined;
-  }
-  return {
-    sourceType: 'ptable',
-    model: pTable,
-  };
+const tableSettings = usePlDataTableSettingsV2({
+  model: () => app.model.outputs.pt,
 });
 
 const tableLoadingText = computed(() => {
@@ -96,10 +88,10 @@ const downsamplingOptions: ListOption<string | undefined>[] = [
       v-model="app.model.ui.tableState"
       :settings="tableSettings"
       :loading-text="tableLoadingText"
-      not-ready-text="Block is not started"
+      not-ready-text="Data is not computed"
       show-columns-panel
       show-export-button
-      @columns-changed="(newColumns) => (columns = newColumns)"
+      @columns-changed="(info) => (columns = info.columns)"
     />
   </PlBlockPage>
 
