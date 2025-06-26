@@ -1,9 +1,20 @@
 import type { GraphMakerState } from '@milaboratories/graph-maker';
 import type {
-  InferOutputsType, PColumnIdAndSpec, PFrameHandle, PlDataTableState,
-  PlRef, PlTableFiltersModel, SUniversalPColumnId, TreeNodeAccessor,
+  InferOutputsType,
+  PColumnIdAndSpec,
+  PFrameHandle,
+  PlDataTableStateV2,
+  PlRef,
+  PlTableFiltersModel,
+  SUniversalPColumnId,
+  TreeNodeAccessor,
 } from '@platforma-sdk/model';
-import { BlockModel, createPFrameForGraphs, createPlDataTableV2 } from '@platforma-sdk/model';
+import {
+  BlockModel,
+  createPFrameForGraphs,
+  createPlDataTableStateV2,
+  createPlDataTableV2,
+} from '@platforma-sdk/model';
 import type { APColumnSelectorWithSplit } from '@platforma-sdk/model/dist/render/util/split_selectors';
 
 export type DownsamplingParameters = {
@@ -14,7 +25,7 @@ export type DownsamplingParameters = {
 
 export type UiState = {
   title?: string;
-  tableState: PlDataTableState;
+  tableState: PlDataTableStateV2;
   bubbleState: GraphMakerState;
   lineState: GraphMakerState;
   stackedState: GraphMakerState;
@@ -40,13 +51,7 @@ export const model = BlockModel.create()
 
   .withUiState<UiState>({
     title: 'Clonotype enrichment',
-    tableState: {
-      gridState: {},
-      pTableParams: {
-        sorting: [],
-        filters: [],
-      },
-    },
+    tableState: createPlDataTableStateV2(),
     bubbleState: {
       title: 'Clonotype enrichment',
       template: 'bubble',
@@ -138,13 +143,13 @@ export const model = BlockModel.create()
       col.spec.name === 'pl7.app/vdj/maxEnrichment'),
     );
 
-    // Clone tableState and add sorting
-    const tableState = {
-      ...ctx.uiState.tableState,
-      pTableParams: {
-        ...ctx.uiState.tableState.pTableParams,
+    return createPlDataTableV2(
+      ctx,
+      pCols,
+      ctx.uiState.tableState,
+      {
+        filters: ctx.uiState.filterModel?.filters,
         sorting: [{
-          ...(ctx.uiState.tableState.pTableParams?.sorting ?? []),
           column: {
             id: maxEnrichPcol[0].id,
             type: 'column' as const,
@@ -153,12 +158,7 @@ export const model = BlockModel.create()
           naAndAbsentAreLeastValues: false,
         }],
       },
-    };
-
-    return createPlDataTableV2(ctx, pCols, (_) => true,
-      tableState, {
-        filters: ctx.uiState.filterModel?.filters,
-      });
+    );
   })
 
   // Returns a map of results for plot
