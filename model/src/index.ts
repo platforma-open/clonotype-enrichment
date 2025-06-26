@@ -139,25 +139,25 @@ export const model = BlockModel.create()
       return undefined;
     }
 
-    const maxEnrichPcol = pCols.filter((col) => (
-      col.spec.name === 'pl7.app/vdj/maxEnrichment'),
-    );
+    // const maxEnrichPcol = pCols.filter((col) => (
+    //   col.spec.name === 'pl7.app/vdj/maxEnrichment'),
+    // );
 
     return createPlDataTableV2(
       ctx,
       pCols,
       ctx.uiState.tableState,
-      {
-        filters: ctx.uiState.filterModel?.filters,
-        sorting: [{
-          column: {
-            id: maxEnrichPcol[0].id,
-            type: 'column' as const,
-          },
-          ascending: false,
-          naAndAbsentAreLeastValues: false,
-        }],
-      },
+      // {
+      //   filters: ctx.uiState.filterModel?.filters,
+      //   sorting: [{
+      //     column: {
+      //       id: maxEnrichPcol[0].id,
+      //       type: 'column' as const,
+      //     },
+      //     ascending: false,
+      //     naAndAbsentAreLeastValues: false,
+      //   }],
+      // },
     );
   })
 
