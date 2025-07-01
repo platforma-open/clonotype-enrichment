@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment
 
+## 2.2.0
+
+### Minor Changes
+
+- a531978: allow prepare venv on Windows
+
 ## 2.1.17
 
 ### Patch Changes
