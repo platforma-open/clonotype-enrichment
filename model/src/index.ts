@@ -5,7 +5,6 @@ import type {
   PFrameHandle,
   PlDataTableStateV2,
   PlRef,
-  PlTableFiltersModel,
   SUniversalPColumnId,
   TreeNodeAccessor,
 } from '@platforma-sdk/model';
@@ -29,7 +28,6 @@ export type UiState = {
   bubbleState: GraphMakerState;
   lineState: GraphMakerState;
   stackedState: GraphMakerState;
-  filterModel: PlTableFiltersModel;
 };
 
 export type BlockArgs = {
@@ -72,7 +70,6 @@ export const model = BlockModel.create()
       template: 'stackedBar',
       currentTab: null,
     },
-    filterModel: {},
   })
 
   .argsValid((ctx) => ctx.args.abundanceRef !== undefined
@@ -148,7 +145,6 @@ export const model = BlockModel.create()
       pCols,
       ctx.uiState.tableState,
       // {
-      //   filters: ctx.uiState.filterModel?.filters,
       //   sorting: [{
       //     column: {
       //       id: maxEnrichPcol[0].id,

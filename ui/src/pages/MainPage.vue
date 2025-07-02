@@ -1,11 +1,10 @@
 <script setup lang="ts">
-import type { PlRef, PTableColumnSpec } from '@platforma-sdk/model';
+import type { PlRef } from '@platforma-sdk/model';
 import { plRefsEqual } from '@platforma-sdk/model';
 import type {
   ListOption,
 } from '@platforma-sdk/ui-vue';
 import {
-  PlAgDataTableToolsPanel,
   PlAgDataTableV2,
   PlBlockPage,
   PlBtnGhost,
@@ -13,10 +12,8 @@ import {
   PlDropdown,
   PlDropdownMulti,
   PlDropdownRef,
-  PlMaskIcon24,
   PlNumberField,
   PlSlideModal,
-  PlTableFilters,
   usePlDataTableSettingsV2,
 } from '@platforma-sdk/ui-vue';
 import { computed, ref } from 'vue';
@@ -28,8 +25,6 @@ const settingsAreShown = ref(app.model.outputs.datasetSpec === undefined);
 const showSettings = () => {
   settingsAreShown.value = true;
 };
-
-const columns = ref<PTableColumnSpec[]>([]);
 
 // Update page title by dataset
 function setInput(inputRef?: PlRef) {
@@ -73,15 +68,8 @@ const downsamplingOptions: ListOption<string | undefined>[] = [
   <PlBlockPage>
     <template #title>{{ app.model.ui.title }}</template>
     <template #append>
-      <!-- PlAgDataTableToolsPanel controls showing  Export column and filter-->
-      <PlAgDataTableToolsPanel>
-        <PlTableFilters v-model="app.model.ui.filterModel" :columns="columns" />
-      </PlAgDataTableToolsPanel>
-      <PlBtnGhost @click.stop="showSettings">
+      <PlBtnGhost icon="settings" @click.stop="showSettings">
         Settings
-        <template #append>
-          <PlMaskIcon24 name="settings" />
-        </template>
       </PlBtnGhost>
     </template>
     <PlAgDataTableV2
@@ -89,9 +77,7 @@ const downsamplingOptions: ListOption<string | undefined>[] = [
       :settings="tableSettings"
       :loading-text="tableLoadingText"
       not-ready-text="Data is not computed"
-      show-columns-panel
       show-export-button
-      @columns-changed="(info) => (columns = info.columns)"
     />
   </PlBlockPage>
 
