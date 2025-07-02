@@ -8,6 +8,7 @@ render := import("@platforma-sdk/workflow-tengo:render")
 pSpec := import("@platforma-sdk/workflow-tengo:pframes.spec")
 json := import("json")
 strings := import("@platforma-sdk/workflow-tengo:strings")
+text := import("text")
 
 buildExportsTpl := assets.importTemplate(":build-exports")
 downsamplingSw := assets.importSoftware("@platforma-open/milaboratories.clonotype-enrichment.software:downsampling")
@@ -41,7 +42,7 @@ wf.body(func(args) {
         {
             type: "milaboratories.clonotype-enrichment",
             importance: 30,
-            label: "Clonotype enrichment"
+            label: text.join(conditionOrder, " → ")
         })
 
 	// Get abundance table
@@ -120,7 +121,8 @@ wf.body(func(args) {
 
 	// Export frequency
 	frequencyImportParams := pfFrequencyConv.getColumns(abundanceSpec, conditionOrder,
-														inputType, args.downsampling)
+														inputType, args.downsampling,
+														blockId)
 	frequencyPf := xsv.importFile(enrichCsv, "csv", frequencyImportParams,
 								{ cpu: 1, mem: "32GiB" })
 	// Prepare pFrame to be exported
@@ -160,7 +162,9 @@ wf.body(func(args) {
 		min: min,
 		max: max,
 		cutoff: cutoff,
-		downsampling: args.downsampling
+		downsampling: args.downsampling,
+		conditionOrder: conditionOrder,
+		blockId: blockId
 	})
 
 	exports := buildExports.output("exports")

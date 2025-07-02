@@ -3,6 +3,7 @@ ll := import("@platforma-sdk/workflow-tengo:ll")
 xsv := import("@platforma-sdk/workflow-tengo:pframes.xsv")
 pSpec := import("@platforma-sdk/workflow-tengo:pframes.spec")
 pframes := import("@platforma-sdk/workflow-tengo:pframes")
+text := import("text")
 
 pfEnrichmentConvExport := import(":pf-enrichment-conv-export")
 
@@ -17,13 +18,17 @@ self.body(func(args) {
     abundanceSpec := args.abundanceSpec
     inputType := args.inputType
     topEnrichedColCsv := args.topEnrichedColCsv
+    conditionOrder := args.conditionOrder
+    blockId := args.blockId
 
     enrichmentImportParamsExport := pfEnrichmentConvExport.getColumns(abundanceSpec, 
                                                             inputType,
                                                             string(min),
                                                             string(max),
                                                             string(cutoff),
-                                                            downsampling)
+                                                            downsampling,
+                                                            conditionOrder,
+                                                            blockId)
 
     exportFile := xsv.importFile(topEnrichedColCsv, 
                                 "csv",
@@ -35,7 +40,7 @@ self.body(func(args) {
         {
             type: "milaboratories.clonotype-enrichment",
             importance: 30,
-            label: "Clonotype enrichment"
+            label: text.join(conditionOrder, " → ")
         })
 
     // Define output variables
