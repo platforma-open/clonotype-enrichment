@@ -35,7 +35,7 @@ self.body(func(args) {
                                 enrichmentImportParamsExport,
                                 { cpu: 1, mem: "16GiB" })
 
-    // Make trace
+    // Make trace with condition order (max enrichment will differ depending on the order)
     trace := pSpec.makeTrace(abundanceSpec,
         {
             type: "milaboratories.clonotype-enrichment",

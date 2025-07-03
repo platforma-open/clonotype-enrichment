@@ -37,12 +37,12 @@ wf.body(func(args) {
 	conditionOrder := args.conditionOrder
 	abundanceSpec := columns.getSpec(args.abundanceRef)
 
-	// Make trace
+	// Make trace (Frequencies are always the same, so we don't need to add the condition order)
     trace := pSpec.makeTrace(abundanceSpec,
         {
             type: "milaboratories.clonotype-enrichment",
             importance: 30,
-            label: text.join(conditionOrder, " → ")
+            label: "Clonotype enrichment"
         })
 
 	// Get abundance table
