@@ -2,7 +2,7 @@ ll := import("@platforma-sdk/workflow-tengo:ll")
 canonical := import("@platforma-sdk/workflow-tengo:canonical")
 
 getColumns := func(abundanceSpec, inputType, min, max, cutoff, downsampling, 
-                  conditionsOrder, blockId) {
+                  conditionOrder, blockId) {
   return {
     axes: [
       {
@@ -20,7 +20,7 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, downsampling,
           valueType: "Double",
           domain: {
             "pl7.app/downsampling": canonical.encode(downsampling),
-            "pl7.app/conditionsOrder": canonical.encode(conditionsOrder),
+            "pl7.app/conditionsOrder": canonical.encode(conditionOrder),
             "pl7.app/blockId": blockId
           },
           annotations: {
