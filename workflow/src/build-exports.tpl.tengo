@@ -36,11 +36,22 @@ self.body(func(args) {
                                 { cpu: 1, mem: "16GiB" })
 
     // Make trace with condition order (max enrichment will differ depending on the order)
+    // Downsampling is also important to add to the label
+	label := ""
+	if downsampling.type == "hypergeometric" {
+		if downsampling.valueChooser == "fixed" {
+			label = "Downsampling: " + downsampling.type + " - " + downsampling.valueChooser + " - " + string(downsampling.n)
+		} else {
+			label = "Downsampling: " + downsampling.type + " - " + downsampling.valueChooser
+		}
+	} else {
+		label = "Downsampling: " + downsampling.type
+	}
     trace := pSpec.makeTrace(abundanceSpec,
         {
             type: "milaboratories.clonotype-enrichment",
             importance: 30,
-            label: text.join(conditionOrder, " → ")
+            label: text.join(conditionOrder, " → ") + " - " + label
         })
 
     // Define output variables

@@ -36,13 +36,26 @@ wf.body(func(args) {
 	columns := args.columns
 	conditionOrder := args.conditionOrder
 	abundanceSpec := columns.getSpec(args.abundanceRef)
+	downsampling:= args.downsampling
 
 	// Make trace (Frequencies are always the same, so we don't need to add the condition order)
+	// Downsampling will cause it to change, so lets add it
+	label := ""
+	if downsampling.type == "hypergeometric" {
+		if downsampling.valueChooser == "fixed" {
+			label = "Downsampling: " + downsampling.type + " - " + downsampling.valueChooser + " - " + string(downsampling.n)
+		} else {
+			label = "Downsampling: " + downsampling.type + " - " + downsampling.valueChooser
+		}
+	} else {
+		label = "Downsampling: " + downsampling.type
+	}
+
     trace := pSpec.makeTrace(abundanceSpec,
         {
             type: "milaboratories.clonotype-enrichment",
             importance: 30,
-            label: "Clonotype enrichment"
+            label: label
         })
 
 	// Get abundance table
@@ -59,7 +72,7 @@ wf.body(func(args) {
 		software(downsamplingSw).
 		mem("32GiB").
 		cpu(1).
-		writeFile("downsampling.json", json.encode(args.downsampling)).
+		writeFile("downsampling.json", json.encode(downsampling)).
 		addFile("input.csv", cloneTable).
 		saveFile("result.csv").
 		run()
@@ -121,7 +134,7 @@ wf.body(func(args) {
 
 	// Export frequency
 	frequencyImportParams := pfFrequencyConv.getColumns(abundanceSpec, conditionOrder,
-														inputType, args.downsampling,
+														inputType, downsampling,
 														blockId)
 	frequencyPf := xsv.importFile(enrichCsv, "csv", frequencyImportParams,
 								{ cpu: 1, mem: "32GiB" })
@@ -162,7 +175,7 @@ wf.body(func(args) {
 		min: min,
 		max: max,
 		cutoff: cutoff,
-		downsampling: args.downsampling,
+		downsampling: downsampling,
 		conditionOrder: conditionOrder,
 		blockId: blockId
 	})
