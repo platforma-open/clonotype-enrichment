@@ -23,6 +23,9 @@ def hybrid_enrichment_analysis(
     """
     # Read data with polars lazy evaluation
     input_df = pl.scan_csv(input_data_csv)
+
+    # Make sure condition_order is a list of strings
+    condition_order = [str(cond) for cond in condition_order]
     
     # Rename and validate columns
     input_df = input_df.rename({"downsampledAbundance": "abundance"})
