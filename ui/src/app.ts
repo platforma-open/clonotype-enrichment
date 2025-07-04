@@ -6,8 +6,11 @@ import BubblePage from './pages/BubblePage.vue';
 import LinePage from './pages/LinePage.vue';
 import StackedPage from './pages/StackedPage.vue';
 
-export const sdkPlugin = defineApp(model, () => {
+export const sdkPlugin = defineApp(model, (app) => {
   return {
+    progress: () => {
+      return app.model.outputs.isRunning;
+    },
     routes: {
       '/': () => MainPage,
       '/buble': () => BubblePage,

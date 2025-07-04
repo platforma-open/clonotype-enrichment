@@ -1,4 +1,4 @@
-import pandas as pd
+import polars as pl
 import numpy as np
 from numpy.random import default_rng
 import json
@@ -26,53 +26,75 @@ def parse_params():
 
 
 downsampling_params = parse_params()
-data = pd.read_csv(input_file, sep=",")
+data = pl.read_csv(input_file)
 
-totals = data.groupby('sampleId')['abundance'].sum().reset_index()
+# Calculate sample totals efficiently
+totals = data.group_by('sampleId').agg(pl.col('abundance').sum())
+totals_values = totals.select('abundance').to_numpy().flatten()
+
 # Calculate 20th percentile across all totals
-q20 = totals['abundance'].quantile(0.2)
+q20 = np.percentile(totals_values, 20)
+
 # Find the minimum value that is above 0.5*q20
-min_above_threshold = totals[totals['abundance'] > 0.5 * q20]['abundance'].min()
-fixed_auto_downsampling_value = min_above_threshold if not pd.isna(
-    min_above_threshold) else q20
+above_threshold = totals_values[totals_values > 0.5 * q20]
+min_above_threshold = np.min(above_threshold) if len(above_threshold) > 0 else q20
+fixed_auto_downsampling_value = min_above_threshold
 
 
-def downsample(df, downsampling):
+def downsample_sample(sample_df, downsampling):
+    """
+    Downsample a dataframe representing a single sample using polars.
+    """
     if downsampling['type'] == "none":
-        return df
+        return sample_df.with_columns(pl.col('abundance').alias('downsampledAbundance'))
 
     elif downsampling['type'] == "hypergeometric":
         if downsampling['valueChooser'] == "min":
-            value = totals['abundance'].min()
+            value = np.min(totals_values)
         elif downsampling['valueChooser'] == "fixed":
             value = downsampling['n']
         elif downsampling['valueChooser'] == "auto":
             value = fixed_auto_downsampling_value
 
-        if df['abundance'].sum() < value:
-            return df
+        total_abundance = sample_df.select(pl.col('abundance').sum()).item()
+        if total_abundance < value:
+            return sample_df.with_columns(pl.col('abundance').alias('downsampledAbundance'))
 
         rng = default_rng(31415)  # always fix seed for reproducibility
 
-        df['abundance'] = rng.multivariate_hypergeometric(
-            df['abundance'].astype(np.int64), int(value))
+        # Convert to numpy for hypergeometric sampling
+        abundance_values = sample_df.select('abundance').to_numpy().flatten().astype(np.int64)
+        downsampled_values = rng.multivariate_hypergeometric(abundance_values, int(value))
         
-        return df
+        # Create new dataframe with downsampled values
+        result_df = sample_df.with_columns(pl.lit(downsampled_values).alias('downsampledAbundance'))
+        
+        return result_df
 
     else:
         raise ValueError(f"Invalid downsampling type: {downsampling['type']}")
 
-bySample = data.groupby('sampleId')
+# Process each sample group efficiently
+downsampled_parts = []
 
-# Store downsampled abundance in table
-downsampled_id = 'downsampledAbundance'
-data[downsampled_id] = None
-for sampleId, df in bySample:
-    downsampled = downsample(df.copy(), downsampling_params)
-    data.loc[downsampled.index, downsampled_id] =\
-        downsampled.loc[downsampled.index, "abundance"]
+# Get unique sample IDs
+sample_ids = data.select('sampleId').unique().to_series()
 
-# Remove clonotypes that for a given sample where downsampled to zero counts
-# data = data.loc[data[downsampled_id] != 0]
+for sample_id in sample_ids:
+    # Filter data for this sample
+    sample_data = data.filter(pl.col('sampleId') == sample_id)
     
-data.to_csv('result.csv', sep=',', index=False)
+    # Downsample this sample
+    downsampled_sample = downsample_sample(sample_data, downsampling_params)
+    
+    # Add to results
+    downsampled_parts.append(downsampled_sample)
+
+# Combine all parts
+if downsampled_parts:
+    result_data = pl.concat(downsampled_parts)
+else:
+    result_data = data.with_columns(pl.col('abundance').alias('downsampledAbundance'))
+
+# Write the result to CSV
+result_data.write_csv('result.csv')
