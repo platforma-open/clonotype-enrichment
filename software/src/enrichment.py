@@ -23,6 +23,9 @@ def hybrid_enrichment_analysis(
     """
     # Read data with polars lazy evaluation
     input_df = pl.scan_csv(input_data_csv)
+
+    # Make sure condition_order is a list of strings
+    condition_order = [str(cond) for cond in condition_order]
     
     # Rename and validate columns
     input_df = input_df.rename({"downsampledAbundance": "abundance"})
@@ -34,8 +37,8 @@ def hybrid_enrichment_analysis(
     if missing_cols:
         raise ValueError(f"Missing expected columns: {', '.join(missing_cols)}")
     
-    # Select only needed columns to reduce memory
-    input_df = input_df.select(['elementId', 'abundance', 'condition'])
+    # Select only needed columns to reduce memory and ensure condition is string type
+    input_df = input_df.select(['elementId', 'abundance', 'condition']).with_columns(pl.col('condition').cast(pl.Utf8))
     
     # Calculate total reads per condition efficiently
     total_reads = (
