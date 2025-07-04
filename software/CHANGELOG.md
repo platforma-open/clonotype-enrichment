@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.software
 
+## 2.11.0
+
+### Minor Changes
+
+- 56e442d: Small fix to ensure condition labels are always treated as strings
+
 ## 2.10.0
 
 ### Minor Changes
