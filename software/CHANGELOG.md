@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.software
 
+## 2.10.0
+
+### Minor Changes
+
+- 5fed921: Switch to polars
+
 ## 2.9.0
 
 ### Minor Changes
