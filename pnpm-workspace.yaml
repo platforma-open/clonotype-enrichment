@@ -16,7 +16,7 @@ catalog:
   "@platforma-sdk/package-builder": ^2.16.2
   "@platforma-sdk/eslint-config": ^1.0.3
 
-  "@milaboratories/graph-maker": ^1.1.129
+  "@milaboratories/graph-maker": 1.1.128
   '@milaboratories/software-pframes-conv': ^2.2.2
   "@platforma-open/milaboratories.runenv-python-3": ^1.1.16
   "@platforma-open/milaboratories.software-ptransform": ^1.5.0
