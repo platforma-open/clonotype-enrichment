@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.workflow
 
+## 2.16.0
+
+### Minor Changes
+
+- 40fd37c: Update trace and domain
+
 ## 2.15.1
 
 ### Patch Changes
