@@ -1,19 +1,26 @@
-import pandas as pd
+import polars as pl
 import numpy as np
 import argparse
 import os
 
 def process_enrichment(input_file, output_dir='.'):
+    """
+    Process enrichment data using polars for better performance.
+    """
     # Read the CSV file
-    df = pd.read_csv(input_file)
+    df = pl.read_csv(input_file)
 
-    # Extract the 'Enrichment' column
-    enrichment_values = df['Enrichment'].values
+    # Extract the 'Enrichment' column and calculate statistics
+    enrichment_stats = df.select([
+        pl.col('Enrichment').min().alias('min'),
+        pl.col('Enrichment').max().alias('max'),
+        pl.col('Enrichment').quantile(0.75).alias('p75')
+    ])
 
-    # Calculate min, max, and 75th percentile
-    enrichment_min = np.min(enrichment_values)
-    enrichment_max = np.max(enrichment_values)
-    enrichment_75 = np.percentile(enrichment_values, 75)
+    # Get the values from the result
+    enrichment_min = enrichment_stats['min'][0]
+    enrichment_max = enrichment_stats['max'][0]
+    enrichment_75 = enrichment_stats['p75'][0]
 
     # For the 75th percentile, output 1 if the value is less than or equal to 1
     enrichment_75_out = enrichment_75 if enrichment_75 > 1 else 1
@@ -47,15 +54,22 @@ def main():
     except FileNotFoundError:
         print(f"Error: Input file '{args.input_file}' not found.")
         exit(1)
-    except pd.errors.EmptyDataError:
-        print(f"Error: Input file '{args.input_file}' is empty.")
-        exit(1)
-    except KeyError:
-        print("Error: Input file must contain an 'Enrichment' column.")
-        exit(1)
+    except pl.exceptions.ComputeError as e:
+        error_msg = str(e).lower()
+        if "not found" in error_msg or "enrichment" in error_msg:
+            print("Error: Input file must contain an 'Enrichment' column.")
+            exit(1)
+        else:
+            print(f"Error processing data: {str(e)}")
+            exit(1)
     except Exception as e:
-        print(f"An error occurred: {str(e)}")
-        exit(1)
+        error_msg = str(e).lower()
+        if "empty" in error_msg or "no data" in error_msg:
+            print(f"Error: Input file '{args.input_file}' appears to be empty or invalid.")
+            exit(1)
+        else:
+            print(f"An error occurred: {str(e)}")
+            exit(1)
 
 if __name__ == '__main__':
     main()

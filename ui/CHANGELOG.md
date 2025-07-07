@@ -1,5 +1,17 @@
 # @platforma-open/milaboratories.clonotype-enrichment.ui
 
+## 2.6.0
+
+### Minor Changes
+
+- 5fed921: Switch to polars
+
+## 2.5.0
+
+### Minor Changes
+
+- adbe364: Switch to polars
+
 ## 2.4.2
 
 ### Patch Changes

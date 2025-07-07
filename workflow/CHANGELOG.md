@@ -1,5 +1,34 @@
 # @platforma-open/milaboratories.clonotype-enrichment.workflow
 
+## 2.15.1
+
+### Patch Changes
+
+- Updated dependencies [56e442d]
+  - @platforma-open/milaboratories.clonotype-enrichment.software@2.11.0
+
+## 2.15.0
+
+### Minor Changes
+
+- 5fed921: Switch to polars
+
+### Patch Changes
+
+- Updated dependencies [5fed921]
+  - @platforma-open/milaboratories.clonotype-enrichment.software@2.10.0
+
+## 2.14.0
+
+### Minor Changes
+
+- adbe364: Switch to polars
+
+### Patch Changes
+
+- Updated dependencies [adbe364]
+  - @platforma-open/milaboratories.clonotype-enrichment.software@2.9.0
+
 ## 2.13.2
 
 ### Patch Changes

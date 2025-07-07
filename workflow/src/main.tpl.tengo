@@ -71,7 +71,7 @@ wf.body(func(args) {
 	runDownsampling := exec.builder().
 		software(downsamplingSw).
 		mem("32GiB").
-		cpu(1).
+		cpu(8).
 		writeFile("downsampling.json", json.encode(downsampling)).
 		addFile("input.csv", cloneTable).
 		saveFile("result.csv").
@@ -92,7 +92,7 @@ wf.body(func(args) {
 	calculateEnrichment := exec.builder().
 		software(assets.importSoftware("@platforma-open/milaboratories.clonotype-enrichment.software:calculate-enrichment")).
 		mem("32GiB").
-		cpu(1).
+		cpu(8).
 		addFile("inputFile.csv", downsamplingFile).
 		arg("--input_data").arg("inputFile.csv").
 		arg("--conditions").arg(string(conditionOrder)).
