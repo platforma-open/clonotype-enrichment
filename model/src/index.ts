@@ -137,7 +137,9 @@ export const model = BlockModel.create()
     }
     // Check if cutoffValue.cutoff exists and is a number
     if ('cutoff' in cutoffValue && typeof cutoffValue.cutoff === 'string') {
-      return cutoffValue.cutoff;
+      // Convert string to numerical and round it
+      const cutoff = +cutoffValue.cutoff;
+      return String(cutoff.toFixed(2));
     }
     return undefined;
   })
