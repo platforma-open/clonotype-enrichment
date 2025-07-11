@@ -128,6 +128,20 @@ export const model = BlockModel.create()
     return [...new Set(Object.values(values))];
   })
 
+  // Get assigned cutoff value and add it to cutoffValue UI variable
+  .output('cutoffValue', (ctx): string | undefined => {
+    const cutoffValue = ctx.outputs?.resolve('cutoffValue')?.getDataAsJson() as object;
+    // Check if cutoff is undefined or null
+    if (cutoffValue === undefined || cutoffValue === null) {
+      return undefined;
+    }
+    // Check if cutoffValue.cutoff exists and is a number
+    if ('cutoff' in cutoffValue && typeof cutoffValue.cutoff === 'string') {
+      return cutoffValue.cutoff;
+    }
+    return undefined;
+  })
+
   // Returns a map of results for main table
   .output('pt', (ctx) => {
     const pCols = ctx.outputs?.resolve('enrichmentPf')?.getPColumns();

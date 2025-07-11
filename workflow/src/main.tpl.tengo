@@ -181,9 +181,11 @@ wf.body(func(args) {
 	})
 
 	exports := buildExports.output("exports")
+	cutoffValue := buildExports.output("cutoffValue")
 
 	return {
 		outputs: {
+			cutoffValue: cutoffValue,
 			enrichmentPf: pframes.exportFrame(enrichmentPf),
 			bubblePf: pframes.exportFrame(bubblePf),
 			stackedPf: pframes.exportFrame(stackedPf),

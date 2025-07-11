@@ -14,7 +14,9 @@ import {
   PlDropdownRef,
   PlMaskIcon24,
   PlNumberField,
+  PlSectionSeparator,
   PlSlideModal,
+  PlTextField,
   usePlDataTableSettingsV2,
 } from '@platforma-sdk/ui-vue';
 import { computed, ref } from 'vue';
@@ -127,5 +129,16 @@ const downsamplingOptions: ListOption<string | undefined>[] = [
       :minValue="0"
       required
     />
+    <!-- Cutoff Value Section -->
+    <div v-if="app.model.outputs.cutoffValue !== undefined">
+      <PlSectionSeparator>Block defined variables</PlSectionSeparator>
+      <div class="mt-4">
+        <PlTextField
+          :model-value="app.model.outputs.cutoffValue"
+          label="Enrichment cutoff value"
+          readonly
+        />
+      </div>
+    </div>
   </PlSlideModal>
 </template>
