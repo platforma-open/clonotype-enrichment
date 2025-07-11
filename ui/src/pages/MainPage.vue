@@ -15,6 +15,7 @@ import {
   PlMaskIcon24,
   PlNumberField,
   PlSlideModal,
+  PlTextField,
   usePlDataTableSettingsV2,
 } from '@platforma-sdk/ui-vue';
 import { computed, ref } from 'vue';
@@ -26,6 +27,7 @@ const settingsAreShown = ref(app.model.outputs.datasetSpec === undefined);
 const showSettings = () => {
   settingsAreShown.value = true;
 };
+const statsOpen = ref(false);
 
 // Update page title by dataset
 function setInput(inputRef?: PlRef) {
@@ -69,6 +71,12 @@ const downsamplingOptions: ListOption<string | undefined>[] = [
   <PlBlockPage>
     <template #title>{{ app.model.ui.title }}</template>
     <template #append>
+      <PlBtnGhost @click.stop="() => (statsOpen = true)">
+        Stats
+        <template #append>
+          <PlMaskIcon24 name="info-outline" />
+        </template>
+      </PlBtnGhost>
       <PlBtnGhost @click.stop="showSettings">
         Settings
         <template #append>
@@ -126,6 +134,14 @@ const downsamplingOptions: ListOption<string | undefined>[] = [
       label="Select N"
       :minValue="0"
       required
+    />
+  </PlSlideModal>
+  <!-- Slide window with computed variables -->
+  <PlSlideModal v-model="statsOpen">
+    <PlTextField
+      :model-value="app.model.outputs.cutoffValue || ''"
+      label="Enrichment cutoff value"
+      readonly
     />
   </PlSlideModal>
 </template>
