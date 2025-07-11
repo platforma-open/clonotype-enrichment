@@ -48,11 +48,17 @@ self.body(func(args) {
 	} else {
 		label = "Downsampling: " + downsampling.type
 	}
+    // Add two traces, one for the condition order and one for the downsampling
     trace := pSpec.makeTrace(abundanceSpec,
         {
-            type: "milaboratories.clonotype-enrichment",
+            type: "milaboratories.clonotype-enrichment.condition-order",
+            importance: 35,
+            label: text.join(conditionOrder, " → ")
+        },
+        {
+            type: "milaboratories.clonotype-enrichment.downsampling",
             importance: 30,
-            label: text.join(conditionOrder, " → ") + " - " + label
+            label: label
         })
 
     // Define output variables
