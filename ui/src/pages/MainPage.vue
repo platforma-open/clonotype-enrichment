@@ -14,7 +14,6 @@ import {
   PlDropdownRef,
   PlMaskIcon24,
   PlNumberField,
-  PlSectionSeparator,
   PlSlideModal,
   PlTextField,
   usePlDataTableSettingsV2,
@@ -28,6 +27,7 @@ const settingsAreShown = ref(app.model.outputs.datasetSpec === undefined);
 const showSettings = () => {
   settingsAreShown.value = true;
 };
+const statsOpen = ref(false);
 
 // Update page title by dataset
 function setInput(inputRef?: PlRef) {
@@ -71,6 +71,12 @@ const downsamplingOptions: ListOption<string | undefined>[] = [
   <PlBlockPage>
     <template #title>{{ app.model.ui.title }}</template>
     <template #append>
+      <PlBtnGhost @click.stop="() => (statsOpen = true)">
+        Stats
+        <template #append>
+          <PlMaskIcon24 name="info-outline" />
+        </template>
+      </PlBtnGhost>
       <PlBtnGhost @click.stop="showSettings">
         Settings
         <template #append>
@@ -129,16 +135,13 @@ const downsamplingOptions: ListOption<string | undefined>[] = [
       :minValue="0"
       required
     />
-    <!-- Cutoff Value Section -->
-    <div v-if="app.model.outputs.cutoffValue !== undefined">
-      <PlSectionSeparator>Block defined variables</PlSectionSeparator>
-      <div class="mt-4">
-        <PlTextField
-          :model-value="app.model.outputs.cutoffValue"
-          label="Enrichment cutoff value"
-          readonly
-        />
-      </div>
-    </div>
+  </PlSlideModal>
+  <!-- Slide window with computed variables -->
+  <PlSlideModal v-model="statsOpen">
+    <PlTextField
+      :model-value="app.model.outputs.cutoffValue || ''"
+      label="Enrichment cutoff value"
+      readonly
+    />
   </PlSlideModal>
 </template>
