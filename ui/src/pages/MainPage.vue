@@ -140,8 +140,13 @@ const downsamplingOptions: ListOption<string | undefined>[] = [
   <PlSlideModal v-model="statsOpen">
     <PlTextField
       :model-value="app.model.outputs.cutoffValue || ''"
-      label="Enrichment cutoff value"
+      label="Enrichment cutoff"
       readonly
-    />
+    >
+      <template #tooltip>
+        This cutoff is calculated based on the enrichment values distribution (max(1, 3rd quantile)) \
+        and used in downstream blocks as a threshold.
+      </template>
+    </PlTextField>
   </PlSlideModal>
 </template>
