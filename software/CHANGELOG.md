@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.software
 
+## 2.12.0
+
+### Minor Changes
+
+- 076d9c6: Add stats window
+
 ## 2.11.0
 
 ### Minor Changes

@@ -1,5 +1,12 @@
 # @platforma-open/milaboratories.clonotype-enrichment.model
 
+## 2.7.0
+
+### Minor Changes
+
+- bc547f7: Show block defined cutoff in UI
+- 076d9c6: Add stats window
+
 ## 2.6.1
 
 ### Patch Changes

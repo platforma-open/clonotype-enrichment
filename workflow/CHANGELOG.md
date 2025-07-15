@@ -1,5 +1,17 @@
 # @platforma-open/milaboratories.clonotype-enrichment.workflow
 
+## 2.17.0
+
+### Minor Changes
+
+- bc547f7: Show block defined cutoff in UI
+- 076d9c6: Add stats window
+
+### Patch Changes
+
+- Updated dependencies [076d9c6]
+  - @platforma-open/milaboratories.clonotype-enrichment.software@2.12.0
+
 ## 2.16.0
 
 ### Minor Changes
