@@ -37,20 +37,6 @@ export type BlockArgs = {
   downsampling: DownsamplingParameters;
 };
 
-// Function to gets stats values output from the workflow
-function getStatValue(statsObj: object | undefined, label: string): string | undefined {
-  if (statsObj === undefined || statsObj === null) {
-    return undefined;
-  }
-  // Check if the label exists and is a string
-  const obj = statsObj as Record<string, string>;
-  if (label in obj && typeof obj[label] === 'string') {
-    const value = +obj[label];
-    return String(value.toFixed(2));
-  }
-  return undefined;
-}
-
 export const model = BlockModel.create()
 
   .withArgs<BlockArgs>({
@@ -144,14 +130,17 @@ export const model = BlockModel.create()
 
   // Get all enrichment statistics
   .output('enrichmentStats', (ctx) => {
-    const statsObj = ctx.outputs?.resolve('outStats')?.getDataAsJson() as object ?? undefined;
-    return {
-      cutoffValue: getStatValue(statsObj, 'cutoff'),
-      medianValue: getStatValue(statsObj, 'median'),
-      minValue: getStatValue(statsObj, 'min'),
-      maxValue: getStatValue(statsObj, 'max'),
-      meanValue: getStatValue(statsObj, 'mean'),
-    };
+    const statsObj = ctx.outputs?.resolve('outStats')?.getDataAsJson();
+    if (!statsObj) return undefined;
+
+    const result: Record<string, string | undefined> = {};
+    for (const [key, value] of Object.entries(statsObj)) {
+      if (typeof value === 'string') {
+        const numValue = +value;
+        result[key + 'Value'] = String(numValue.toFixed(2));
+      }
+    }
+    return result;
   })
 
   // Returns a map of results for main table
