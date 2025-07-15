@@ -133,7 +133,7 @@ export const model = BlockModel.create()
     const statsObj = ctx.outputs?.resolve('outStats')?.getDataAsJson();
     if (!statsObj) return undefined;
 
-    const result: Record<string, string | undefined> = {};
+    const result: Record<string, string> = {};
     for (const [key, value] of Object.entries(statsObj)) {
       if (typeof value === 'string') {
         const numValue = +value;
