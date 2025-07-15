@@ -128,6 +128,21 @@ export const model = BlockModel.create()
     return [...new Set(Object.values(values))];
   })
 
+  // Get all enrichment statistics
+  .output('enrichmentStats', (ctx) => {
+    const statsObj = ctx.outputs?.resolve('outStats')?.getDataAsJson();
+    if (!statsObj) return undefined;
+
+    const result: Record<string, string> = {};
+    for (const [key, value] of Object.entries(statsObj)) {
+      if (typeof value === 'string') {
+        const numValue = +value;
+        result[key + 'Value'] = String(numValue.toFixed(2));
+      }
+    }
+    return result;
+  })
+
   // Returns a map of results for main table
   .output('pt', (ctx) => {
     const pCols = ctx.outputs?.resolve('enrichmentPf')?.getPColumns();

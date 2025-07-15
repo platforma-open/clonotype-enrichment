@@ -9,6 +9,7 @@ import {
   PlBlockPage,
   PlBtnGhost,
   PlBtnGroup,
+  PlDialogModal,
   PlDropdown,
   PlDropdownMulti,
   PlDropdownRef,
@@ -26,6 +27,7 @@ const settingsAreShown = ref(app.model.outputs.datasetSpec === undefined);
 const showSettings = () => {
   settingsAreShown.value = true;
 };
+const statsOpen = ref(false);
 
 // Update page title by dataset
 function setInput(inputRef?: PlRef) {
@@ -63,12 +65,50 @@ const downsamplingOptions: ListOption<string | undefined>[] = [
   { label: 'Random Sampling', value: 'hypergeometric' },
 ];
 
+// Function to create statistics table HTML
+const createStatsTable = () => {
+  const stats = [
+    { label: 'Minimum enrichment', value: app.model.outputs.enrichmentStats?.minValue || '' },
+    { label: 'Maximum enrichment', value: app.model.outputs.enrichmentStats?.maxValue || '' },
+    { label: 'Mean enrichment', value: app.model.outputs.enrichmentStats?.meanValue || '' },
+    { label: 'Median enrichment', value: app.model.outputs.enrichmentStats?.medianValue || '' },
+    { label: 'Enrichment score cutoff', value: app.model.outputs.enrichmentStats?.cutoffValue || '' },
+  ];
+
+  const rows = stats.map((stat) =>
+    `<tr>
+      <td style="padding: 8px 12px; border-bottom: 1px solid #e5e7eb; font-weight: 500; color: #111;">${stat.label}</td>
+      <td style="padding: 8px 12px; border-bottom: 1px solid #e5e7eb; color: #374151; text-align: right;">${stat.value}</td>
+    </tr>`,
+  ).join('');
+
+  return `
+    <table style="width: 100%; border-collapse: collapse; margin: 0;">
+      <thead>
+        <tr style="background-color: #f9fafb;">
+          <th style="padding: 12px; text-align: left; border-bottom: 2px solid #e5e7eb; color: #111; font-weight: 600;">Statistic</th>
+          <th style="padding: 12px; text-align: right; border-bottom: 2px solid #e5e7eb; color: #111; font-weight: 600;">Value</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows}
+      </tbody>
+    </table>
+  `;
+};
+
 </script>
 
 <template>
   <PlBlockPage>
     <template #title>{{ app.model.ui.title }}</template>
     <template #append>
+      <PlBtnGhost @click.stop="() => (statsOpen = true)">
+        Stats
+        <template #append>
+          <PlMaskIcon24 name="info-outline" />
+        </template>
+      </PlBtnGhost>
       <PlBtnGhost @click.stop="showSettings">
         Settings
         <template #append>
@@ -128,4 +168,21 @@ const downsamplingOptions: ListOption<string | undefined>[] = [
       required
     />
   </PlSlideModal>
+  <!-- Slide window with computed variables -->
+  <PlDialogModal
+    v-model="statsOpen"
+    :width="`448px`"
+    :close-on-outside-click="true"
+    :actions-has-top-border="true"
+  >
+    <template #title>
+      <div>
+        <div>Enrichment statistics</div>
+        <div style="color: #6b7280; font-size: 14px; margin-top: 4px; line-height: 1.2; margin-bottom: 0;">
+          Derived from each clonotype's highest enrichment value among all comparisons
+        </div>
+      </div>
+    </template>
+    <div style="margin-top: 0px;" v-html="createStatsTable()"/>
+  </PlDialogModal>
 </template>

@@ -158,6 +158,8 @@ wf.body(func(args) {
 		arg("inputFile.csv").
 		saveFileContent("enrichment_min.txt"). 
 		saveFileContent("enrichment_max.txt").
+		saveFileContent("enrichment_median.txt").
+		saveFileContent("enrichment_mean.txt").
 		saveFileContent("enrichment_75.txt").
 		printErrStreamToStdout().
 		saveStdoutContent().
@@ -166,6 +168,8 @@ wf.body(func(args) {
 
 	min := annotationValues.getFileContent("enrichment_min.txt")
 	max := annotationValues.getFileContent("enrichment_max.txt")
+	median := annotationValues.getFileContent("enrichment_median.txt")
+	mean := annotationValues.getFileContent("enrichment_mean.txt")
 	cutoff := annotationValues.getFileContent("enrichment_75.txt")
 
 	buildExports := render.create(buildExportsTpl, {
@@ -174,6 +178,8 @@ wf.body(func(args) {
 		topEnrichedColCsv: topEnrichedColCsv,
 		min: min,
 		max: max,
+		median: median,
+		mean: mean,
 		cutoff: cutoff,
 		downsampling: downsampling,
 		conditionOrder: conditionOrder,
@@ -181,9 +187,11 @@ wf.body(func(args) {
 	})
 
 	exports := buildExports.output("exports")
+	outStats := buildExports.output("outStats")
 
 	return {
 		outputs: {
+			outStats: outStats,
 			enrichmentPf: pframes.exportFrame(enrichmentPf),
 			bubblePf: pframes.exportFrame(bubblePf),
 			stackedPf: pframes.exportFrame(stackedPf),

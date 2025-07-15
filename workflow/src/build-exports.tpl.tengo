@@ -7,7 +7,7 @@ text := import("text")
 
 pfEnrichmentConvExport := import(":pf-enrichment-conv-export")
 
-self.defineOutputs("exports")
+self.defineOutputs("exports", "outStats")
 
 self.body(func(args) {
 
@@ -20,6 +20,14 @@ self.body(func(args) {
     topEnrichedColCsv := args.topEnrichedColCsv
     conditionOrder := args.conditionOrder
     blockId := args.blockId
+
+    outStats := {
+        cutoff: string(args.cutoff.getData()), 
+        median: string(args.median.getData()),
+        min: string(args.min.getData()),
+        max: string(args.max.getData()),
+        mean: string(args.mean.getData())
+    }
 
     enrichmentImportParamsExport := pfEnrichmentConvExport.getColumns(abundanceSpec, 
                                                             inputType,
@@ -47,11 +55,17 @@ self.body(func(args) {
 	} else {
 		label = "Downsampling: " + downsampling.type
 	}
+    // Add two traces, one for the condition order and one for the downsampling
     trace := pSpec.makeTrace(abundanceSpec,
         {
-            type: "milaboratories.clonotype-enrichment",
+            type: "milaboratories.clonotype-enrichment.condition-order",
+            importance: 35,
+            label: text.join(conditionOrder, " → ")
+        },
+        {
+            type: "milaboratories.clonotype-enrichment.downsampling",
             importance: 30,
-            label: text.join(conditionOrder, " → ") + " - " + label
+            label: label
         })
 
     // Define output variables
@@ -64,6 +78,7 @@ self.body(func(args) {
     )
 
     return {
-        exports: exports.build()    
+        exports: exports.build(),
+        outStats: outStats
     }
 })
