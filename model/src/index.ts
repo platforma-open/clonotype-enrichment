@@ -43,7 +43,7 @@ function getStatValue(statsObj: object | undefined, label: string): string | und
     return undefined;
   }
   // Check if the label exists and is a string
-  const obj = statsObj as Record<string, number>;
+  const obj = statsObj as Record<string, string>;
   if (label in obj && typeof obj[label] === 'string') {
     const value = +obj[label];
     return String(value.toFixed(2));
