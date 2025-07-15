@@ -14,12 +14,16 @@ def process_enrichment(input_file, output_dir='.'):
     enrichment_stats = df.select([
         pl.col('Enrichment').min().alias('min'),
         pl.col('Enrichment').max().alias('max'),
+        pl.col('Enrichment').median().alias('median'),
+        pl.col('Enrichment').mean().alias('mean'),
         pl.col('Enrichment').quantile(0.75).alias('p75')
     ])
 
     # Get the values from the result
     enrichment_min = enrichment_stats['min'][0]
     enrichment_max = enrichment_stats['max'][0]
+    enrichment_median = enrichment_stats['median'][0]
+    enrichment_mean = enrichment_stats['mean'][0]
     enrichment_75 = enrichment_stats['p75'][0]
 
     # For the 75th percentile, output 1 if the value is less than or equal to 1
@@ -32,6 +36,8 @@ def process_enrichment(input_file, output_dir='.'):
     output_files = {
         'enrichment_min.txt': str(enrichment_min),
         'enrichment_max.txt': str(enrichment_max),
+        'enrichment_median.txt': str(enrichment_median),
+        'enrichment_mean.txt': str(enrichment_mean),
         'enrichment_75.txt': str(enrichment_75_out)
     }
 

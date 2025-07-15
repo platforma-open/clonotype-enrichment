@@ -37,6 +37,20 @@ export type BlockArgs = {
   downsampling: DownsamplingParameters;
 };
 
+// Function to gets stats values output from the workflow
+function getStatValue(statsObj: object | undefined, label: string): string | undefined {
+  if (statsObj === undefined || statsObj === null) {
+    return undefined;
+  }
+  // Check if the label exists and is a string
+  const obj = statsObj as Record<string, number>;
+  if (label in obj && typeof obj[label] === 'string') {
+    const value = +obj[label];
+    return String(value.toFixed(2));
+  }
+  return undefined;
+}
+
 export const model = BlockModel.create()
 
   .withArgs<BlockArgs>({
@@ -128,20 +142,25 @@ export const model = BlockModel.create()
     return [...new Set(Object.values(values))];
   })
 
-  // Get assigned cutoff value and add it to cutoffValue UI variable
-  .output('cutoffValue', (ctx): string | undefined => {
-    const cutoffValue = ctx.outputs?.resolve('cutoffValue')?.getDataAsJson() as object;
-    // Check if cutoff is undefined or null
-    if (cutoffValue === undefined || cutoffValue === null) {
-      return undefined;
-    }
-    // Check if cutoffValue.cutoff exists and is a number
-    if ('cutoff' in cutoffValue && typeof cutoffValue.cutoff === 'string') {
-      // Convert string to numerical and round it
-      const cutoff = +cutoffValue.cutoff;
-      return String(cutoff.toFixed(2));
-    }
-    return undefined;
+  // Get assigned cutoff value
+  .output('cutoffValue', (ctx) => {
+    return getStatValue(ctx.outputs?.resolve('outStats')?.getDataAsJson(), 'cutoff');
+  })
+  // Get enrichment data median value
+  .output('medianValue', (ctx) => {
+    return getStatValue(ctx.outputs?.resolve('outStats')?.getDataAsJson(), 'median');
+  })
+  // Get enrichment data min value
+  .output('minValue', (ctx) => {
+    return getStatValue(ctx.outputs?.resolve('outStats')?.getDataAsJson(), 'min');
+  })
+  // Get enrichment data max value
+  .output('maxValue', (ctx) => {
+    return getStatValue(ctx.outputs?.resolve('outStats')?.getDataAsJson(), 'max');
+  })
+  // Get enrichment data mean value
+  .output('meanValue', (ctx) => {
+    return getStatValue(ctx.outputs?.resolve('outStats')?.getDataAsJson(), 'mean');
   })
 
   // Returns a map of results for main table

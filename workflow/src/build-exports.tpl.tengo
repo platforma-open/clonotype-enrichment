@@ -7,20 +7,27 @@ text := import("text")
 
 pfEnrichmentConvExport := import(":pf-enrichment-conv-export")
 
-self.defineOutputs("exports", "cutoffValue")
+self.defineOutputs("exports", "outStats")
 
 self.body(func(args) {
 
     min := args.min.getDataAsJson()
     max := args.max.getDataAsJson()
     cutoff := args.cutoff.getDataAsJson()
-    cutoffValue := {cutoff: string(args.cutoff.getData())}
     downsampling := args.downsampling
     abundanceSpec := args.abundanceSpec
     inputType := args.inputType
     topEnrichedColCsv := args.topEnrichedColCsv
     conditionOrder := args.conditionOrder
     blockId := args.blockId
+
+    outStats := {
+        cutoff: string(args.cutoff.getData()), 
+        median: string(args.median.getData()),
+        min: string(args.min.getData()),
+        max: string(args.max.getData()),
+        mean: string(args.mean.getData())
+    }
 
     enrichmentImportParamsExport := pfEnrichmentConvExport.getColumns(abundanceSpec, 
                                                             inputType,
@@ -72,6 +79,6 @@ self.body(func(args) {
 
     return {
         exports: exports.build(),
-        cutoffValue: cutoffValue
+        outStats: outStats
     }
 })
