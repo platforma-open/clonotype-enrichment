@@ -68,11 +68,11 @@ const downsamplingOptions: ListOption<string | undefined>[] = [
 // Function to create statistics table HTML
 const createStatsTable = () => {
   const stats = [
-    { label: 'Minimum enrichment', value: app.model.outputs.minValue || '' },
-    { label: 'Maximum enrichment', value: app.model.outputs.maxValue || '' },
-    { label: 'Mean enrichment', value: app.model.outputs.meanValue || '' },
-    { label: 'Median enrichment', value: app.model.outputs.medianValue || '' },
-    { label: 'Enrichment score cutoff', value: app.model.outputs.cutoffValue || '' },
+    { label: 'Minimum enrichment', value: app.model.outputs.enrichmentStats?.minValue || '' },
+    { label: 'Maximum enrichment', value: app.model.outputs.enrichmentStats?.maxValue || '' },
+    { label: 'Mean enrichment', value: app.model.outputs.enrichmentStats?.meanValue || '' },
+    { label: 'Median enrichment', value: app.model.outputs.enrichmentStats?.medianValue || '' },
+    { label: 'Enrichment score cutoff', value: app.model.outputs.enrichmentStats?.cutoffValue || '' },
   ];
 
   const rows = stats.map((stat) =>

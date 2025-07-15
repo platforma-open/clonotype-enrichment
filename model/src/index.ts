@@ -142,25 +142,16 @@ export const model = BlockModel.create()
     return [...new Set(Object.values(values))];
   })
 
-  // Get assigned cutoff value
-  .output('cutoffValue', (ctx) => {
-    return getStatValue(ctx.outputs?.resolve('outStats')?.getDataAsJson(), 'cutoff');
-  })
-  // Get enrichment data median value
-  .output('medianValue', (ctx) => {
-    return getStatValue(ctx.outputs?.resolve('outStats')?.getDataAsJson(), 'median');
-  })
-  // Get enrichment data min value
-  .output('minValue', (ctx) => {
-    return getStatValue(ctx.outputs?.resolve('outStats')?.getDataAsJson(), 'min');
-  })
-  // Get enrichment data max value
-  .output('maxValue', (ctx) => {
-    return getStatValue(ctx.outputs?.resolve('outStats')?.getDataAsJson(), 'max');
-  })
-  // Get enrichment data mean value
-  .output('meanValue', (ctx) => {
-    return getStatValue(ctx.outputs?.resolve('outStats')?.getDataAsJson(), 'mean');
+  // Get all enrichment statistics
+  .output('enrichmentStats', (ctx) => {
+    const statsObj = ctx.outputs?.resolve('outStats')?.getDataAsJson() as object ?? undefined;
+    return {
+      cutoffValue: getStatValue(statsObj, 'cutoff'),
+      medianValue: getStatValue(statsObj, 'median'),
+      minValue: getStatValue(statsObj, 'min'),
+      maxValue: getStatValue(statsObj, 'max'),
+      meanValue: getStatValue(statsObj, 'mean'),
+    };
   })
 
   // Returns a map of results for main table
