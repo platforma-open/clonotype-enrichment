@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.software
 
+## 2.12.1
+
+### Patch Changes
+
+- 52844c2: Fix python versions
+
 ## 2.12.0
 
 ### Minor Changes
