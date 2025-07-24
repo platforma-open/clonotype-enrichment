@@ -44,11 +44,11 @@ def process_enrichment(input_file, output_dir='.'):
 
         # Write results to txt files
         output_files = {
-            'enrichment_min.txt': f"{enrichment_min:.2f}" if enrichment_min is not None else nan_value,
-            'enrichment_max.txt': f"{enrichment_max:.2f}" if enrichment_max is not None else nan_value,
-            'enrichment_median.txt': f"{enrichment_median:.2f}" if enrichment_median is not None else nan_value,
-            'enrichment_mean.txt': f"{enrichment_mean:.2f}" if enrichment_mean is not None else nan_value,
-            'enrichment_75.txt': f"{enrichment_75_out:.2f}" if enrichment_75_out is not None else nan_value
+            'enrichment_min.txt': f"{enrichment_min:.2f}",
+            'enrichment_max.txt': f"{enrichment_max:.2f}",
+            'enrichment_median.txt': f"{enrichment_median:.2f}",
+            'enrichment_mean.txt': f"{enrichment_mean:.2f}",
+            'enrichment_75.txt': f"{enrichment_75_out:.2f}" 
         }
 
     for filename, content in output_files.items():
