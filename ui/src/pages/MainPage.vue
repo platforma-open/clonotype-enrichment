@@ -167,6 +167,23 @@ const createStatsTable = () => {
       :minValue="0"
       required
     />
+
+    <PlBtnGroup
+      v-model="app.model.args.filteringMode"
+      :options="[
+        { value: 'none', label: 'All clonotypes' },
+        { value: 'single-sample', label: 'Shared clonotypes' },
+      ]"
+      label="Clonotype filtering"
+    >
+      <template #tooltip>
+        <div>
+          <strong>Clonotype filtering strategy:</strong><br/>
+          <strong>All clonotypes:</strong> Analyze all clonotypes, including those specific to individual conditions (may include rare or condition-specific responses)<br/>
+          <strong>Shared clonotypes:</strong> Focus on clonotypes present in multiple conditions (excludes condition-specific clonotypes that may represent noise or rare events)
+        </div>
+      </template>
+    </PlBtnGroup>
   </PlSlideModal>
   <!-- Slide window with computed variables -->
   <PlDialogModal

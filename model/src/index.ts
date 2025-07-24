@@ -35,6 +35,7 @@ export type BlockArgs = {
   conditionColumnRef?: SUniversalPColumnId;
   conditionOrder: string[];
   downsampling: DownsamplingParameters;
+  filteringMode: 'none' | 'single-sample';
 };
 
 export const model = BlockModel.create()
@@ -45,6 +46,7 @@ export const model = BlockModel.create()
       type: 'hypergeometric',
       valueChooser: 'auto',
     },
+    filteringMode: 'none',
   })
 
   .withUiState<UiState>({

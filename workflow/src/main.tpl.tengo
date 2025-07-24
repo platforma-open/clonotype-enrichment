@@ -40,6 +40,7 @@ wf.body(func(args) {
 
 	// Make trace (Frequencies are always the same, so we don't need to add the condition order)
 	// Downsampling will cause it to change, so lets add it
+	// Filtering will also cause changes, so include filtering mode
 	label := ""
 	if downsampling.type == "hypergeometric" {
 		if downsampling.valueChooser == "fixed" {
@@ -50,6 +51,10 @@ wf.body(func(args) {
 	} else {
 		label = "Downsampling: " + downsampling.type
 	}
+	
+	// Add filtering mode to ensure cache differentiation
+	filteringMode := args.filteringMode
+	label = label + " - Filtering: " + filteringMode
 
     trace := pSpec.makeTrace(abundanceSpec,
         {
@@ -88,7 +93,7 @@ wf.body(func(args) {
 	}
 	
 	//////////// Enrichment analysis ////////////
-	// Run enrichment script
+	// Run enrichment script with boolean filtering flags for reliable cache differentiation
 	calculateEnrichment := exec.builder().
 		software(assets.importSoftware("@platforma-open/milaboratories.clonotype-enrichment.software:calculate-enrichment")).
 		mem("32GiB").
@@ -101,7 +106,20 @@ wf.body(func(args) {
 		arg("--top_enriched").arg("top_enriched.csv").
 		arg("--top_20").arg("top_20.csv").
 		// arg("--min_enrichment").arg(string(enrichmentThreshold)).
-		arg("--highest_enrichment_clonotype").arg("highest_enrichment_clonotype.csv").
+		arg("--highest_enrichment_clonotype").arg("highest_enrichment_clonotype.csv")
+
+	// Add filtering flags based on user selection
+	if filteringMode != "none" {
+		calculateEnrichment = calculateEnrichment.arg("--filter_clonotypes")
+		
+		if filteringMode == "single-sample" {
+			calculateEnrichment = calculateEnrichment.arg("--filter_single_sample")
+		} else if filteringMode == "any-zero" {
+			calculateEnrichment = calculateEnrichment.arg("--filter_any_zero")
+		}
+	}
+
+	calculateEnrichment = calculateEnrichment.
 		saveFile("enrichment_results.csv").
 		saveFile("bubble_data.csv").
 		saveFile("top_enriched.csv").

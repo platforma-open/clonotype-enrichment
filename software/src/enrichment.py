@@ -3,6 +3,78 @@ import numpy as np
 import json
 from typing import List, Dict, Optional, Tuple
 
+def filter_clonotypes_by_criteria(
+    aggregated_df: pl.DataFrame,
+    condition_order: List[str],
+    filter_single_sample: bool = False,
+    filter_any_zero: bool = False
+) -> pl.DataFrame:
+    """
+    Filter clonotypes based on specified criteria.
+    
+    Args:
+        aggregated_df: DataFrame with columns [elementId, condition, abundance]
+        condition_order: List of conditions in order
+        filter_single_sample: If True, remove clonotypes present in only one sample
+        filter_any_zero: If True, remove clonotypes with zero abundance in any sample
+    
+    Returns:
+        Filtered DataFrame with same structure as input
+    """
+    if not (filter_single_sample or filter_any_zero):
+        return aggregated_df
+    
+    # Create pivot table to analyze abundance patterns
+    pivot_for_filtering = (
+        aggregated_df
+        .pivot(values='abundance', index='elementId', on='condition', aggregate_function='sum')
+        .fill_null(0)
+    )
+    
+    # Ensure all conditions are present
+    for condition in condition_order:
+        if condition not in pivot_for_filtering.columns:
+            pivot_for_filtering = pivot_for_filtering.with_columns(pl.lit(0).alias(condition))
+    
+    # Select condition columns in the specified order
+    condition_cols = [col for col in condition_order if col in pivot_for_filtering.columns]
+    pivot_for_filtering = pivot_for_filtering.select(['elementId'] + condition_cols)
+    
+    elements_to_keep = None
+    
+    if filter_single_sample:
+        # Filter out clonotypes present in only one sample (zero abundance in all but one)
+        # Count non-zero abundances per clonotype
+        non_zero_counts = pivot_for_filtering.with_columns(
+            pl.concat_list([pl.when(pl.col(col) > 0).then(1).otherwise(0) for col in condition_cols])
+            .list.sum()
+            .alias('non_zero_count')
+        )
+        
+        # Keep clonotypes present in more than one sample
+        single_sample_filter = non_zero_counts.filter(pl.col('non_zero_count') > 1).select('elementId')
+        elements_to_keep = single_sample_filter if elements_to_keep is None else elements_to_keep.join(single_sample_filter, on='elementId', how='inner')
+    
+    if filter_any_zero:
+        # Filter out clonotypes with zero abundance in any sample
+        # Keep only clonotypes with non-zero abundance in ALL samples
+        all_non_zero = pivot_for_filtering.with_columns(
+            pl.concat_list([pl.when(pl.col(col) > 0).then(1).otherwise(0) for col in condition_cols])
+            .list.sum()
+            .alias('non_zero_count')
+        )
+        
+        # Keep clonotypes present in ALL samples
+        any_zero_filter = all_non_zero.filter(pl.col('non_zero_count') == len(condition_cols)).select('elementId')
+        elements_to_keep = any_zero_filter if elements_to_keep is None else elements_to_keep.join(any_zero_filter, on='elementId', how='inner')
+    
+    if elements_to_keep is not None:
+        # Filter the original aggregated data
+        filtered_df = aggregated_df.join(elements_to_keep, on='elementId', how='inner')
+        return filtered_df
+    else:
+        return aggregated_df
+
 def hybrid_enrichment_analysis(
     input_data_csv: str,
     condition_order: List[str],
@@ -16,10 +88,18 @@ def hybrid_enrichment_analysis(
     penalty_deplete: int = 10,
     top_n_bubble: int = 20,
     top_n_enriched: int = 5,
-    min_enrichment: float = 3
+    min_enrichment: float = 3,
+    filter_clonotypes: bool = False,
+    filter_single_sample: bool = False,
+    filter_any_zero: bool = False
 ) -> None:
     """
     Optimized hybrid enrichment analysis using polars for better performance and memory efficiency.
+    
+    New filtering options:
+    - filter_clonotypes: Enable clonotype filtering before enrichment calculation
+    - filter_single_sample: Remove clonotypes present in only one sample (zero abundance in all but one)
+    - filter_any_zero: Remove clonotypes absent in any sample (zero abundance in any sample)
     """
     # Read data with polars lazy evaluation
     input_df = pl.scan_csv(input_data_csv)
@@ -57,6 +137,19 @@ def hybrid_enrichment_analysis(
         .agg(pl.col('abundance').sum().alias('abundance'))
         .collect()
     )
+    
+    # Generate consistent labels BEFORE filtering based on alphabetical elementId order
+    # This ensures each clonotype gets the same label regardless of filtering
+    all_element_ids = aggregated_df.select('elementId').unique().sort('elementId')
+    label_mapping = all_element_ids.with_row_index("_row_index").with_columns(
+        (pl.col('_row_index') + 1).map_elements(lambda x: f"C{int(x)}", return_dtype=pl.Utf8).alias('Label')
+    ).select(['elementId', 'Label'])
+    
+    # Apply clonotype filtering if requested
+    if filter_clonotypes:
+        aggregated_df = filter_clonotypes_by_criteria(
+            aggregated_df, condition_order, filter_single_sample, filter_any_zero
+        )
     
     # Create pivot table to match pandas behavior exactly (elementId as index)
     pivot_df = (
@@ -102,11 +195,8 @@ def hybrid_enrichment_analysis(
         pl.Series('elementId', element_ids)
     )
     
-    # Generate labels to match original pandas behavior (based on DataFrame order)
-    enrichment_results = enrichment_results.with_row_index("_row_index")
-    enrichment_results = enrichment_results.with_columns(
-        (pl.col('_row_index') + 1).map_elements(lambda x: f"C{int(x)}", return_dtype=pl.Utf8).alias('Label')
-    ).drop('_row_index')
+    # Apply label mapping to the enriched results
+    enrichment_results = enrichment_results.join(label_mapping, on='elementId', how='left')
     
     # Reorder columns to match original pandas implementation: elementId, Label, then other columns
     other_cols = [col for col in enrichment_results.columns if col not in ['elementId', 'Label']]
@@ -255,8 +345,8 @@ def _process_outputs(
                 enrichment_detailed
                 .filter(pl.col('Enrichment').is_not_null())
                 .group_by(['elementId', 'Label'])
-                .agg(pl.all().sort_by('Enrichment', descending=True).first())
-                .sort('Enrichment', descending=True)
+                .agg(pl.all().sort_by(['Enrichment', 'elementId'], descending=[True, False]).first())
+                .sort(['Enrichment', 'elementId'], descending=[True, False])
             )
             highest_enrichment.write_csv(highest_enrichment_csv)
         
@@ -372,7 +462,7 @@ def _create_bubble_data(
         filtered_data
         .group_by('elementId')
         .agg(pl.col('MaxPositiveEnrichment').max())
-        .sort('MaxPositiveEnrichment', descending=True)
+        .sort(['MaxPositiveEnrichment', 'elementId'], descending=[True, False])
         .head(top_n_bubble)
         .select('elementId')
     )
@@ -435,7 +525,7 @@ def _create_top_enriched_data(
         bubble_data
         .group_by('elementId')
         .agg(pl.col('MaxPositiveEnrichment').max())
-        .sort('MaxPositiveEnrichment', descending=True)
+        .sort(['MaxPositiveEnrichment', 'elementId'], descending=[True, False])
         .head(top_n)
         .select('elementId')
     )
@@ -477,6 +567,9 @@ if __name__ == "__main__":
     parser.add_argument("--top_n_bubble", type=int, default=20)
     parser.add_argument("--top_n_enriched", type=int, default=5)
     parser.add_argument("--min_enrichment", required=False, type=float, default=0)
+    parser.add_argument("--filter_clonotypes", action="store_true", help="Enable clonotype filtering before enrichment calculation")
+    parser.add_argument("--filter_single_sample", action="store_true", help="Remove clonotypes present in only one sample (zero abundance in all but one)")
+    parser.add_argument("--filter_any_zero", action="store_true", help="Remove clonotypes absent in any sample (zero abundance in any sample)")
 
     args = parser.parse_args()
 
@@ -493,5 +586,8 @@ if __name__ == "__main__":
         penalty_deplete=args.penalty_deplete,
         top_n_bubble=args.top_n_bubble,
         top_n_enriched=args.top_n_enriched,
-        min_enrichment=args.min_enrichment
+        min_enrichment=args.min_enrichment,
+        filter_clonotypes=args.filter_clonotypes,
+        filter_single_sample=args.filter_single_sample,
+        filter_any_zero=args.filter_any_zero
     )
