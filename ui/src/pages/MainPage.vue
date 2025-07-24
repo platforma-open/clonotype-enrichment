@@ -128,11 +128,11 @@ const createStatsTable = () => {
     <template #title>Settings</template>
     <PlDropdownRef
       v-model="app.model.args.abundanceRef" :options="app.model.outputs.abundanceOptions"
-      label="Select abundance" clearable
+      label="Select abundance" clearable required
       @update:model-value="setInput"
     />
-    <PlDropdown v-model="app.model.args.conditionColumnRef" :options="app.model.outputs.metadataOptions" label="Condition column" />
-    <PlDropdownMulti v-model="app.model.args.conditionOrder" :options="conditionValues" label="Condition order" >
+    <PlDropdown v-model="app.model.args.conditionColumnRef" :options="app.model.outputs.metadataOptions" label="Condition column" required />
+    <PlDropdownMulti v-model="app.model.args.conditionOrder" :options="conditionValues" label="Condition order" required >
       <template #tooltip>
         Order aware selection. Calculate contrast between an element (numerator) and each of its preceding elements (denominators).
         Example: if you select "Cond 1", "Cond 2" and "Cond 3" as order, the contrasts will be "Cond 2 vs Cond 1", "Cond 3 vs Cond 1" and "Cond 3 vs Cond 2".
