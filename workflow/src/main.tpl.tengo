@@ -114,8 +114,6 @@ wf.body(func(args) {
 		
 		if filteringMode == "single-sample" {
 			calculateEnrichment = calculateEnrichment.arg("--filter_single_sample")
-		} else if filteringMode == "any-zero" {
-			calculateEnrichment = calculateEnrichment.arg("--filter_any_zero")
 		}
 	}
 
