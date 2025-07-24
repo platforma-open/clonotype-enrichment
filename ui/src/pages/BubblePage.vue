@@ -7,7 +7,7 @@ import { useApp } from '../app';
 
 const app = useApp();
 
-const defaultOptions = computed((): GraphMakerProps['defaultOptions'] => {
+const defaultOptions = computed((): PredefinedGraphOption<'bubble'>[] | undefined => {
   if (!app.model.outputs.bubblePCols)
     return undefined;
 

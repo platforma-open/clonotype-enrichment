@@ -128,11 +128,11 @@ const createStatsTable = () => {
     <template #title>Settings</template>
     <PlDropdownRef
       v-model="app.model.args.abundanceRef" :options="app.model.outputs.abundanceOptions"
-      label="Select abundance" clearable
+      label="Select abundance" clearable required
       @update:model-value="setInput"
     />
-    <PlDropdown v-model="app.model.args.conditionColumnRef" :options="app.model.outputs.metadataOptions" label="Condition column" />
-    <PlDropdownMulti v-model="app.model.args.conditionOrder" :options="conditionValues" label="Condition order" >
+    <PlDropdown v-model="app.model.args.conditionColumnRef" :options="app.model.outputs.metadataOptions" label="Condition column" required />
+    <PlDropdownMulti v-model="app.model.args.conditionOrder" :options="conditionValues" label="Condition order" required >
       <template #tooltip>
         Order aware selection. Calculate contrast between an element (numerator) and each of its preceding elements (denominators).
         Example: if you select "Cond 1", "Cond 2" and "Cond 3" as order, the contrasts will be "Cond 2 vs Cond 1", "Cond 3 vs Cond 1" and "Cond 3 vs Cond 2".
@@ -167,6 +167,23 @@ const createStatsTable = () => {
       :minValue="0"
       required
     />
+
+    <PlBtnGroup
+      v-model="app.model.args.filteringMode"
+      :options="[
+        { value: 'none', label: 'All clonotypes' },
+        { value: 'single-sample', label: 'Shared clonotypes' },
+      ]"
+      label="Clonotype filtering"
+    >
+      <template #tooltip>
+        <div>
+          <strong>Clonotype filtering strategy:</strong><br/>
+          <strong>All clonotypes:</strong> Analyze all clonotypes, including those specific to individual conditions (may include rare or condition-specific responses)<br/>
+          <strong>Shared clonotypes:</strong> Focus on clonotypes present in multiple conditions (excludes condition-specific clonotypes that may represent noise or rare events)
+        </div>
+      </template>
+    </PlBtnGroup>
   </PlSlideModal>
   <!-- Slide window with computed variables -->
   <PlDialogModal

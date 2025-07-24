@@ -77,8 +77,8 @@ def downsample_sample(sample_df, downsampling):
 # Process each sample group efficiently
 downsampled_parts = []
 
-# Get unique sample IDs
-sample_ids = data.select('sampleId').unique().to_series()
+# Get unique sample IDs in sorted order for deterministic processing
+sample_ids = data.select('sampleId').unique().sort('sampleId').to_series()
 
 for sample_id in sample_ids:
     # Filter data for this sample
