@@ -106,7 +106,7 @@ const createStatsTable = () => {
       <PlBtnGhost @click.stop="() => (statsOpen = true)">
         Stats
         <template #append>
-          <PlMaskIcon24 name="info-outline" />
+          <PlMaskIcon24 name="statistics" />
         </template>
       </PlBtnGhost>
       <PlBtnGhost @click.stop="showSettings">
