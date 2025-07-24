@@ -1,6 +1,6 @@
 {
   "name": "@platforma-open/milaboratories.clonotype-enrichment.workflow",
-  "version": "2.17.1",
+  "version": "2.18.0",
   "type": "module",
   "description": "Block Workflow",
   "scripts": {

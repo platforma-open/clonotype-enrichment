@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.model
 
+## 2.8.0
+
+### Minor Changes
+
+- eaffd65: Added clonotype filtering option.
+
 ## 2.7.0
 
 ### Minor Changes

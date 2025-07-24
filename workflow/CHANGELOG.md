@@ -1,5 +1,16 @@
 # @platforma-open/milaboratories.clonotype-enrichment.workflow
 
+## 2.18.0
+
+### Minor Changes
+
+- eaffd65: Added clonotype filtering option.
+
+### Patch Changes
+
+- Updated dependencies [eaffd65]
+  - @platforma-open/milaboratories.clonotype-enrichment.software@2.13.0
+
 ## 2.17.1
 
 ### Patch Changes
