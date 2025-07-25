@@ -1,6 +1,6 @@
 {
   "name": "@platforma-open/milaboratories.clonotype-enrichment.software",
-  "version": "2.13.0",
+  "version": "2.14.0",
   "scripts": {
     "build": "pl-pkg build",
     "prepublishOnly": "pl-pkg publish packages",

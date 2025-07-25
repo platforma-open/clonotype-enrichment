@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.model
 
+## 2.9.0
+
+### Minor Changes
+
+- 4270125: Stats work with an empty table (all filtered)
+
 ## 2.8.0
 
 ### Minor Changes
