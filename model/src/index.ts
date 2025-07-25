@@ -138,8 +138,7 @@ export const model = BlockModel.create()
     const result: Record<string, string> = {};
     for (const [key, value] of Object.entries(statsObj)) {
       if (typeof value === 'string') {
-        const numValue = +value;
-        result[key + 'Value'] = String(numValue.toFixed(2));
+        result[key + 'Value'] = value;
       }
     }
     return result;
