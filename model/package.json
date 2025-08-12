@@ -1,6 +1,6 @@
 {
   "name": "@platforma-open/milaboratories.clonotype-enrichment.model",
-  "version": "2.9.0",
+  "version": "2.9.1",
   "description": "Block model",
   "type": "module",
   "main": "dist/index.cjs",

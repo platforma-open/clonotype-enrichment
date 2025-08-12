@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.model
 
+## 2.9.1
+
+### Patch Changes
+
+- 859d9d1: Updated SDK.
+
 ## 2.9.0
 
 ### Minor Changes
