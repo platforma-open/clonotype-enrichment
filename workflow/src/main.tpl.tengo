@@ -24,6 +24,12 @@ wf.prepare(func(args){
 	bundleBuilder.addAnchor("main", args.abundanceRef) 
 	bundleBuilder.addSingle(args.conditionColumnRef)
 
+	if args.clonotypeDefinition != undefined {
+        for columnRef in args.clonotypeDefinition {
+            bundleBuilder.addSingle(columnRef)
+        }
+    }
+
 	return {
 		columns: bundleBuilder.build()
 	}
@@ -73,6 +79,18 @@ wf.body(func(args) {
 	cloneTable.cpu(1)
 	cloneTable = cloneTable.build()
 
+	clonotypeDefinitionFile := undefined
+    if args.clonotypeDefinition != undefined && len(args.clonotypeDefinition) > 0 {
+        clonotypeDefinitionTable := pframes.csvFileBuilder()
+        for i, columnRef in args.clonotypeDefinition {
+            clonotypeDefinitionTable.add(columns.getColumn(columnRef), {header: "clonotypeDefinition_" + i})
+        }
+        clonotypeDefinitionTable.setAxisHeader(abundanceSpec.axesSpec[1].name, "elementId")
+        clonotypeDefinitionTable.mem("16GiB")
+        clonotypeDefinitionTable.cpu(1)
+        clonotypeDefinitionFile = clonotypeDefinitionTable.build()
+    }
+
 	runDownsampling := exec.builder().
 		software(downsamplingSw).
 		mem("32GiB").
@@ -107,6 +125,11 @@ wf.body(func(args) {
 		arg("--top_20").arg("top_20.csv").
 		// arg("--min_enrichment").arg(string(enrichmentThreshold)).
 		arg("--highest_enrichment_clonotype").arg("highest_enrichment_clonotype.csv")
+
+	if clonotypeDefinitionFile != undefined {
+        calculateEnrichment = calculateEnrichment.addFile("clonotypeDefinition.csv", clonotypeDefinitionFile).
+		    arg("--clonotype-definition").arg("clonotypeDefinition.csv")
+    }
 
 	// Add filtering flags based on user selection
 	if filteringMode != "none" {

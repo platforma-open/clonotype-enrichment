@@ -36,6 +36,7 @@ export type BlockArgs = {
   conditionOrder: string[];
   downsampling: DownsamplingParameters;
   filteringMode: 'none' | 'single-sample';
+  clonotypeDefinition: SUniversalPColumnId[];
 };
 
 export const model = BlockModel.create()
@@ -46,6 +47,7 @@ export const model = BlockModel.create()
       type: 'hypergeometric',
       valueChooser: 'auto',
     },
+    clonotypeDefinition: [],
     filteringMode: 'none',
   })
 
@@ -92,6 +94,19 @@ export const model = BlockModel.create()
     },
     ], { includeNativeLabel: true }),
   )
+
+  .output('sequenceColumnOptions', (ctx) => {
+    const anchor = ctx.args.abundanceRef;
+    if (anchor === undefined) return undefined;
+    return ctx.resultPool.getCanonicalOptions({ main: anchor },
+      [{
+        axes: [
+          { anchor: 'main', idx: 1 },
+        ],
+        name: 'pl7.app/vdj/sequence',
+      }],
+    );
+  })
 
   .output('metadataOptions', (ctx) => {
     const anchor = ctx.args.abundanceRef;
