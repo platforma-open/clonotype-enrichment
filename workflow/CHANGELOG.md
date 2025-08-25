@@ -1,5 +1,16 @@
 # @platforma-open/milaboratories.clonotype-enrichment.workflow
 
+## 2.19.0
+
+### Minor Changes
+
+- 78ab568: Custom clonotype definition for enrichment analysis
+
+### Patch Changes
+
+- Updated dependencies [78ab568]
+  - @platforma-open/milaboratories.clonotype-enrichment.software@2.15.0
+
 ## 2.18.2
 
 ### Patch Changes

@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.software
 
+## 2.15.0
+
+### Minor Changes
+
+- 78ab568: Custom clonotype definition for enrichment analysis
+
 ## 2.14.1
 
 ### Patch Changes
