@@ -5,6 +5,7 @@ import type {
   ListOption,
 } from '@platforma-sdk/ui-vue';
 import {
+  PlAccordionSection,
   PlAgDataTableV2,
   PlBlockPage,
   PlBtnGhost,
@@ -184,6 +185,19 @@ const createStatsTable = () => {
         </div>
       </template>
     </PlBtnGroup>
+
+    <PlAccordionSection label="Advanced Settings">
+      <PlDropdownMulti
+        v-model="app.model.args.clonotypeDefinition"
+        :options="app.model.outputs.sequenceColumnOptions"
+        label="Clonotype definition"
+      >
+        <template #tooltip>
+          Select columns that define a clonotype. By default, it's a nucletotide sequence of the clonotype.
+          Here you can override this behavior and calculate enrichment score based on e.g. amino acid sequence of CDR3.
+        </template>
+      </PlDropdownMulti>
+    </PlAccordionSection>
   </PlSlideModal>
   <!-- Slide window with computed variables -->
   <PlDialogModal
