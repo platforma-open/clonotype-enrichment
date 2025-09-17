@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.model
 
+## 2.10.2
+
+### Patch Changes
+
+- 293fcf5: Update python
+
 ## 2.10.1
 
 ### Patch Changes
