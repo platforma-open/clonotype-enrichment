@@ -152,6 +152,8 @@ def hybrid_enrichment_analysis(
     condition_order = [str(cond) for cond in condition_order]
 
     # Rename and validate columns
+    if "abundance" in input_df.columns:
+        input_df = input_df.drop("abundance")
     input_df = input_df.rename({"downsampledAbundance": "abundance"})
 
     # Validate expected columns - collect only schema to avoid loading full data
