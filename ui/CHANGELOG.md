@@ -1,5 +1,12 @@
 # @platforma-open/milaboratories.clonotype-enrichment.ui
 
+## 2.10.1
+
+### Patch Changes
+
+- Updated dependencies [2aa0f2a]
+  - @platforma-open/milaboratories.clonotype-enrichment.model@2.10.1
+
 ## 2.10.0
 
 ### Minor Changes
