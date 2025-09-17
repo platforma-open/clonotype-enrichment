@@ -21,6 +21,9 @@ catalogs:
     '@platforma-sdk/block-tools':
       specifier: ^2.5.83
       version: 2.5.83
+    '@platforma-sdk/blocks-deps-updater':
+      specifier: ^2.0.0
+      version: 2.0.0
     '@platforma-sdk/eslint-config':
       specifier: ^1.0.3
       version: 1.0.3
@@ -28,8 +31,8 @@ catalogs:
       specifier: ^1.42.20
       version: 1.42.20
     '@platforma-sdk/package-builder':
-      specifier: ^2.17.1
-      version: 2.17.1
+      specifier: ^3.2.3
+      version: 3.2.4
     '@platforma-sdk/tengo-builder':
       specifier: ^2.1.15
       version: 2.1.15
@@ -40,14 +43,11 @@ catalogs:
       specifier: ^1.42.21
       version: 1.42.21
     '@platforma-sdk/workflow-tengo':
-      specifier: ^5.0.3
-      version: 5.0.3
+      specifier: ^5.1.4
+      version: 5.2.0
     '@vitejs/plugin-vue':
       specifier: ^5.2.1
       version: 5.2.3
-    js-yaml:
-      specifier: ^4.1.0
-      version: 4.1.0
     sass-embedded:
       specifier: ^1.77.8
       version: 1.89.0
@@ -80,9 +80,9 @@ importers:
       '@changesets/cli':
         specifier: 'catalog:'
         version: 2.28.1
-      js-yaml:
+      '@platforma-sdk/blocks-deps-updater':
         specifier: 'catalog:'
-        version: 4.1.0
+        version: 2.0.0
       turbo:
         specifier: 'catalog:'
         version: 2.4.4
@@ -135,7 +135,7 @@ importers:
         version: 1.1.16
       '@platforma-sdk/package-builder':
         specifier: 'catalog:'
-        version: 2.17.1
+        version: 3.2.4
 
   test:
     dependencies:
@@ -197,7 +197,7 @@ importers:
         version: link:../software
       '@platforma-sdk/workflow-tengo':
         specifier: 'catalog:'
-        version: 5.0.3
+        version: 5.2.0
     devDependencies:
       '@platforma-open/milaboratories.software-ptransform':
         specifier: 'catalog:'
@@ -1154,6 +1154,9 @@ packages:
   '@milaboratories/software-pframes-conv@2.2.2':
     resolution: {integrity: sha512-eJIp1YGi6g83peviw8SYlr5N4KV2SmDi3Mhz2FjrS4d/WaKOhoTD9+YvRpOTCQ0KyT44FNRF+nCoN/idKT3SzA==}
 
+  '@milaboratories/software-pframes-conv@2.2.7':
+    resolution: {integrity: sha512-FFZRPP8C86cJdGbaj6t/FmHSfRyuSWnXw8d6UACtPLh7sQRRuwi95LBp808sPP5vqFWBHFijvuh0CtXdSrjZYA==}
+
   '@milaboratories/tengo-tester@1.6.3':
     resolution: {integrity: sha512-HkCvUa9VkCGvxB23BFu6/T11HXT3Sn8FeKu/hE30O8DrF5e6DRcTRuETofarOH2yu7yUXoWBsv8Gmyy7aSPXag==}
     os: [darwin, linux, win32]
@@ -1197,6 +1200,12 @@ packages:
 
   '@platforma-open/milaboratories.software-ptabler@1.11.2':
     resolution: {integrity: sha512-qx3CND7IqTzED5ujefSYGXeFVzChxrkB7AtFFKrGrqA8JdyBVWuq73av5Dm5n3lqdjy6ywCaO+5q+Y5+JvdDFg==}
+
+  '@platforma-open/milaboratories.software-ptabler@1.12.2':
+    resolution: {integrity: sha512-/52gzwaqB2E3OhtVUgEoDWoa/Midma/UINx1LIZ874/7AEIvyc4XK8+bmMQ+9/NdEVHVXwuad7akO3gxeCtDGA==}
+
+  '@platforma-open/milaboratories.software-ptexter@1.1.1':
+    resolution: {integrity: sha512-nTKuFoDm+IhlD3uCktYrpjJ1pJ8TUrGOGAACbLoPwu65iRPOjohmrBZxFux+7eill+aJmqEsy+xF41Dw4mfnkg==}
 
   '@platforma-open/milaboratories.software-ptransform@1.5.0':
     resolution: {integrity: sha512-JTSC71CkvWxw4w1DhJYrVfBgP7/Kqq052/SVEKj5m2C+IVEzGfaJMl48DvJjCeBbZSqmaEdsZDvn3+8ZFXk6GQ==}
@@ -1244,6 +1253,10 @@ packages:
     resolution: {integrity: sha512-HWigo7JwbhzsPuenVPJghdHFqBtHpIThyp3ScvUOdD7dnNCh7i9CAORnvSpO6q8cwVdtGqMnvJQszQv3xioTpA==}
     hasBin: true
 
+  '@platforma-sdk/blocks-deps-updater@2.0.0':
+    resolution: {integrity: sha512-cef5ysA011ub5bofbWQJ3EM9rZ7A4ixGMKhFIsF2VNwYrCu5XRHsayA6vDeFOBjX4Jnq9D0QztW0JUxXD73bpw==}
+    hasBin: true
+
   '@platforma-sdk/eslint-config@1.0.3':
     resolution: {integrity: sha512-ypgWCnlTALlSkeUlYUh+9VexSPVECAHYMOAvbyidf7cmHAVUvPzuAB2J9MeM0HvgAnJpC3ZvUGAsNq2rQFX8uw==}
     peerDependencies:
@@ -1262,8 +1275,8 @@ packages:
   '@platforma-sdk/model@1.42.35':
     resolution: {integrity: sha512-MIX+IKwMiPDFDhmG7UKJMuNxytZBEDBRZoXic4L1UKFujOQOnGxNhmFtlGKJFU1q8+W/Y4aq86SSO4G2Pg2T2w==}
 
-  '@platforma-sdk/package-builder@2.17.1':
-    resolution: {integrity: sha512-fE3apz7qtXfzvRDUW1C5mYPJJBLM5ICe6ItM05DFeMa4wlB3afZ21Sweg7w/CX2u02zuAnShR4+L1dSwkYrAIQ==}
+  '@platforma-sdk/package-builder@3.2.4':
+    resolution: {integrity: sha512-8b9rXLdwukYO3fR+hus2YXsDwyljvpb3Xw1jcsIiQcRJIWWowZqJuQhR9k5RWbMvMlbU8D9L6e3p89hfCrFndA==}
     hasBin: true
 
   '@platforma-sdk/tengo-builder@2.1.15':
@@ -1279,6 +1292,9 @@ packages:
 
   '@platforma-sdk/workflow-tengo@5.0.3':
     resolution: {integrity: sha512-3pTTDZoDEyaIoFU74Lv8VIVXuWaFDKJ8DzFg5NFTOwuJ3cDNLhp6FxEtsfmYy5DKX9J+9xrwYdL8YyTV0TYNxQ==}
+
+  '@platforma-sdk/workflow-tengo@5.2.0':
+    resolution: {integrity: sha512-Mgy9LLKeREim1obrI2eLxqTmuur3hT7WiZswkFDpzeXXAjbcwdK8+e0dfJJcSu8u2i+AKd5jLQvwNp1dnltVsQ==}
 
   '@protobuf-ts/grpc-transport@2.11.1':
     resolution: {integrity: sha512-l6wrcFffY+tuNnuyrNCkRM8hDIsAZVLA8Mn7PKdVyYxITosYh60qW663p9kL6TWXYuDCL3oxH8ih3vLKTDyhtg==}
@@ -1518,10 +1534,6 @@ packages:
     resolution: {integrity: sha512-LWbXUBwn/bcLx2sSsqy7pK5o+Nr+VCoRoAohfJ5C/aBio9nfJmGQqHAhU6pwxV/RmyTk5AqdySma7uwWGlmeuA==}
     cpu: [x64]
     os: [win32]
-
-  '@smithy/abort-controller@4.0.4':
-    resolution: {integrity: sha512-gJnEjZMvigPDQWHrW3oPrFhQtkrgqBkyjj3pCIdF3A5M6vsZODG93KNlfJprv6bp4245bdT32fsHK4kkH3KYDA==}
-    engines: {node: '>=18.0.0'}
 
   '@smithy/abort-controller@4.0.5':
     resolution: {integrity: sha512-jcrqdTQurIrBbUm4W2YdLVMQDoL0sA9DTxYd2s+R/y+2U9NLOP7Xf/YqfSg1FZhlZIYEnvk2mwbyvIfdLEPo8g==}
@@ -5986,7 +5998,7 @@ snapshots:
   '@aws-sdk/lib-storage@3.859.0(@aws-sdk/client-s3@3.859.0)':
     dependencies:
       '@aws-sdk/client-s3': 3.859.0
-      '@smithy/abort-controller': 4.0.4
+      '@smithy/abort-controller': 4.0.5
       '@smithy/middleware-endpoint': 4.1.18
       '@smithy/smithy-client': 4.4.10
       buffer: 5.6.0
@@ -7151,6 +7163,8 @@ snapshots:
 
   '@milaboratories/software-pframes-conv@2.2.2': {}
 
+  '@milaboratories/software-pframes-conv@2.2.7': {}
+
   '@milaboratories/tengo-tester@1.6.3': {}
 
   '@milaboratories/ts-helpers-oclif@1.1.26':
@@ -7239,6 +7253,10 @@ snapshots:
 
   '@platforma-open/milaboratories.software-ptabler@1.11.2': {}
 
+  '@platforma-open/milaboratories.software-ptabler@1.12.2': {}
+
+  '@platforma-open/milaboratories.software-ptexter@1.1.1': {}
+
   '@platforma-open/milaboratories.software-ptransform@1.5.0': {}
 
   '@platforma-open/milaboratories.software-small-binaries.guided-command@1.0.4': {}
@@ -7302,6 +7320,10 @@ snapshots:
       - aws-crt
       - supports-color
 
+  '@platforma-sdk/blocks-deps-updater@2.0.0':
+    dependencies:
+      yaml: 2.8.1
+
   '@platforma-sdk/eslint-config@1.0.3(@eslint/js@9.23.0)(@stylistic/eslint-plugin@2.13.0(eslint@9.23.0)(typescript@5.5.4))(eslint-plugin-n@17.15.1(eslint@9.23.0))(eslint-plugin-vue@9.32.0(eslint@9.23.0))(eslint@9.23.0)(globals@15.14.0)(typescript-eslint@8.24.0(eslint@9.23.0)(typescript@5.5.4))(typescript@5.5.4)':
     dependencies:
       '@eslint/js': 9.23.0
@@ -7329,7 +7351,7 @@ snapshots:
       utility-types: 3.11.0
       zod: 3.23.8
 
-  '@platforma-sdk/package-builder@2.17.1':
+  '@platforma-sdk/package-builder@3.2.4':
     dependencies:
       '@aws-sdk/client-s3': 3.859.0
       '@aws-sdk/lib-storage': 3.859.0(@aws-sdk/client-s3@3.859.0)
@@ -7427,6 +7449,13 @@ snapshots:
     dependencies:
       '@milaboratories/software-pframes-conv': 2.2.2
       '@platforma-open/milaboratories.software-ptabler': 1.11.2
+      '@platforma-open/milaboratories.software-small-binaries': 1.15.21
+
+  '@platforma-sdk/workflow-tengo@5.2.0':
+    dependencies:
+      '@milaboratories/software-pframes-conv': 2.2.7
+      '@platforma-open/milaboratories.software-ptabler': 1.12.2
+      '@platforma-open/milaboratories.software-ptexter': 1.1.1
       '@platforma-open/milaboratories.software-small-binaries': 1.15.21
 
   '@protobuf-ts/grpc-transport@2.11.1(@grpc/grpc-js@1.13.4)':
@@ -7590,11 +7619,6 @@ snapshots:
 
   '@rollup/rollup-win32-x64-msvc@4.37.0':
     optional: true
-
-  '@smithy/abort-controller@4.0.4':
-    dependencies:
-      '@smithy/types': 4.3.1
-      tslib: 2.8.1
 
   '@smithy/abort-controller@4.0.5':
     dependencies:

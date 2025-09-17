@@ -248,6 +248,6 @@ export const model = BlockModel.create()
     { type: 'link', href: '/stacked', label: 'Frequency bar plot' },
   ]))
 
-  .done();
+  .done(2);
 
 export type BlockOutputs = InferOutputsType<typeof model>;
