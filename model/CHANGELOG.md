@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.model
 
+## 2.10.3
+
+### Patch Changes
+
+- b15e3d9: technical release
+
 ## 2.10.2
 
 ### Patch Changes
