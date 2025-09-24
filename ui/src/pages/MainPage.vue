@@ -60,6 +60,27 @@ const conditionValues = computed(() => {
   }));
 });
 
+// Generate comparison options based on condition order
+// Creates all possible numerator-denominator pairs where numerator comes after denominator
+const comparisonOptions = computed(() => {
+  const conditionOrder = app.model.args.conditionOrder;
+  if (!conditionOrder || conditionOrder.length < 2) return [];
+
+  const comparisons = [];
+  for (let num_i = 1; num_i < conditionOrder.length; num_i++) {
+    for (let den_j = 0; den_j < num_i; den_j++) {
+      const numerator = conditionOrder[num_i];
+      const denominator = conditionOrder[den_j];
+      const comparisonName = `${numerator} vs ${denominator}`;
+      comparisons.push({
+        value: comparisonName,
+        label: comparisonName,
+      });
+    }
+  }
+  return comparisons;
+});
+
 // Downsampling options
 const downsamplingOptions: ListOption<string | undefined>[] = [
   { label: 'None', value: 'none' },
@@ -195,6 +216,20 @@ const createStatsTable = () => {
         <template #tooltip>
           Select columns that define a clonotype. By default, it's a nucletotide sequence of the clonotype.
           Here you can override this behavior and calculate enrichment score based on e.g. amino acid sequence of CDR3.
+        </template>
+      </PlDropdownMulti>
+
+      <PlDropdownMulti
+        v-model="app.model.args.additionalEnrichmentExports"
+        :options="comparisonOptions"
+        label="Export specific comparisons"
+      >
+        <template #tooltip>
+          <div>
+            <strong>Export specific enrichment comparisons:</strong><br/>
+            By default, only the highest enrichment value across all comparisons is exported. Here you can select specific condition comparisons (e.g., "Treatment vs Control") to export their individual enrichment scores alongside the maximum enrichment.<br/><br/>
+            <strong>Example:</strong> If you select "Treatment vs Control" and "Treatment vs Baseline", both comparison results will be included in the exports, allowing you to use the enrichment scores for each specific comparison in the next blocks.
+          </div>
         </template>
       </PlDropdownMulti>
     </PlAccordionSection>

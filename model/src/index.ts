@@ -37,6 +37,7 @@ export type BlockArgs = {
   downsampling: DownsamplingParameters;
   filteringMode: 'none' | 'single-sample';
   clonotypeDefinition: SUniversalPColumnId[];
+  additionalEnrichmentExports: string[];
 };
 
 export const model = BlockModel.create()
@@ -49,6 +50,7 @@ export const model = BlockModel.create()
     },
     clonotypeDefinition: [],
     filteringMode: 'none',
+    additionalEnrichmentExports: [],
   })
 
   .withUiState<UiState>({
