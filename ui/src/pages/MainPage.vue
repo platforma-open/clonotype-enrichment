@@ -60,6 +60,27 @@ const conditionValues = computed(() => {
   }));
 });
 
+// Generate comparison options based on condition order
+// Creates all possible numerator-denominator pairs where numerator comes after denominator
+const comparisonOptions = computed(() => {
+  const conditionOrder = app.model.args.conditionOrder;
+  if (!conditionOrder || conditionOrder.length < 2) return [];
+
+  const comparisons = [];
+  for (let num_i = 1; num_i < conditionOrder.length; num_i++) {
+    for (let den_j = 0; den_j < num_i; den_j++) {
+      const numerator = conditionOrder[num_i];
+      const denominator = conditionOrder[den_j];
+      const comparisonName = `${numerator} vs ${denominator}`;
+      comparisons.push({
+        value: comparisonName,
+        label: comparisonName,
+      });
+    }
+  }
+  return comparisons;
+});
+
 // Downsampling options
 const downsamplingOptions: ListOption<string | undefined>[] = [
   { label: 'None', value: 'none' },
@@ -122,6 +143,7 @@ const createStatsTable = () => {
       :settings="tableSettings"
       :loading-text="tableLoadingText"
       not-ready-text="Data is not computed"
+      show-export-button
     />
   </PlBlockPage>
 
@@ -195,6 +217,21 @@ const createStatsTable = () => {
         <template #tooltip>
           Select columns that define a clonotype. By default, it's a nucletotide sequence of the clonotype.
           Here you can override this behavior and calculate enrichment score based on e.g. amino acid sequence of CDR3.
+        </template>
+      </PlDropdownMulti>
+
+      <PlDropdownMulti
+        v-model="app.model.args.additionalEnrichmentExports"
+        :options="comparisonOptions"
+        label="Export specific comparisons"
+      >
+        <template #tooltip>
+          <div>
+            <strong>Export Specific Enrichment Comparisons</strong><br/><br/>
+            By default, the highest enrichment value across all comparisons is exported.
+            <br/><br/>
+            This option allows you to select additional comparisons (e.g., "Treatment vs. Control") to be exported as separate columns. This is useful for downstream analysis where scores from specific comparisons are needed.
+          </div>
         </template>
       </PlDropdownMulti>
     </PlAccordionSection>

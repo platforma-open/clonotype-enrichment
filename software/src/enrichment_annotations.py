@@ -3,7 +3,7 @@ import numpy as np
 import argparse
 import os
 
-def process_enrichment(input_file, output_dir='.'):
+def process_enrichment(input_file, output_dir='.', enrichment_column='Enrichment'):
     """
     Process enrichment data using polars for better performance.
     """
@@ -25,11 +25,11 @@ def process_enrichment(input_file, output_dir='.'):
     else:
         # Extract the 'Enrichment' column and calculate statistics
         enrichment_stats = df.select([
-            pl.col('Enrichment').min().alias('min'),
-            pl.col('Enrichment').max().alias('max'),
-            pl.col('Enrichment').median().alias('median'),
-            pl.col('Enrichment').mean().alias('mean'),
-            pl.col('Enrichment').quantile(0.75).alias('p75')
+            pl.col(enrichment_column).min().alias('min'),
+            pl.col(enrichment_column).max().alias('max'),
+            pl.col(enrichment_column).median().alias('median'),
+            pl.col(enrichment_column).mean().alias('mean'),
+            pl.col(enrichment_column).quantile(0.75).alias('p75')
         ])
 
         # Get the values from the result
@@ -60,20 +60,21 @@ def process_enrichment(input_file, output_dir='.'):
 def main():
     parser = argparse.ArgumentParser(description='Process enrichment data from a CSV file.')
     parser.add_argument('input_file', help='Path to the input CSV file containing enrichment data')
+    parser.add_argument('--enrichment-column', default='Enrichment', help='Label of the enrichment column')
     parser.add_argument('--output-dir', '-o', default='.',
                       help='Directory to save output files (default: current directory)')
     
     args = parser.parse_args()
     
     try:
-        process_enrichment(args.input_file, args.output_dir)
+        process_enrichment(args.input_file, args.output_dir, args.enrichment_column)
     except FileNotFoundError:
         print(f"Error: Input file '{args.input_file}' not found.")
         exit(1)
     except pl.exceptions.ComputeError as e:
         error_msg = str(e).lower()
         if "not found" in error_msg or "enrichment" in error_msg:
-            print("Error: Input file must contain an 'Enrichment' column.")
+            print(f"Error: Input file must contain an '{args.enrichment_column}' column.")
             exit(1)
         else:
             print(f"Error processing data: {str(e)}")

@@ -1,0 +1,45 @@
+self := import("@platforma-sdk/workflow-tengo:tpl")
+ll := import("@platforma-sdk/workflow-tengo:ll")
+render := import("@platforma-sdk/workflow-tengo:render")
+pframes := import("@platforma-sdk/workflow-tengo:pframes")
+assets := import("@platforma-sdk/workflow-tengo:assets")
+
+enrichmentColumnTpl := assets.importTemplate(":enrichment-column")
+
+self.defineOutputs("exports", "outStats")
+
+self.body(func(args) {
+    outStats := {
+        cutoff: string(args.cutoff.getData()), 
+        median: string(args.median.getData()),
+        min: string(args.min.getData()),
+        max: string(args.max.getData()),
+        mean: string(args.mean.getData())
+    }
+
+    exportColumnRender := render.create(enrichmentColumnTpl, {
+        min: args.min,
+        max: args.max,
+        cutoff: args.cutoff,
+        downsampling: args.downsampling,
+        abundanceSpec: args.abundanceSpec,
+        inputType: args.inputType,
+        topEnrichedColCsv: args.topEnrichedColCsv,
+        conditionOrder: args.conditionOrder,
+        blockId: args.blockId
+    })
+
+    // Define output variables
+    exports := pframes.pFrameBuilder()
+    // store data to be exported
+    exports.add(
+        "Enrichment - Highest", 
+        exportColumnRender.output("columnSpec"),
+        exportColumnRender.output("columnData")
+    )
+
+    return {
+        exports: exports.build(),
+        outStats: outStats
+    }
+})

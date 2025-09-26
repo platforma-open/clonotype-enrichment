@@ -10,7 +10,8 @@ json := import("json")
 strings := import("@platforma-sdk/workflow-tengo:strings")
 text := import("text")
 
-buildExportsTpl := assets.importTemplate(":build-exports")
+buildMainExportTpl := assets.importTemplate(":build-main-export")
+enrichmentColumnTpl := assets.importTemplate(":enrichment-column")
 downsamplingSw := assets.importSoftware("@platforma-open/milaboratories.clonotype-enrichment.software:downsampling")
 
 pfEnrichmentConv := import(":pf-enrichment-conv")
@@ -43,6 +44,7 @@ wf.body(func(args) {
 	conditionOrder := args.conditionOrder
 	abundanceSpec := columns.getSpec(args.abundanceRef)
 	downsampling:= args.downsampling
+	additionalEnrichmentExports := args.additionalEnrichmentExports
 
 	// Make trace (Frequencies are always the same, so we don't need to add the condition order)
 	// Downsampling will cause it to change, so lets add it
@@ -188,6 +190,65 @@ wf.body(func(args) {
 		)
 	}
 
+	// Export additional enrichment comparisons if selected
+	exportsAdditionalEnrichments := pframes.pFrameBuilder()
+	if additionalEnrichmentExports != undefined && len(additionalEnrichmentExports) > 0 {
+		vsPattern := text.re_compile(" vs ")
+		for comparison in additionalEnrichmentExports {
+			// Convert display name (e.g., "Treatment vs Control") to column ID format (enrichment_Treatment_Control)
+			colId := strings.substituteSpecialCharacters("enrichment_" + vsPattern.replace(comparison, "_"))
+
+			annotationValues := exec.builder().
+				software(assets.importSoftware("@platforma-open/milaboratories.clonotype-enrichment.software:calculate-annotations")).
+				mem("16GiB").
+				cpu(1).
+				addFile("inputFile.csv", enrichCsv).
+				arg("inputFile.csv").
+				arg("--enrichment-column").arg("Enrichment " + comparison).
+				saveFileContent("enrichment_min.txt"). 
+				saveFileContent("enrichment_max.txt").
+				saveFileContent("enrichment_median.txt").
+				saveFileContent("enrichment_mean.txt").
+				saveFileContent("enrichment_75.txt").
+				printErrStreamToStdout().
+				saveStdoutContent().
+				cache(24 * 60 * 60 * 1000).
+				run()
+
+			min := annotationValues.getFileContent("enrichment_min.txt")
+			max := annotationValues.getFileContent("enrichment_max.txt")
+			median := annotationValues.getFileContent("enrichment_median.txt")
+			mean := annotationValues.getFileContent("enrichment_mean.txt")
+			cutoff := annotationValues.getFileContent("enrichment_75.txt")
+
+			specOpts := {
+				name: "pl7.app/vdj/enrichment",
+				label: inputType + " Enrichment " + comparison
+			}
+
+			exportColumnRender := render.create(enrichmentColumnTpl, {
+				min: min,
+				max: max,
+				median: median,
+				mean: mean,
+				cutoff: cutoff,
+				abundanceSpec: abundanceSpec,
+				inputType: inputType,
+				topEnrichedColCsv: enrichCsv,
+				downsampling: downsampling,
+				conditionOrder: conditionOrder,
+				blockId: blockId,
+				specOpts: specOpts
+			})
+
+			exportsAdditionalEnrichments.add(
+				"Enrichment - " + comparison,
+				exportColumnRender.output("columnSpec"),
+				enrichmentPf[colId + ".data"]
+			)
+		}
+	}
+
 	//////////// Calculate annotation values ////////////
 	annotationValues := exec.builder().
 		software(assets.importSoftware("@platforma-open/milaboratories.clonotype-enrichment.software:calculate-annotations")).
@@ -211,7 +272,7 @@ wf.body(func(args) {
 	mean := annotationValues.getFileContent("enrichment_mean.txt")
 	cutoff := annotationValues.getFileContent("enrichment_75.txt")
 
-	buildExports := render.create(buildExportsTpl, {
+	buildExports := render.create(buildMainExportTpl, {
 		abundanceSpec: abundanceSpec,
 		inputType: inputType,
 		topEnrichedColCsv: topEnrichedColCsv,
@@ -239,7 +300,8 @@ wf.body(func(args) {
 		},
 		exports: {
 			pf: exports,
-			frequency: exportsFreq.build()    
+			frequency: exportsFreq.build(),
+			additionalEnrichments: exportsAdditionalEnrichments.build()
 		}
 	}	
 })

@@ -7,36 +7,42 @@ text := import("text")
 
 pfEnrichmentConvExport := import(":pf-enrichment-conv-export")
 
-self.defineOutputs("exports", "outStats")
+self.defineOutputs("columnSpec", "columnData")
 
 self.body(func(args) {
-
-    min := args.min.getDataAsJson()
-    max := args.max.getDataAsJson()
-    cutoff := args.cutoff.getDataAsJson()
+    min := args.min
+    max := args.max
+    cutoff := args.cutoff
     downsampling := args.downsampling
     abundanceSpec := args.abundanceSpec
     inputType := args.inputType
     topEnrichedColCsv := args.topEnrichedColCsv
     conditionOrder := args.conditionOrder
     blockId := args.blockId
+    specOpts := args.specOpts
 
-    outStats := {
-        cutoff: string(args.cutoff.getData()), 
-        median: string(args.median.getData()),
-        min: string(args.min.getData()),
-        max: string(args.max.getData()),
-        mean: string(args.mean.getData())
+    enrichmentImportParamsExport := undefined
+    // In case of additional exports we will modify some spec values using specOpts
+    if specOpts != undefined {
+        enrichmentImportParamsExport = pfEnrichmentConvExport.getColumns(abundanceSpec, 
+                                                                inputType,
+                                                                string(min.getData()),
+                                                                string(max.getData()),
+                                                                string(cutoff.getData()),
+                                                                downsampling,
+                                                                conditionOrder,
+                                                                blockId,
+                                                                specOpts)
+    } else {
+        enrichmentImportParamsExport = pfEnrichmentConvExport.getColumns(abundanceSpec, 
+                                                                inputType,
+                                                                string(min.getData()),
+                                                                string(max.getData()),
+                                                                string(cutoff.getData()),
+                                                                downsampling,
+                                                                conditionOrder,
+                                                                blockId)
     }
-
-    enrichmentImportParamsExport := pfEnrichmentConvExport.getColumns(abundanceSpec, 
-                                                            inputType,
-                                                            string(min),
-                                                            string(max),
-                                                            string(cutoff),
-                                                            downsampling,
-                                                            conditionOrder,
-                                                            blockId)
 
     exportFile := xsv.importFile(topEnrichedColCsv, 
                                 "csv",
@@ -68,17 +74,8 @@ self.body(func(args) {
             label: label
         })
 
-    // Define output variables
-    exports := pframes.pFrameBuilder()
-    // store data to be exported
-    exports.add(
-        "Enrichment - Highest", 
-        trace.inject(exportFile["enrichment.spec"]), 
-        exportFile["enrichment.data"]
-    )
-
     return {
-        exports: exports.build(),
-        outStats: outStats
+        columnSpec: trace.inject(exportFile["enrichment.spec"]),
+        columnData: exportFile["enrichment.data"]
     }
 })

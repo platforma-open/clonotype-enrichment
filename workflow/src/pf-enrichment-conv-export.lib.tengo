@@ -2,7 +2,17 @@ ll := import("@platforma-sdk/workflow-tengo:ll")
 canonical := import("@platforma-sdk/workflow-tengo:canonical")
 
 getColumns := func(abundanceSpec, inputType, min, max, cutoff, downsampling, 
-                  conditionOrder, blockId) {
+                  conditionOrder, blockId, ...opts) {
+  ll.assert(len(opts) <= 1, "expected at most one options map")
+
+  specName := "pl7.app/vdj/maxEnrichment"
+  specLabel := "Maximum " + inputType + " Enrichment"
+
+  if len(opts) == 1 {
+    specName = opts[0].name
+    specLabel = opts[0].label
+  }
+
   return {
     axes: [
       {
@@ -16,7 +26,7 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, downsampling,
         id: "enrichment",
         allowNA: true,
         spec: {
-          name: "pl7.app/vdj/maxEnrichment",
+          name: specName,
           valueType: "Double",
           domain: {
             "pl7.app/downsampling": canonical.encode(downsampling),
@@ -24,7 +34,7 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, downsampling,
             "pl7.app/blockId": blockId
           },
           annotations: {
-            "pl7.app/label": "Maximum " + inputType + " Enrichment",
+            "pl7.app/label": specLabel,
             "pl7.app/table/orderPriority": "9000",
             "pl7.app/table/visibility": "default",
             "pl7.app/min": min,
