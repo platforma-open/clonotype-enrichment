@@ -1,5 +1,17 @@
 # @platforma-open/milaboratories.clonotype-enrichment.workflow
 
+## 2.20.0
+
+### Minor Changes
+
+- 3548d8a: Export additional enrichment scores
+
+### Patch Changes
+
+- 090d6c8: Allow selection of specific enrichment comparisons to export
+- Updated dependencies [3548d8a]
+  - @platforma-open/milaboratories.clonotype-enrichment.software@2.16.0
+
 ## 2.19.3
 
 ### Patch Changes

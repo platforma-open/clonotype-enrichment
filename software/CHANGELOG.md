@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.software
 
+## 2.16.0
+
+### Minor Changes
+
+- 3548d8a: Export additional enrichment scores
+
 ## 2.15.3
 
 ### Patch Changes

@@ -1,5 +1,15 @@
 # @platforma-open/milaboratories.clonotype-enrichment.model
 
+## 2.11.0
+
+### Minor Changes
+
+- 3548d8a: Export additional enrichment scores
+
+### Patch Changes
+
+- 090d6c8: Allow selection of specific enrichment comparisons to export
+
 ## 2.10.3
 
 ### Patch Changes
