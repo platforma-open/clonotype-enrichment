@@ -143,6 +143,7 @@ const createStatsTable = () => {
       :settings="tableSettings"
       :loading-text="tableLoadingText"
       not-ready-text="Data is not computed"
+      show-export-button
     />
   </PlBlockPage>
 
@@ -226,9 +227,10 @@ const createStatsTable = () => {
       >
         <template #tooltip>
           <div>
-            <strong>Export specific enrichment comparisons:</strong><br/>
-            By default, only the highest enrichment value across all comparisons is exported. Here you can select specific condition comparisons (e.g., "Treatment vs Control") to export their individual enrichment scores alongside the maximum enrichment.<br/><br/>
-            <strong>Example:</strong> If you select "Treatment vs Control" and "Treatment vs Baseline", both comparison results will be included in the exports, allowing you to use the enrichment scores for each specific comparison in the next blocks.
+            <strong>Export Specific Enrichment Comparisons</strong><br/><br/>
+            By default, the highest enrichment value across all comparisons is exported.
+            <br/><br/>
+            This option allows you to select additional comparisons (e.g., "Treatment vs. Control") to be exported as separate columns. This is useful for downstream analysis where scores from specific comparisons are needed.
           </div>
         </template>
       </PlDropdownMulti>
