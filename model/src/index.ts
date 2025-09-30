@@ -70,6 +70,11 @@ export const model = BlockModel.create()
       title: 'Top 20 enriched clonotype frequencies',
       template: 'curve_dots',
       currentTab: null,
+      layersSettings: {
+        curve: {
+          smoothing: false,
+        },
+      },
     },
     stackedState: {
       title: 'Top 5 enriched clonotype frequencies',
