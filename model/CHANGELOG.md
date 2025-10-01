@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.model
 
+## 2.11.1
+
+### Patch Changes
+
+- 42f20a5: Switch from line plot to scatter plot
+
 ## 2.11.0
 
 ### Minor Changes
