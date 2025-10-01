@@ -25,22 +25,6 @@ def parse_params():
         return {}
 
 
-downsampling_params = parse_params()
-data = pl.read_csv(input_file)
-
-# Calculate sample totals efficiently
-totals = data.group_by('sampleId').agg(pl.col('abundance').sum())
-totals_values = totals.select('abundance').to_numpy().flatten()
-
-# Calculate 20th percentile across all totals
-q20 = np.percentile(totals_values, 20)
-
-# Find the minimum value that is above 0.5*q20
-above_threshold = totals_values[totals_values > 0.5 * q20]
-min_above_threshold = np.min(above_threshold) if len(above_threshold) > 0 else q20
-fixed_auto_downsampling_value = min_above_threshold
-
-
 def downsample_sample(sample_df, downsampling):
     """
     Downsample a dataframe representing a single sample using polars.
@@ -73,6 +57,27 @@ def downsample_sample(sample_df, downsampling):
 
     else:
         raise ValueError(f"Invalid downsampling type: {downsampling['type']}")
+
+downsampling_params = parse_params()
+data = pl.read_csv(input_file)
+
+# If there are no clonotypes, return empty dataframe
+if data.count()["elementId"].item() == 0:
+    data = data.with_columns(pl.lit(0).alias('downsampledAbundance'))
+    data.write_csv('result.csv')
+    exit()
+
+# Calculate sample totals efficiently
+totals = data.group_by('sampleId').agg(pl.col('abundance').sum())
+totals_values = totals.select('abundance').to_numpy().flatten()
+
+# Calculate 20th percentile across all totals
+q20 = np.percentile(totals_values, 20)
+
+# Find the minimum value that is above 0.5*q20
+above_threshold = totals_values[totals_values > 0.5 * q20]
+min_above_threshold = np.min(above_threshold) if len(above_threshold) > 0 else q20
+fixed_auto_downsampling_value = min_above_threshold
 
 # Process each sample group efficiently
 downsampled_parts = []
