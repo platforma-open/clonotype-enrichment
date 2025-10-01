@@ -68,8 +68,13 @@ export const model = BlockModel.create()
     },
     lineState: {
       title: 'Top 20 enriched clonotype frequencies',
-      template: 'line',
+      template: 'curve_dots',
       currentTab: null,
+      layersSettings: {
+        curve: {
+          smoothing: false,
+        },
+      },
     },
     stackedState: {
       title: 'Top 5 enriched clonotype frequencies',
