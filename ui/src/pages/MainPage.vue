@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import type { PlRef } from '@platforma-sdk/model';
-import { plRefsEqual } from '@platforma-sdk/model';
+import { getRawPlatformaInstance, plRefsEqual } from '@platforma-sdk/model';
 import type {
   ListOption,
 } from '@platforma-sdk/ui-vue';
 import {
   PlAccordionSection,
   PlAgDataTableV2,
+  PlAlert,
   PlBlockPage,
   PlBtnGhost,
   PlBtnGroup,
@@ -19,6 +20,7 @@ import {
   PlSlideModal,
   usePlDataTableSettingsV2,
 } from '@platforma-sdk/ui-vue';
+import { asyncComputed } from '@vueuse/core';
 import { computed, ref } from 'vue';
 import { useApp } from '../app';
 
@@ -40,9 +42,9 @@ function setInput(inputRef?: PlRef) {
   }
 }
 
-const tableSettings = usePlDataTableSettingsV2({
+const tableSettings = computed(() => usePlDataTableSettingsV2({
   model: () => app.model.outputs.pt,
-});
+}).value);
 
 const tableLoadingText = computed(() => {
   if (app.model.outputs.isRunning) {
@@ -119,6 +121,12 @@ const createStatsTable = () => {
   `;
 };
 
+// Check if the output enrichment file is empty
+const isEmpty = asyncComputed(async () => {
+  if (app.model.outputs.pt === undefined) return undefined;
+  return (await getRawPlatformaInstance().pFrameDriver.getShape(app.model.outputs.pt.fullTableHandle)).rows === 0;
+});
+
 </script>
 
 <template>
@@ -138,6 +146,11 @@ const createStatsTable = () => {
         </template>
       </PlBtnGhost>
     </template>
+    <PlAlert v-if="isEmpty === true" type="warn" icon>
+      <template #title>Empty dataset selection</template>
+      The input dataset you have selected is empty or has too few clonotypes.
+      Please choose a different dataset.
+    </PlAlert>
     <PlAgDataTableV2
       v-model="app.model.ui.tableState"
       :settings="tableSettings"
