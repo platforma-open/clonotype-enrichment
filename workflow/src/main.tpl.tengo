@@ -19,6 +19,34 @@ pfFrequencyConv := import(":pf-frequency-conv")
 pfBubbleConv := import(":pf-bubble-conv")
 pfStackedConv := import(":pf-stacked-conv")
 
+// Helper function to calculate annotation values for enrichment data
+calculateAnnotationValues := func(inputFile, enrichmentColumn) {
+	annotationValues := exec.builder().
+		software(assets.importSoftware("@platforma-open/milaboratories.clonotype-enrichment.software:calculate-annotations")).
+		mem("16GiB").
+		cpu(1).
+		addFile("inputFile.csv", inputFile).
+		arg("inputFile.csv").
+		arg("--enrichment-column").arg(enrichmentColumn).
+		saveFileContent("enrichment_min.txt"). 
+		saveFileContent("enrichment_max.txt").
+		saveFileContent("enrichment_median.txt").
+		saveFileContent("enrichment_mean.txt").
+		saveFileContent("enrichment_75.txt").
+		printErrStreamToStdout().
+		saveStdoutContent().
+		cache(24 * 60 * 60 * 1000).
+		run()
+
+	return {
+		min: annotationValues.getFileContent("enrichment_min.txt"),
+		max: annotationValues.getFileContent("enrichment_max.txt"),
+		median: annotationValues.getFileContent("enrichment_median.txt"),
+		mean: annotationValues.getFileContent("enrichment_mean.txt"),
+		cutoff: annotationValues.getFileContent("enrichment_75.txt")
+	}
+}
+
 wf.prepare(func(args){
 
 	bundleBuilder := wf.createPBundleBuilder()
@@ -198,28 +226,7 @@ wf.body(func(args) {
 			// Convert display name (e.g., "Treatment vs Control") to column ID format (enrichment_Treatment_Control)
 			colId := strings.substituteSpecialCharacters("enrichment_" + vsPattern.replace(comparison, "_"))
 
-			annotationValues := exec.builder().
-				software(assets.importSoftware("@platforma-open/milaboratories.clonotype-enrichment.software:calculate-annotations")).
-				mem("16GiB").
-				cpu(1).
-				addFile("inputFile.csv", enrichCsv).
-				arg("inputFile.csv").
-				arg("--enrichment-column").arg("Enrichment " + comparison).
-				saveFileContent("enrichment_min.txt"). 
-				saveFileContent("enrichment_max.txt").
-				saveFileContent("enrichment_median.txt").
-				saveFileContent("enrichment_mean.txt").
-				saveFileContent("enrichment_75.txt").
-				printErrStreamToStdout().
-				saveStdoutContent().
-				cache(24 * 60 * 60 * 1000).
-				run()
-
-			min := annotationValues.getFileContent("enrichment_min.txt")
-			max := annotationValues.getFileContent("enrichment_max.txt")
-			median := annotationValues.getFileContent("enrichment_median.txt")
-			mean := annotationValues.getFileContent("enrichment_mean.txt")
-			cutoff := annotationValues.getFileContent("enrichment_75.txt")
+			annotationStats := calculateAnnotationValues(enrichCsv, "Enrichment " + comparison)
 
 			specOpts := {
 				name: "pl7.app/vdj/enrichment",
@@ -227,11 +234,11 @@ wf.body(func(args) {
 			}
 
 			exportColumnRender := render.create(enrichmentColumnTpl, {
-				min: min,
-				max: max,
-				median: median,
-				mean: mean,
-				cutoff: cutoff,
+				min: annotationStats.min,
+				max: annotationStats.max,
+				median: annotationStats.median,
+				mean: annotationStats.mean,
+				cutoff: annotationStats.cutoff,
 				abundanceSpec: abundanceSpec,
 				inputType: inputType,
 				topEnrichedColCsv: enrichCsv,
@@ -250,37 +257,17 @@ wf.body(func(args) {
 	}
 
 	//////////// Calculate annotation values ////////////
-	annotationValues := exec.builder().
-		software(assets.importSoftware("@platforma-open/milaboratories.clonotype-enrichment.software:calculate-annotations")).
-		mem("16GiB").
-		cpu(1).
-		addFile("inputFile.csv", topEnrichedColCsv).
-		arg("inputFile.csv").
-		saveFileContent("enrichment_min.txt"). 
-		saveFileContent("enrichment_max.txt").
-		saveFileContent("enrichment_median.txt").
-		saveFileContent("enrichment_mean.txt").
-		saveFileContent("enrichment_75.txt").
-		printErrStreamToStdout().
-		saveStdoutContent().
-		cache(24 * 60 * 60 * 1000).
-		run()
-
-	min := annotationValues.getFileContent("enrichment_min.txt")
-	max := annotationValues.getFileContent("enrichment_max.txt")
-	median := annotationValues.getFileContent("enrichment_median.txt")
-	mean := annotationValues.getFileContent("enrichment_mean.txt")
-	cutoff := annotationValues.getFileContent("enrichment_75.txt")
+	mainAnnotationStats := calculateAnnotationValues(topEnrichedColCsv, "Enrichment")
 
 	buildExports := render.create(buildMainExportTpl, {
 		abundanceSpec: abundanceSpec,
 		inputType: inputType,
 		topEnrichedColCsv: topEnrichedColCsv,
-		min: min,
-		max: max,
-		median: median,
-		mean: mean,
-		cutoff: cutoff,
+		min: mainAnnotationStats.min,
+		max: mainAnnotationStats.max,
+		median: mainAnnotationStats.median,
+		mean: mainAnnotationStats.mean,
+		cutoff: mainAnnotationStats.cutoff,
 		downsampling: downsampling,
 		conditionOrder: conditionOrder,
 		blockId: blockId

@@ -87,6 +87,66 @@ def filter_clonotypes_by_criteria(
         return aggregated_df
 
 
+def create_empty_outputs(
+    condition_order: List[str],
+    enrichment_csv: str,
+    bubble_csv: str,
+    top_enriched_csv: str,
+    top_20_csv: Optional[str] = None,
+    highest_enrichment_csv: Optional[str] = None
+) -> None:
+    """
+    Create empty output files when input data is empty.
+    """
+    # Create empty enrichment results with all expected columns
+    enrichment_schema = {
+        'elementId': pl.Utf8,
+        'Label': pl.Utf8
+    }
+    
+    ## Add frequency columns for each condition
+    for condition in condition_order:
+        enrichment_schema[f'Frequency {condition}'] = pl.Float64
+    ## Add enrichment columns for all possible comparisons
+    for num_i in range(1, len(condition_order)):
+        for den_j in range(num_i):
+            numerator = condition_order[num_i]
+            denominator = condition_order[den_j]
+            enrichment_schema[f'Enrichment {numerator} vs {denominator}'] = pl.Float64
+    ## Add MaxPositiveEnrichment column
+    enrichment_schema['MaxPositiveEnrichment'] = pl.Float64
+    
+    empty_enrichment = pl.DataFrame(schema=enrichment_schema)
+    empty_enrichment.write_csv(enrichment_csv)
+    
+    # Create empty bubble data with proper schema
+    empty_bubble = pl.DataFrame(schema={
+        'elementId': pl.Utf8, 'Label': pl.Utf8, 'Numerator': pl.Utf8,
+        'Denominator': pl.Utf8, 'Enrichment': pl.Float64,
+        'Frequency_Numerator': pl.Float64, 'MaxPositiveEnrichment': pl.Float64
+    })
+    empty_bubble.write_csv(bubble_csv)
+    
+    # Create empty top enriched data with proper schema
+    empty_top_enriched = pl.DataFrame(schema={
+        'elementId': pl.Utf8, 'Label': pl.Utf8, 'Condition': pl.Utf8, 'Frequency': pl.Float64
+    })
+    empty_top_enriched.write_csv(top_enriched_csv)
+    
+    # Create empty top 20 data if requested
+    if top_20_csv:
+        empty_top_enriched.write_csv(top_20_csv)
+    
+    # Create empty highest enrichment data with proper schema
+    if highest_enrichment_csv:
+        empty_highest = pl.DataFrame(schema={
+            'elementId': pl.Utf8, 'Label': pl.Utf8, 'Comparison': pl.Utf8,
+            'Numerator': pl.Utf8, 'Denominator': pl.Utf8, 'Enrichment': pl.Float64,
+            'Frequency_Numerator': pl.Float64
+        })
+        empty_highest.write_csv(highest_enrichment_csv)
+
+
 def hybrid_enrichment_analysis(
     input_data_csv: str,
     condition_order: List[str],
@@ -116,6 +176,18 @@ def hybrid_enrichment_analysis(
     """
     # Read data with polars lazy evaluation
     input_df = pl.scan_csv(input_data_csv)
+    
+    # Check if input data is empty (no clonotypes)
+    ## Check if there are any non-null, non-empty elementId value in lazy frame
+    element_count = input_df.filter(
+        pl.col('elementId').is_not_null() & 
+        (pl.col('elementId') != "")
+    ).select(pl.len()).collect().item()
+    if element_count == 0:
+        # Create empty outputs and exit
+        create_empty_outputs(condition_order, enrichment_csv, bubble_csv,
+                                top_enriched_csv, top_20_csv, highest_enrichment_csv)
+        return
 
     if clonotype_definition_csv:
         clonotype_def_df = pl.scan_csv(clonotype_definition_csv)
