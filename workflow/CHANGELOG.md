@@ -1,5 +1,16 @@
 # @platforma-open/milaboratories.clonotype-enrichment.workflow
 
+## 2.21.0
+
+### Minor Changes
+
+- 30383bc: Support empty inputs
+
+### Patch Changes
+
+- Updated dependencies [30383bc]
+  - @platforma-open/milaboratories.clonotype-enrichment.software@2.17.0
+
 ## 2.20.0
 
 ### Minor Changes

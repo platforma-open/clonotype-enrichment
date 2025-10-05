@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.ui
 
+## 2.12.0
+
+### Minor Changes
+
+- 30383bc: Support empty inputs
+
 ## 2.11.1
 
 ### Patch Changes

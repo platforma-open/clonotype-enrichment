@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.software
 
+## 2.17.0
+
+### Minor Changes
+
+- 30383bc: Support empty inputs
+
 ## 2.16.0
 
 ### Minor Changes
