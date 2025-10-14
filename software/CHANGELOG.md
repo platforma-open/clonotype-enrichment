@@ -1,5 +1,15 @@
 # @platforma-open/milaboratories.clonotype-enrichment.software
 
+## 2.17.1
+
+### Patch Changes
+
+- b7af80a: technical release
+- c3cf16a: technical release
+- 087861a: technical release
+- df1d277: technical release
+- e57c186: technical release
+
 ## 2.17.0
 
 ### Minor Changes
