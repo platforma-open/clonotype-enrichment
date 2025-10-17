@@ -21,7 +21,7 @@ import {
   usePlDataTableSettingsV2,
 } from '@platforma-sdk/ui-vue';
 import { asyncComputed } from '@vueuse/core';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useApp } from '../app';
 
 const app = useApp();
@@ -125,6 +125,11 @@ const createStatsTable = () => {
 const isEmpty = asyncComputed(async () => {
   if (app.model.outputs.pt === undefined) return undefined;
   return (await getRawPlatformaInstance().pFrameDriver.getShape(app.model.outputs.pt.fullTableHandle)).rows === 0;
+});
+
+// Make sure numerator and denominator are reset when contrast factor is changed
+watch(() => [app.model.args.conditionColumnRef], (_) => {
+  app.model.args.conditionOrder = [];
 });
 
 </script>
