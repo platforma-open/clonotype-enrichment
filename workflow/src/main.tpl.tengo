@@ -229,7 +229,6 @@ wf.body(func(args) {
 			annotationStats := calculateAnnotationValues(enrichCsv, "Enrichment " + comparison)
 
 			specOpts := {
-				name: "pl7.app/vdj/enrichment",
 				label: inputType + " Enrichment " + comparison
 			}
 

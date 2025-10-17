@@ -5,11 +5,9 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, downsampling,
                   conditionOrder, blockId, ...opts) {
   ll.assert(len(opts) <= 1, "expected at most one options map")
 
-  specName := "pl7.app/vdj/maxEnrichment"
   specLabel := "Maximum " + inputType + " Enrichment"
 
   if len(opts) == 1 {
-    specName = opts[0].name
     specLabel = opts[0].label
   }
 
@@ -26,12 +24,13 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, downsampling,
         id: "enrichment",
         allowNA: true,
         spec: {
-          name: specName,
+          name: "pl7.app/vdj/enrichment",
           valueType: "Double",
           domain: {
             "pl7.app/downsampling": canonical.encode(downsampling),
             "pl7.app/conditionsOrder": canonical.encode(conditionOrder),
-            "pl7.app/blockId": blockId
+            "pl7.app/blockId": blockId,
+            "pl7.app/comparison": specLabel
           },
           annotations: {
             "pl7.app/label": specLabel,
