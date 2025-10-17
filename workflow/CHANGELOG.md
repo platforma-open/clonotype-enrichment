@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.workflow
 
+## 2.22.0
+
+### Minor Changes
+
+- 08c2cea: Fix MILAB-4422 bug
+
 ## 2.21.1
 
 ### Patch Changes

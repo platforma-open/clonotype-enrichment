@@ -1,5 +1,15 @@
 # @platforma-open/milaboratories.clonotype-enrichment.ui
 
+## 2.13.0
+
+### Minor Changes
+
+- 08c2cea: Fix MILAB-4422 bug
+
+### Patch Changes
+
+- 344bdb7: Reset conditionOrder after changing conditionColumnRef
+
 ## 2.12.1
 
 ### Patch Changes
