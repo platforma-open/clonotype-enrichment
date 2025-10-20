@@ -76,7 +76,7 @@ getColumns := func(countsSpec, conditionOrder) {
       }
     ],
     columns: columns,
-    storageFormat: "Binary",
+    storageFormat: "Parquet",
     partitionKeyLength: 0
   }
 }
