@@ -33,7 +33,7 @@ getColumns := func(abundanceSpec, conditionOrder, inputType, downsampling, block
       }
     ],
     columns: columns,
-    storageFormat: "Binary",
+    storageFormat: "Parquet",
     partitionKeyLength: 0
   }
 }

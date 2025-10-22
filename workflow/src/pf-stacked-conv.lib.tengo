@@ -36,7 +36,7 @@ getColumns := func(abundanceSpec) {
         }
       }
       ],
-    storageFormat: "Binary",
+    storageFormat: "Parquet",
     partitionKeyLength: 0
   }
 }
