@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.workflow
 
+## 2.22.1
+
+### Patch Changes
+
+- 4602121: Support parquet format (update SDK)
+
 ## 2.22.0
 
 ### Minor Changes
