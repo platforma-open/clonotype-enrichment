@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment
 
+## 2.2.24
+
+### Patch Changes
+
+- cfc2a24: Update SDK
+
 ## 2.2.23
 
 ### Patch Changes
