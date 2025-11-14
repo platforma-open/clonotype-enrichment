@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment
 
+## 2.2.25
+
+### Patch Changes
+
+- f34a79b: Block metadata updated
+
 ## 2.2.24
 
 ### Patch Changes
