@@ -25,7 +25,7 @@
       "title": "Clonotype Enrichment",
       "logo": "file:../logos/block-logo.png",
       "url": "https://github.com/platforma-open/clonotype-enrichment",
-      "docs": "https://github.com/platforma-open/clonotype-enrichment/docs",
+      "docs": "https://docs.platforma.bio/guides/antibody-discovery/enrichment-analysis/",
       "support": "mailto:support@milaboratories.com",
       "description": "Identifies and ranks clonotypes enriched through selection rounds, showing how their frequencies change across conditions.",
       "longDescription": "file:../docs/description.md",
