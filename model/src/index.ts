@@ -99,7 +99,9 @@ export const model = BlockModel.create()
         'pl7.app/abundance/isPrimary': 'true',
       },
     },
-    ], { includeNativeLabel: true }),
+    ], {
+      label: { includeNativeLabel: true, forceTraceElements: ['milaboratories.samples-and-data/dataset'] },
+    }),
   )
 
   .output('sequenceColumnOptions', (ctx) => {
