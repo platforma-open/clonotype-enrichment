@@ -1,5 +1,6 @@
 import type { GraphMakerState } from '@milaboratories/graph-maker';
 import type {
+  APColumnSelectorWithSplit,
   InferOutputsType,
   PColumnIdAndSpec,
   PFrameHandle,
@@ -14,7 +15,6 @@ import {
   createPlDataTableStateV2,
   createPlDataTableV2,
 } from '@platforma-sdk/model';
-import type { APColumnSelectorWithSplit } from '@platforma-sdk/model/dist/render/util/split_selectors';
 
 export type DownsamplingParameters = {
   type?: 'none' | 'hypergeometric' ;
