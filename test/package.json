@@ -3,17 +3,22 @@
   "private": true,
   "version": "2.0.5",
   "description": "Block tests",
-  "type": "module",
   "scripts": {
-    "test": "vitest --passWithNoTests"
+    "test": "vitest --run --passWithNoTests"
   },
   "files": [],
   "keywords": [],
   "dependencies": {
-    "this-block": "workspace:@platforma-open/milaboratories.clonotype-enrichment@*"
+    "this-block": "workspace:@platforma-open/milaboratories.clonotype-enrichment@*",
+    "@platforma-open/milaboratories.clonotype-enrichment.model": "workspace:*",
+    "@platforma-sdk/model": "catalog:"
   },
   "devDependencies": {
+    "@milaboratories/ts-builder": "catalog:",
+    "@milaboratories/ts-configs": "catalog:",
+    "@platforma-sdk/eslint-config": "catalog:",
     "@platforma-sdk/test": "catalog:",
+    "eslint": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

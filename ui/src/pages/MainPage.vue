@@ -39,6 +39,9 @@ function setInput(inputRef?: PlRef) {
     const abundanceLabel = app.model.outputs.abundanceOptions?.find((o) => plRefsEqual(o.ref, inputRef))?.label;
     if (abundanceLabel)
       app.model.ui.title = 'Clonotype enrichment - ' + abundanceLabel;
+  } else {
+    // reset the condition column if abundance is reset
+    app.model.args.conditionColumnRef = undefined;
   }
 }
 
@@ -138,7 +141,7 @@ watch(() => [app.model.args.conditionColumnRef], (_) => {
   <PlBlockPage>
     <template #title>{{ app.model.ui.title }}</template>
     <template #append>
-      <PlBtnGhost @click.stop="() => (statsOpen = true)">
+      <PlBtnGhost :disabled="app.model.outputs.enrichmentStats === undefined" @click.stop="() => (statsOpen = true)">
         Stats
         <template #append>
           <PlMaskIcon24 name="statistics" />
@@ -167,13 +170,26 @@ watch(() => [app.model.args.conditionColumnRef], (_) => {
 
   <PlSlideModal v-model="settingsAreShown">
     <template #title>Settings</template>
+
     <PlDropdownRef
       v-model="app.model.args.abundanceRef" :options="app.model.outputs.abundanceOptions"
       label="Select abundance" clearable required
       @update:model-value="setInput"
     />
-    <PlDropdown v-model="app.model.args.conditionColumnRef" :options="app.model.outputs.metadataOptions" label="Condition column" required />
-    <PlDropdownMulti v-model="app.model.args.conditionOrder" :options="conditionValues" label="Condition order" required >
+
+    <PlDropdown
+      v-model="app.model.args.conditionColumnRef"
+      :options="app.model.outputs.metadataOptions"
+      :disabled="app.model.args.abundanceRef === undefined"
+      label="Condition column" required
+    />
+
+    <PlDropdownMulti
+      v-model="app.model.args.conditionOrder"
+      :options="conditionValues"
+      :disabled="app.model.args.abundanceRef === undefined"
+      label="Condition order" required
+    >
       <template #tooltip>
         Order aware selection. Calculate contrast between an element (numerator) and each of its preceding elements (denominators).
         Example: if you select "Cond 1", "Cond 2" and "Cond 3" as order, the contrasts will be "Cond 2 vs Cond 1", "Cond 3 vs Cond 1" and "Cond 3 vs Cond 2".
