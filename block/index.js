@@ -13,4 +13,3 @@ module.exports = {
   blockSpec,
   loadBlockDescription
 };
-

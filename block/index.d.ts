@@ -7,4 +7,3 @@ declare const blockSpec: {
 };
 
 export { loadBlockDescription, blockSpec };
-
