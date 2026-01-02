@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.model
 
+## 2.11.3
+
+### Patch Changes
+
+- 7b64916: Use "Shared Clonotypes" for clonotype filtering by default
+
 ## 2.11.2
 
 ### Patch Changes
