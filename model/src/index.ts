@@ -49,7 +49,7 @@ export const model = BlockModel.create()
       valueChooser: 'auto',
     },
     clonotypeDefinition: [],
-    filteringMode: 'none',
+    filteringMode: 'single-sample',
     additionalEnrichmentExports: [],
   })
 
