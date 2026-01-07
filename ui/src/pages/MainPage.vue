@@ -123,8 +123,8 @@ const createStatsTable = () => {
 
 // Check if the output enrichment file is empty
 const isEmpty = asyncComputed(async () => {
-  if (app.model.outputs.pt === undefined) return undefined;
-  return (await getRawPlatformaInstance().pFrameDriver.getShape(app.model.outputs.pt.fullTableHandle)).rows === 0;
+  if (app.model.outputs.pt === undefined || !app.model.outputs.pt.ok) return undefined;
+  return (await getRawPlatformaInstance().pFrameDriver.getShape(app.model.outputs.pt.value.fullTableHandle)).rows === 0;
 });
 
 // Make sure numerator and denominator are reset when contrast factor is changed

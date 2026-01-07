@@ -3,26 +3,27 @@
   "version": "2.13.2",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "watch": "vue-tsc && vite build --watch",
-    "build": "vue-tsc -b && vite build",
+    "build": "ts-builder build --target block-ui",
+    "watch": "ts-builder build --target block-ui --watch",
+    "type-check": "ts-builder types --target block-ui",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "do-pack": "rm -f *.tgz && pnpm pack && mv *.tgz package.tgz"
   },
   "dependencies": {
     "@platforma-open/milaboratories.clonotype-enrichment.model": "workspace:*",
     "@platforma-sdk/ui-vue": "catalog:",
-    "vue": "catalog:",
-    "@milaboratories/graph-maker": "catalog:",
     "@platforma-sdk/model": "catalog:",
-    "@vueuse/core": "catalog:"
+    "@milaboratories/graph-maker": "catalog:",
+    "@vueuse/core": "catalog:",
+    "vue": "catalog:"
   },
   "devDependencies": {
-    "@vitejs/plugin-vue": "catalog:",
-    "typescript": "catalog:",
-    "vite": "catalog:",
-    "vue-tsc": "catalog:",
+    "@milaboratories/ts-builder": "catalog:",
+    "@milaboratories/ts-configs": "catalog:",
     "@platforma-sdk/eslint-config": "catalog:",
+    "eslint": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
     "sass-embedded": "catalog:"
   }
 }
