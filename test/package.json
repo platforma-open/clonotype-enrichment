@@ -1,7 +1,7 @@
 {
   "name": "@platforma-open/milaboratories.clonotype-enrichment.test",
   "private": true,
-  "version": "2.0.5",
+  "version": "2.0.6",
   "description": "Block tests",
   "scripts": {
     "test": "vitest --passWithNoTests"

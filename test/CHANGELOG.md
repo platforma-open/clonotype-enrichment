@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.test
 
+## 2.0.6
+
+### Patch Changes
+
+- 69998c8: Show running state for tables and graphs, migrate to new project template
+
 ## 2.0.5
 
 ### Patch Changes
