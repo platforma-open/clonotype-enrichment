@@ -1,5 +1,6 @@
 import type { GraphMakerState } from '@milaboratories/graph-maker';
 import type {
+  AnchoredPColumnSelector,
   InferOutputsType,
   PColumnIdAndSpec,
   PFrameHandle,
@@ -14,7 +15,6 @@ import {
   createPlDataTableStateV2,
   createPlDataTableV2,
 } from '@platforma-sdk/model';
-import type { APColumnSelectorWithSplit } from '@platforma-sdk/model/dist/render/util/split_selectors';
 
 export type DownsamplingParameters = {
   type?: 'none' | 'hypergeometric' ;
@@ -141,7 +141,7 @@ export const model = BlockModel.create()
     if (anchor === undefined) return undefined;
 
     const pCols = ctx.resultPool.getAnchoredPColumns({ main: anchor },
-      JSON.parse(conditionColumnRef) as APColumnSelectorWithSplit,
+      JSON.parse(conditionColumnRef) as AnchoredPColumnSelector,
     );
     const data = pCols?.[0]?.data as TreeNodeAccessor | undefined;
 
@@ -167,7 +167,7 @@ export const model = BlockModel.create()
   })
 
   // Returns a map of results for main table
-  .output('pt', (ctx) => {
+  .outputWithStatus('pt', (ctx) => {
     const pCols = ctx.outputs?.resolve('enrichmentPf')?.getPColumns();
 
     if (pCols === undefined) {
@@ -186,7 +186,7 @@ export const model = BlockModel.create()
   })
 
   // Returns a map of results for plot
-  .output('bubblePf', (ctx): PFrameHandle | undefined => {
+  .outputWithStatus('bubblePf', (ctx): PFrameHandle | undefined => {
     const pCols = ctx.outputs?.resolve('bubblePf')?.getPColumns();
     if (pCols === undefined) {
       return undefined;
@@ -211,7 +211,7 @@ export const model = BlockModel.create()
     );
   })
 
-  .output('stackedPf', (ctx): PFrameHandle | undefined => {
+  .outputWithStatus('stackedPf', (ctx): PFrameHandle | undefined => {
     const pCols = ctx.outputs?.resolve('stackedPf')?.getPColumns();
     if (pCols === undefined) {
       return undefined;
@@ -235,7 +235,7 @@ export const model = BlockModel.create()
     );
   })
 
-  .output('linePf', (ctx): PFrameHandle | undefined => {
+  .outputWithStatus('linePf', (ctx): PFrameHandle | undefined => {
     const pCols = ctx.outputs?.resolve('linePf')?.getPColumns();
     if (pCols === undefined) {
       return undefined;
