@@ -41,7 +41,7 @@ function setInput(inputRef?: PlRef) {
 watchEffect(() => {
   const conditionOrder = app.model.args.conditionOrder;
   if (conditionOrder && conditionOrder.length > 0) {
-    app.model.args.defaultBlockLabel = conditionOrder.join(' vs ');
+    app.model.args.defaultBlockLabel = conditionOrder.join('-');
   } else {
     app.model.args.defaultBlockLabel = '';
   }
