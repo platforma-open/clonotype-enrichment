@@ -1,7 +1,6 @@
 import type { GraphMakerState } from '@milaboratories/graph-maker';
 import type {
   AnchoredPColumnSelector,
-  InferOutputsType,
   PColumnIdAndSpec,
   PFrameHandle,
   PlDataTableStateV2,
@@ -23,7 +22,6 @@ export type DownsamplingParameters = {
 };
 
 export type UiState = {
-  title?: string;
   tableState: PlDataTableStateV2;
   bubbleState: GraphMakerState;
   lineState: GraphMakerState;
@@ -31,6 +29,8 @@ export type UiState = {
 };
 
 export type BlockArgs = {
+  defaultBlockLabel: string;
+  customBlockLabel: string;
   abundanceRef?: PlRef;
   conditionColumnRef?: SUniversalPColumnId;
   conditionOrder: string[];
@@ -43,6 +43,8 @@ export type BlockArgs = {
 export const model = BlockModel.create()
 
   .withArgs<BlockArgs>({
+    defaultBlockLabel: '',
+    customBlockLabel: '',
     conditionOrder: [],
     downsampling: {
       type: 'hypergeometric',
@@ -54,7 +56,6 @@ export const model = BlockModel.create()
   })
 
   .withUiState<UiState>({
-    title: 'Clonotype enrichment',
     tableState: createPlDataTableStateV2(),
     bubbleState: {
       title: 'Clonotype enrichment',
@@ -246,7 +247,9 @@ export const model = BlockModel.create()
 
   .output('isRunning', (ctx) => ctx.outputs?.getIsReadyOrError() === false)
 
-  .title((ctx) => ctx.uiState.title ?? 'Clonotype enrichment')
+  .title(() => 'Clonotype enrichment')
+
+  .subtitle((ctx) => ctx.args.customBlockLabel || ctx.args.defaultBlockLabel)
 
   .sections((_ctx) => ([
     { type: 'link', href: '/', label: 'Main' },
@@ -256,5 +259,3 @@ export const model = BlockModel.create()
   ]))
 
   .done(2);
-
-export type BlockOutputs = InferOutputsType<typeof model>;

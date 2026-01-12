@@ -20,6 +20,8 @@ self.body(func(args) {
     conditionOrder := args.conditionOrder
     blockId := args.blockId
     specOpts := args.specOpts
+    customBlockLabel := args.customBlockLabel
+    defaultBlockLabel := args.defaultBlockLabel
 
     enrichmentImportParamsExport := undefined
     // In case of additional exports we will modify some spec values using specOpts
@@ -61,12 +63,15 @@ self.body(func(args) {
 	} else {
 		label = "Downsampling: " + downsampling.type
 	}
+    // Determine the label for condition order trace
+    conditionOrderLabel := customBlockLabel || defaultBlockLabel
+
     // Add two traces, one for the condition order and one for the downsampling
     trace := pSpec.makeTrace(abundanceSpec,
         {
             type: "milaboratories.clonotype-enrichment.condition-order",
             importance: 35,
-            label: text.join(conditionOrder, " → ")
+            label: conditionOrderLabel
         },
         {
             type: "milaboratories.clonotype-enrichment.downsampling",
