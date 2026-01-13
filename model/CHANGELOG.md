@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.model
 
+## 2.11.5
+
+### Patch Changes
+
+- 70243e2: Support custom block title
+
 ## 2.11.4
 
 ### Patch Changes
