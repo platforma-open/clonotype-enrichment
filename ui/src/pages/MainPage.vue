@@ -75,9 +75,9 @@ watchEffect(() => {
   app.model.args.defaultBlockLabel = label;
 });
 
-const tableSettings = computed(() => usePlDataTableSettingsV2({
+const tableSettings = usePlDataTableSettingsV2({
   model: () => app.model.outputs.pt,
-}).value);
+});
 
 const tableLoadingText = computed(() => {
   if (app.model.outputs.isRunning) {
@@ -156,7 +156,7 @@ const createStatsTable = () => {
 
 // Check if the output enrichment file is empty
 const isEmpty = asyncComputed(async () => {
-  if (app.model.outputs.pt === undefined || !app.model.outputs.pt.ok) return undefined;
+  if (!app.model.outputs.pt.ok || !app.model.outputs.pt.value) return undefined;
   return (await getRawPlatformaInstance().pFrameDriver.getShape(app.model.outputs.pt.value.fullTableHandle)).rows === 0;
 });
 
