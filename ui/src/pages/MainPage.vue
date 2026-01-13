@@ -40,11 +40,39 @@ function setInput(inputRef?: PlRef) {
 // updating defaultBlockLabel
 watchEffect(() => {
   const conditionOrder = app.model.args.conditionOrder;
-  if (conditionOrder && conditionOrder.length > 0) {
-    app.model.args.defaultBlockLabel = conditionOrder.join('-');
-  } else {
-    app.model.args.defaultBlockLabel = '';
+  const clonotypeDefinition = app.model.args.clonotypeDefinition;
+  const sequenceColumnOptions = app.model.outputs.sequenceColumnOptions;
+  const filteringMode = app.model.args.filteringMode;
+
+  let label = '';
+
+  // Add clonotype definition prefix if selected
+  if (clonotypeDefinition && clonotypeDefinition.length > 0 && sequenceColumnOptions) {
+    const clonotypeLabels = clonotypeDefinition
+      .map((colId) => {
+        const option = sequenceColumnOptions.find((opt) => opt.value === colId);
+        return option?.label;
+      })
+      .filter((label) => label !== undefined);
+
+    if (clonotypeLabels.length > 0) {
+      label = clonotypeLabels.join('-');
+    }
   }
+
+  // Add condition order
+  if (conditionOrder && conditionOrder.length > 0) {
+    const conditionLabel = conditionOrder.join('-');
+    label = label ? `${label}, ${conditionLabel}` : conditionLabel;
+  }
+
+  // Add filtering mode at the end
+  if (filteringMode) {
+    const filteringLabel = filteringMode === 'none' ? 'All clonotypes' : 'Shared clonotypes';
+    label = label ? `${label}, ${filteringLabel}` : filteringLabel;
+  }
+
+  app.model.args.defaultBlockLabel = label;
 });
 
 const tableSettings = computed(() => usePlDataTableSettingsV2({
