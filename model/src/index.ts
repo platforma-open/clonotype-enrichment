@@ -130,7 +130,7 @@ export const model = BlockModel.create()
   })
 
   .output('datasetSpec', (ctx) => {
-    if (ctx.args.abundanceRef) return ctx.resultPool.getSpecByRef(ctx.args.abundanceRef);
+    if (ctx.args.abundanceRef) return ctx.resultPool.getPColumnSpecByRef(ctx.args.abundanceRef);
     else return undefined;
   })
 

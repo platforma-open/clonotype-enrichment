@@ -137,6 +137,10 @@ watch(() => [app.model.args.conditionColumnRef], (_) => {
   app.model.args.conditionOrder = [];
 });
 
+const isClusterId = computed(() => {
+  if (app.model.outputs.datasetSpec === undefined) return false;
+  return app.model.outputs.datasetSpec?.axesSpec.length >= 1 && app.model.outputs.datasetSpec?.axesSpec[1]?.name === 'pl7.app/vdj/clusterId';
+});
 </script>
 
 <template>
@@ -236,6 +240,7 @@ watch(() => [app.model.args.conditionColumnRef], (_) => {
 
     <PlAccordionSection label="Advanced Settings">
       <PlDropdownMulti
+        v-if="!isClusterId"
         v-model="app.model.args.clonotypeDefinition"
         :options="app.model.outputs.sequenceColumnOptions"
         label="Clonotype definition"
