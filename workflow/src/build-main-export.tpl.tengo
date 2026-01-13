@@ -26,7 +26,9 @@ self.body(func(args) {
         inputType: args.inputType,
         topEnrichedColCsv: args.topEnrichedColCsv,
         conditionOrder: args.conditionOrder,
-        blockId: args.blockId
+        blockId: args.blockId,
+        customBlockLabel: args.customBlockLabel,
+        defaultBlockLabel: args.defaultBlockLabel
     })
 
     // Define output variables

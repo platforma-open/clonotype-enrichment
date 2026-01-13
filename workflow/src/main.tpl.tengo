@@ -244,7 +244,9 @@ wf.body(func(args) {
 				downsampling: downsampling,
 				conditionOrder: conditionOrder,
 				blockId: blockId,
-				specOpts: specOpts
+				specOpts: specOpts,
+				customBlockLabel: args.customBlockLabel,
+				defaultBlockLabel: args.defaultBlockLabel
 			})
 
 			exportsAdditionalEnrichments.add(
@@ -269,7 +271,9 @@ wf.body(func(args) {
 		cutoff: mainAnnotationStats.cutoff,
 		downsampling: downsampling,
 		conditionOrder: conditionOrder,
-		blockId: blockId
+		blockId: blockId,
+		customBlockLabel: args.customBlockLabel,
+		defaultBlockLabel: args.defaultBlockLabel
 	})
 
 	exports := buildExports.output("exports")

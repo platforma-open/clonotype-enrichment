@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { PlRef } from '@platforma-sdk/model';
-import { getRawPlatformaInstance, plRefsEqual } from '@platforma-sdk/model';
+import { getRawPlatformaInstance } from '@platforma-sdk/model';
 import type {
   ListOption,
 } from '@platforma-sdk/ui-vue';
@@ -21,7 +21,7 @@ import {
   usePlDataTableSettingsV2,
 } from '@platforma-sdk/ui-vue';
 import { asyncComputed } from '@vueuse/core';
-import { computed, ref, watch } from 'vue';
+import { computed, ref, watch, watchEffect } from 'vue';
 import { useApp } from '../app';
 
 const app = useApp();
@@ -35,12 +35,45 @@ const statsOpen = ref(false);
 // Update page title by dataset
 function setInput(inputRef?: PlRef) {
   app.model.args.abundanceRef = inputRef;
-  if (inputRef) {
-    const abundanceLabel = app.model.outputs.abundanceOptions?.find((o) => plRefsEqual(o.ref, inputRef))?.label;
-    if (abundanceLabel)
-      app.model.ui.title = 'Clonotype enrichment - ' + abundanceLabel;
-  }
 }
+
+// updating defaultBlockLabel
+watchEffect(() => {
+  const conditionOrder = app.model.args.conditionOrder;
+  const clonotypeDefinition = app.model.args.clonotypeDefinition;
+  const sequenceColumnOptions = app.model.outputs.sequenceColumnOptions;
+  const filteringMode = app.model.args.filteringMode;
+
+  let label = '';
+
+  // Add clonotype definition prefix if selected
+  if (clonotypeDefinition && clonotypeDefinition.length > 0 && sequenceColumnOptions) {
+    const clonotypeLabels = clonotypeDefinition
+      .map((colId) => {
+        const option = sequenceColumnOptions.find((opt) => opt.value === colId);
+        return option?.label;
+      })
+      .filter((label) => label !== undefined);
+
+    if (clonotypeLabels.length > 0) {
+      label = clonotypeLabels.join('-');
+    }
+  }
+
+  // Add condition order
+  if (conditionOrder && conditionOrder.length > 0) {
+    const conditionLabel = conditionOrder.join('-');
+    label = label ? `${label}, ${conditionLabel}` : conditionLabel;
+  }
+
+  // Add filtering mode at the end
+  if (filteringMode) {
+    const filteringLabel = filteringMode === 'none' ? 'All clonotypes' : 'Shared clonotypes';
+    label = label ? `${label}, ${filteringLabel}` : filteringLabel;
+  }
+
+  app.model.args.defaultBlockLabel = label;
+});
 
 const tableSettings = computed(() => usePlDataTableSettingsV2({
   model: () => app.model.outputs.pt,
@@ -132,11 +165,18 @@ watch(() => [app.model.args.conditionColumnRef], (_) => {
   app.model.args.conditionOrder = [];
 });
 
+const isClusterId = computed(() => {
+  if (app.model.outputs.datasetSpec === undefined) return false;
+  return app.model.outputs.datasetSpec?.axesSpec.length >= 1 && app.model.outputs.datasetSpec?.axesSpec[1]?.name === 'pl7.app/vdj/clusterId';
+});
 </script>
 
 <template>
-  <PlBlockPage>
-    <template #title>{{ app.model.ui.title }}</template>
+  <PlBlockPage
+    v-model:subtitle="app.model.args.customBlockLabel"
+    :subtitle-placeholder="app.model.args.defaultBlockLabel"
+    title="Clonotype Enrichment"
+  >
     <template #append>
       <PlBtnGhost @click.stop="() => (statsOpen = true)">
         Stats
@@ -228,6 +268,7 @@ watch(() => [app.model.args.conditionColumnRef], (_) => {
 
     <PlAccordionSection label="Advanced Settings">
       <PlDropdownMulti
+        v-if="!isClusterId"
         v-model="app.model.args.clonotypeDefinition"
         :options="app.model.outputs.sequenceColumnOptions"
         label="Clonotype definition"
