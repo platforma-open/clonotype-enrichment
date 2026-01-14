@@ -1,5 +1,13 @@
 # @platforma-open/milaboratories.clonotype-enrichment
 
+## 2.2.29
+
+### Patch Changes
+
+- efe36e8: Fix unnecessary table rerenders
+- Updated dependencies [efe36e8]
+  - @platforma-open/milaboratories.clonotype-enrichment.ui@2.13.5
+
 ## 2.2.28
 
 ### Patch Changes

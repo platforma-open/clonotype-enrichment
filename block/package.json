@@ -1,6 +1,6 @@
 {
   "name": "@platforma-open/milaboratories.clonotype-enrichment",
-  "version": "2.2.28",
+  "version": "2.2.29",
   "scripts": {
     "build": "rm -rf block-pack/* && block-tools pack",
     "do-pack": "rm -f *.tgz && pnpm pack && mv *.tgz package.tgz",

@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.ui
 
+## 2.13.5
+
+### Patch Changes
+
+- efe36e8: Fix unnecessary table rerenders
+
 ## 2.13.4
 
 ### Patch Changes
