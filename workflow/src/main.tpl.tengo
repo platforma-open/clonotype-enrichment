@@ -89,8 +89,8 @@ wf.body(func(args) {
 	}
 	
 	// Add filtering mode to ensure cache differentiation
-	filteringMode := args.filteringMode
-	label = label + " - Filtering: " + filteringMode
+	FilteringConfig := args.FilteringConfig
+	label = label + " - Filtering: " + FilteringConfig
 
     trace := pSpec.makeTrace(abundanceSpec,
         {
@@ -162,11 +162,13 @@ wf.body(func(args) {
     }
 
 	// Add filtering flags based on user selection
-	if filteringMode != "none" {
+	if FilteringConfig != "none" {
 		calculateEnrichment = calculateEnrichment.arg("--filter_clonotypes")
 		
-		if filteringMode == "single-sample" {
+		if FilteringConfig == "single-sample" {
 			calculateEnrichment = calculateEnrichment.arg("--filter_single_sample")
+		} else if FilteringConfig == "shared" {
+			calculateEnrichment = calculateEnrichment.arg("--filter_any_zero")
 		}
 	}
 

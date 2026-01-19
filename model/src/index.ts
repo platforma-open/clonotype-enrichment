@@ -21,6 +21,24 @@ export type DownsamplingParameters = {
   n?: number;
 };
 
+type FilteringConfig = {
+  // Mutually exclusive base filter
+  baseFilter: 'none' | 'shared' | 'single-sample';
+
+  // Combinatory filters (apply on top of base)
+  minAbundance?: {
+    enabled: boolean;
+    threshold: number;
+    metric: 'count' | 'frequency';
+  };
+
+  presentInRounds?: {
+    enabled: boolean;
+    rounds: string[];
+    logic: 'OR' | 'AND';
+  };
+};
+
 export type UiState = {
   tableState: PlDataTableStateV2;
   bubbleState: GraphMakerState;
@@ -35,7 +53,7 @@ export type BlockArgs = {
   conditionColumnRef?: SUniversalPColumnId;
   conditionOrder: string[];
   downsampling: DownsamplingParameters;
-  filteringMode: 'none' | 'single-sample';
+  FilteringConfig: FilteringConfig;
   clonotypeDefinition: SUniversalPColumnId[];
   additionalEnrichmentExports: string[];
 };
@@ -51,7 +69,9 @@ export const model = BlockModel.create()
       valueChooser: 'auto',
     },
     clonotypeDefinition: [],
-    filteringMode: 'single-sample',
+    FilteringConfig: {
+      baseFilter: 'none',
+    },
     additionalEnrichmentExports: [],
   })
 

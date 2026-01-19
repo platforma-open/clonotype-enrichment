@@ -1053,7 +1053,7 @@ packages:
     resolution: {integrity: sha512-/f1ZPvNhFEYopy9Yco4+he3aG7tpAMfIJ9Igtq90WK53JTtYuvraNsoZGdTltEjmNXG0iNPlTg3Dw5qzESPKrQ==}
     peerDependencies:
       '@platforma-sdk/model': ^1.51.5
-      '@platforma-sdk/ui-vue': file:/Users/kevindetry/Developer/platforma/sdk/ui-vue/package.tgz
+      '@platforma-sdk/ui-vue': ^1.51.5
 
   '@milaboratories/helpers@1.12.0':
     resolution: {integrity: sha512-Eg3AQMJbVClYhdvhogdlW3Ys9EdLLl8ZTqG675iLwoO64ZJcQOAnIPjXwl4zJ/bZWx4nEhRF9AvwxRdc08fikQ==}

@@ -17,7 +17,9 @@ import {
   PlDropdownRef,
   PlMaskIcon24,
   PlNumberField,
+  PlRadioGroup,
   PlSlideModal,
+  PlTooltip,
   usePlDataTableSettingsV2,
 } from '@platforma-sdk/ui-vue';
 import { asyncComputed } from '@vueuse/core';
@@ -42,7 +44,7 @@ watchEffect(() => {
   const conditionOrder = app.model.args.conditionOrder;
   const clonotypeDefinition = app.model.args.clonotypeDefinition;
   const sequenceColumnOptions = app.model.outputs.sequenceColumnOptions;
-  const filteringMode = app.model.args.filteringMode;
+  const baseFilter = app.model.args.FilteringConfig.baseFilter;
 
   let label = '';
 
@@ -67,8 +69,8 @@ watchEffect(() => {
   }
 
   // Add filtering mode at the end
-  if (filteringMode) {
-    const filteringLabel = filteringMode === 'none' ? 'All clonotypes' : 'Shared clonotypes';
+  if (baseFilter) {
+    const filteringLabel = baseFilter === 'none' ? 'No filtering' : (baseFilter === 'shared' ? 'Shared (all rounds)' : 'Multiple rounds');
     label = label ? `${label}, ${filteringLabel}` : filteringLabel;
   }
 
@@ -169,6 +171,24 @@ const isClusterId = computed(() => {
   if (app.model.outputs.datasetSpec === undefined) return false;
   return app.model.outputs.datasetSpec?.axesSpec.length >= 1 && app.model.outputs.datasetSpec?.axesSpec[1]?.name === 'pl7.app/vdj/clusterId';
 });
+
+watch(() => [app.model.outputs.datasetSpec], (_) => {
+  if (app.model.outputs.datasetSpec === undefined) return false;
+  // Define default filtering mode depending on input type
+  if (app.model.outputs.datasetSpec?.axesSpec.length >= 1
+    && app.model.outputs.datasetSpec?.axesSpec[1]?.name === 'pl7.app/vdj/clusterId') {
+    app.model.args.FilteringConfig.baseFilter = 'shared';
+  } else {
+    app.model.args.FilteringConfig.baseFilter = 'none';
+  }
+}, { deep: true });
+
+// Filtering options
+const filteringOptions = [
+  { value: 'none', label: 'No filtering' },
+  { value: 'shared', label: 'Shared (all rounds)' },
+  { value: 'single-sample', label: 'Multiple rounds' },
+];
 </script>
 
 <template>
@@ -249,22 +269,22 @@ const isClusterId = computed(() => {
       required
     />
 
-    <PlBtnGroup
-      v-model="app.model.args.filteringMode"
-      :options="[
-        { value: 'none', label: 'All clonotypes' },
-        { value: 'single-sample', label: 'Shared clonotypes' },
-      ]"
-      label="Clonotype filtering"
+    <PlRadioGroup
+      v-model="app.model.args.FilteringConfig.baseFilter"
+      :options="filteringOptions"
     >
-      <template #tooltip>
-        <div>
-          <strong>Clonotype filtering strategy:</strong><br/>
-          <strong>All clonotypes:</strong> Analyze all clonotypes, including those specific to individual conditions (may include rare or condition-specific responses)<br/>
-          <strong>Shared clonotypes:</strong> Focus on clonotypes present in multiple conditions (excludes condition-specific clonotypes that may represent noise or rare events)
-        </div>
+      <template #label>
+        Filtering Options
+        <PlTooltip class="info" :style="{display: 'inline-block'}">
+          <template #tooltip>
+            <strong>Clonotype filtering strategy:</strong><br/>
+            <strong>No filtering:</strong> Analyze all clonotypes, including those specific to individual conditions (may include rare or condition-specific responses)<br/>
+            <strong>Shared (all rounds):</strong> Focus only on clonotypes present in all rounds<br/>
+            <strong>Multiple rounds:</strong> Focus on clonotypes present in more than one condition (excludes condition-specific clonotypes that may represent noise or rare events)
+          </template>
+        </PlTooltip>
       </template>
-    </PlBtnGroup>
+    </PlRadioGroup>
 
     <PlAccordionSection label="Advanced Settings">
       <PlDropdownMulti
