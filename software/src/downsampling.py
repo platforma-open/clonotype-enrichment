@@ -61,8 +61,11 @@ def downsample_sample(sample_df, downsampling):
 downsampling_params = parse_params()
 data = pl.read_csv(input_file)
 
-# If there are no clonotypes, return empty dataframe
-if data.count()["elementId"].item() == 0:
+# If there are no clonotypes, return empty dataframe 
+# Empty files can be generated like:
+# sampleId,elementId,abundance,condition
+# 7EDEHESCS4OWL7Y2JP3GZ567,"","",0
+if not data["elementId"].ne("").any():
     data = data.with_columns(pl.lit(0).alias('downsampledAbundance'))
     data.write_csv('result.csv')
     exit()

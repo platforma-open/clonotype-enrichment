@@ -147,7 +147,8 @@ def create_empty_outputs(
     bubble_csv: str,
     top_enriched_csv: str,
     top_20_csv: Optional[str] = None,
-    highest_enrichment_csv: Optional[str] = None
+    highest_enrichment_csv: Optional[str] = None,
+    filtered_too_much_txt: Optional[str] = None
 ) -> None:
     """
     Create empty output files when input data is empty.
@@ -200,6 +201,11 @@ def create_empty_outputs(
         })
         empty_highest.write_csv(highest_enrichment_csv)
 
+    # Create filter check file
+    if filtered_too_much_txt:
+        with open(filtered_too_much_txt, 'w') as f:
+            f.write("false")
+
 
 def hybrid_enrichment_analysis(
     input_data_csv: str,
@@ -248,7 +254,8 @@ def hybrid_enrichment_analysis(
     if element_count == 0:
         # Create empty outputs and exit
         create_empty_outputs(condition_order, enrichment_csv, bubble_csv,
-                                top_enriched_csv, top_20_csv, highest_enrichment_csv)
+                                top_enriched_csv, top_20_csv, highest_enrichment_csv,
+                                filtered_too_much_txt)
         return
 
     if clonotype_definition_csv:
@@ -323,9 +330,6 @@ def hybrid_enrichment_analysis(
         .collect()
     )
 
-    # Count unique clonotypes before filtering to detect if filters are too strict
-    unique_clonotypes_before = aggregated_df.select('elementId').n_unique()
-
     # Generate consistent labels BEFORE filtering based on alphabetical elementId order
     # This ensures each clonotype gets the same label regardless of filtering
     all_element_ids = aggregated_df.select(
@@ -346,9 +350,9 @@ def hybrid_enrichment_analysis(
 
     # Check if we have too few clonotypes only after filtering
     if filtered_too_much_txt:
-        unique_clonotypes_after = aggregated_df.select('elementId').n_unique()
+        unique_clonotypes_count = aggregated_df.select('elementId').n_unique()
         # It's only "filtered too much" if we had at least 2 clonotypes and now we have fewer
-        too_few = "true" if (unique_clonotypes_before >= 2 and unique_clonotypes_after < 2) else "false"
+        too_few = "true" if (unique_clonotypes_count < 2) else "false"
         with open(filtered_too_much_txt, 'w') as f:
             f.write(too_few)
 
