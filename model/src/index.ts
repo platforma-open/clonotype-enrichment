@@ -253,9 +253,9 @@ export const model = BlockModel.create()
 
   .sections((_ctx) => ([
     { type: 'link', href: '/', label: 'Main' },
-    { type: 'link', href: '/buble', label: 'Enriched bubble plot' },
-    { type: 'link', href: '/line', label: 'Frequency line plot' },
-    { type: 'link', href: '/stacked', label: 'Frequency bar plot' },
+    { type: 'link', href: '/buble', label: 'Enriched Bubble Plot' },
+    { type: 'link', href: '/line', label: 'Frequency Line Plot' },
+    { type: 'link', href: '/stacked', label: 'Frequency Bar Plot' },
   ]))
 
   .done(2);
