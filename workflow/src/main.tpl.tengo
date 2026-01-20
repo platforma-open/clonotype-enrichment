@@ -74,7 +74,7 @@ wf.body(func(args) {
 	downsampling:= args.downsampling
 	additionalEnrichmentExports := args.additionalEnrichmentExports
 
-	// Make trace (Frequencies are always the same, so we don't need to add the condition order)
+	// Prepare trace label (Frequencies are always the same, so we don't need to add the condition order)
 	// Downsampling will cause it to change, so lets add it
 	// Filtering will also cause changes, so include filtering mode
 	label := ""
@@ -90,14 +90,7 @@ wf.body(func(args) {
 	
 	// Add filtering mode to ensure cache differentiation
 	FilteringConfig := args.FilteringConfig
-	label = label + " - Filtering: " + FilteringConfig
-
-    trace := pSpec.makeTrace(abundanceSpec,
-        {
-            type: "milaboratories.clonotype-enrichment",
-            importance: 30,
-            label: label
-        })
+	label = label + " - Filtering: " + FilteringConfig.baseFilter
 
 	// Get abundance table
 	cloneTable := pframes.csvFileBuilder() 
@@ -162,14 +155,35 @@ wf.body(func(args) {
     }
 
 	// Add filtering flags based on user selection
-	if FilteringConfig != "none" {
+	if FilteringConfig.baseFilter != "none" {
 		calculateEnrichment = calculateEnrichment.arg("--filter_clonotypes")
 		
-		if FilteringConfig == "single-sample" {
+		if FilteringConfig.baseFilter == "single-sample" {
 			calculateEnrichment = calculateEnrichment.arg("--filter_single_sample")
-		} else if FilteringConfig == "shared" {
+		} else if FilteringConfig.baseFilter == "shared" {
 			calculateEnrichment = calculateEnrichment.arg("--filter_any_zero")
 		}
+	}
+
+	// Apply minimum abundance filters based on selection
+	if FilteringConfig.minAbundance.enabled {
+		label = label + " - (" + FilteringConfig.minAbundance.metric + ", " + string(FilteringConfig.minAbundance.threshold) + ")"
+
+		calculateEnrichment = calculateEnrichment.arg("--filter_clonotypes")
+		if FilteringConfig.minAbundance.metric == "count" {
+			calculateEnrichment = calculateEnrichment.arg("--min_abundance").arg(string(FilteringConfig.minAbundance.threshold))
+		} else if FilteringConfig.minAbundance.metric == "frequency" {
+			calculateEnrichment = calculateEnrichment.arg("--min_frequency").arg(string(FilteringConfig.minAbundance.threshold))
+		}
+	}
+
+	// Apply in-round presence filters based on selection
+	if FilteringConfig.presentInRounds.enabled {
+		label = label + " - (" + FilteringConfig.presentInRounds.logic + ", " + string(FilteringConfig.presentInRounds.rounds) + ")"
+		
+		calculateEnrichment = calculateEnrichment.arg("--filter_clonotypes")
+		calculateEnrichment = calculateEnrichment.arg("--present_in_rounds").arg(string(FilteringConfig.presentInRounds.rounds))
+		calculateEnrichment = calculateEnrichment.arg("--present_in_rounds_logic").arg(FilteringConfig.presentInRounds.logic)
 	}
 
 	calculateEnrichment = calculateEnrichment.
@@ -209,7 +223,15 @@ wf.body(func(args) {
 														blockId)
 	frequencyPf := xsv.importFile(enrichCsv, "csv", frequencyImportParams,
 								{ cpu: 1, mem: "32GiB" })
+
 	// Prepare pFrame to be exported
+	trace := pSpec.makeTrace(abundanceSpec,
+        {
+            type: "milaboratories.clonotype-enrichment",
+            importance: 30,
+            label: label
+        })
+
     exportsFreq := pframes.pFrameBuilder()
 	for condition in conditionOrder {
 		colId := strings.substituteSpecialCharacters("frequency_" + condition)

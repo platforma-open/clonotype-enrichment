@@ -8,7 +8,12 @@ def filter_clonotypes_by_criteria(
     aggregated_df: pl.DataFrame,
     condition_order: List[str],
     filter_single_sample: bool = False,
-    filter_any_zero: bool = False
+    filter_any_zero: bool = False,
+    min_abundance: int = 0,
+    min_frequency: float = 0.0,
+    total_reads_dict: Optional[Dict[str, int]] = None,
+    present_in_rounds: Optional[List[str]] = None,
+    present_in_rounds_logic: str = "OR"
 ) -> pl.DataFrame:
     """
     Filter clonotypes based on specified criteria.
@@ -18,11 +23,17 @@ def filter_clonotypes_by_criteria(
         condition_order: List of conditions in order
         filter_single_sample: If True, remove clonotypes present in only one sample
         filter_any_zero: If True, remove clonotypes with zero abundance in any sample
+        min_abundance: If > 0, remove clonotypes with maximum abundance below this threshold
+        min_frequency: If > 0, remove clonotypes with maximum frequency below this threshold (0-1)
+        total_reads_dict: Dictionary mapping condition to total reads (required for min_frequency)
+        present_in_rounds: Optional list of rounds to filter clonotypes by presence
+        present_in_rounds_logic: Logic for presence filtering ('OR' or 'AND')
 
     Returns:
         Filtered DataFrame with same structure as input
     """
-    if not (filter_single_sample or filter_any_zero):
+    if not (filter_single_sample or filter_any_zero or min_abundance > 0 or 
+            (min_frequency > 0 and total_reads_dict) or present_in_rounds):
         return aggregated_df
 
     # Create pivot table to analyze abundance patterns
@@ -77,6 +88,49 @@ def filter_clonotypes_by_criteria(
             pl.col('non_zero_count') == len(condition_cols)).select('elementId')
         elements_to_keep = any_zero_filter if elements_to_keep is None else elements_to_keep.join(
             any_zero_filter, on='elementId', how='inner')
+
+    if min_abundance > 0:
+        # Filter out clonotypes with maximum abundance below threshold
+        min_abundance_filter = pivot_for_filtering.filter(
+            pl.any_horizontal([pl.col(col) >= min_abundance for col in condition_cols])
+        ).select('elementId')
+        elements_to_keep = min_abundance_filter if elements_to_keep is None else elements_to_keep.join(
+            min_abundance_filter, on='elementId', how='inner')
+
+    if min_frequency > 0 and total_reads_dict:
+        # Filter out clonotypes with maximum frequency below threshold
+        # Create expressions for frequency check in each condition
+        freq_filters = []
+        for col in condition_cols:
+            total = total_reads_dict.get(col, 0)
+            if total >= 1:
+                freq_filters.append(pl.col(col) / total >= min_frequency)
+        
+        if freq_filters:
+            min_frequency_filter = pivot_for_filtering.filter(
+                pl.any_horizontal(freq_filters)
+            ).select('elementId')
+            elements_to_keep = min_frequency_filter if elements_to_keep is None else elements_to_keep.join(
+                min_frequency_filter, on='elementId', how='inner')
+
+    if present_in_rounds and len(present_in_rounds) > 0:
+        # Filter by presence in specific rounds
+        # Ensure selected rounds exist in data
+        existing_rounds = [r for r in present_in_rounds if r in pivot_for_filtering.columns and r in condition_order]
+        
+        if existing_rounds:
+            logic = present_in_rounds_logic.upper()
+            if logic == "AND":
+                presence_filter = pivot_for_filtering.filter(
+                    pl.all_horizontal([pl.col(col) > 0 for col in existing_rounds])
+                ).select('elementId')
+            else:  # Default to OR
+                presence_filter = pivot_for_filtering.filter(
+                    pl.any_horizontal([pl.col(col) > 0 for col in existing_rounds])
+                ).select('elementId')
+                
+            elements_to_keep = presence_filter if elements_to_keep is None else elements_to_keep.join(
+                presence_filter, on='elementId', how='inner')
 
     if elements_to_keep is not None:
         # Filter the original aggregated data
@@ -164,6 +218,10 @@ def hybrid_enrichment_analysis(
     filter_clonotypes: bool = False,
     filter_single_sample: bool = False,
     filter_any_zero: bool = False,
+    min_abundance: int = 0,
+    min_frequency: float = 0.0,
+    present_in_rounds: Optional[List[str]] = None,
+    present_in_rounds_logic: str = "OR",
     clonotype_definition_csv: Optional[str] = None
 ) -> None:
     """
@@ -173,6 +231,9 @@ def hybrid_enrichment_analysis(
     - filter_clonotypes: Enable clonotype filtering before enrichment calculation
     - filter_single_sample: Remove clonotypes present in only one sample (zero abundance in all but one)
     - filter_any_zero: Remove clonotypes absent in any sample (zero abundance in any sample)
+    - min_abundance: Minimum abundance threshold for clonotypes (maximum across all conditions >= threshold)
+    - present_in_rounds: List of rounds to filter clonotypes by presence
+    - present_in_rounds_logic: Logic for presence filtering ('OR' or 'AND')
     """
     # Read data with polars lazy evaluation
     input_df = pl.scan_csv(input_data_csv)
@@ -222,6 +283,8 @@ def hybrid_enrichment_analysis(
 
     # Make sure condition_order is a list of strings
     condition_order = [str(cond) for cond in condition_order]
+    if present_in_rounds:
+        present_in_rounds = [str(cond) for cond in present_in_rounds]
 
     # Rename and validate columns
     if "abundance" in input_df.columns:
@@ -271,7 +334,10 @@ def hybrid_enrichment_analysis(
     # Apply clonotype filtering if requested
     if filter_clonotypes:
         aggregated_df = filter_clonotypes_by_criteria(
-            aggregated_df, condition_order, filter_single_sample, filter_any_zero
+            aggregated_df, condition_order, 
+            filter_single_sample, filter_any_zero, min_abundance,
+            min_frequency, total_reads_dict,
+            present_in_rounds, present_in_rounds_logic
         )
 
     # Create pivot table to match pandas behavior exactly (elementId as index)
@@ -728,6 +794,14 @@ if __name__ == "__main__":
                         help="Remove clonotypes present in only one sample (zero abundance in all but one)")
     parser.add_argument("--filter_any_zero", action="store_true",
                         help="Remove clonotypes absent in any sample (zero abundance in any sample)")
+    parser.add_argument("--min_abundance", type=int, default=0,
+                        help="Minimum abundance threshold for clonotypes (maximum across all conditions)")
+    parser.add_argument("--min_frequency", type=float, default=0.0,
+                        help="Minimum frequency threshold for clonotypes (maximum across all conditions) (0-1)")
+    parser.add_argument("--present_in_rounds", type=str, required=False,
+                        help="JSON list of rounds to filter clonotypes by presence")
+    parser.add_argument("--present_in_rounds_logic", type=str, default="OR",
+                        help="Logic for presence filtering ('OR' or 'AND')")
     parser.add_argument("--clonotype-definition", required=False,
                         help="Path to clonotype definition CSV file.")
 
@@ -750,5 +824,9 @@ if __name__ == "__main__":
         filter_clonotypes=args.filter_clonotypes,
         filter_single_sample=args.filter_single_sample,
         filter_any_zero=args.filter_any_zero,
+        min_abundance=args.min_abundance,
+        min_frequency=args.min_frequency,
+        present_in_rounds=json.loads(args.present_in_rounds) if args.present_in_rounds else None,
+        present_in_rounds_logic=args.present_in_rounds_logic,
         clonotype_definition_csv=args.clonotype_definition
     )

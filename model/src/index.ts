@@ -26,13 +26,13 @@ type FilteringConfig = {
   baseFilter: 'none' | 'shared' | 'single-sample';
 
   // Combinatory filters (apply on top of base)
-  minAbundance?: {
+  minAbundance: {
     enabled: boolean;
     threshold: number;
     metric: 'count' | 'frequency';
   };
 
-  presentInRounds?: {
+  presentInRounds: {
     enabled: boolean;
     rounds: string[];
     logic: 'OR' | 'AND';
@@ -71,6 +71,16 @@ export const model = BlockModel.create()
     clonotypeDefinition: [],
     FilteringConfig: {
       baseFilter: 'none',
+      minAbundance: {
+        enabled: false,
+        threshold: 100,
+        metric: 'count',
+      },
+      presentInRounds: {
+        enabled: false,
+        rounds: [],
+        logic: 'OR',
+      },
     },
     additionalEnrichmentExports: [],
   })

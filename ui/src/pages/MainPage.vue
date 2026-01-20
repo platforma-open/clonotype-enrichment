@@ -5,12 +5,14 @@ import type {
   ListOption,
 } from '@platforma-sdk/ui-vue';
 import {
+  computedCached,
   PlAccordionSection,
   PlAgDataTableV2,
   PlAlert,
   PlBlockPage,
   PlBtnGhost,
   PlBtnGroup,
+  PlCheckbox,
   PlDialogModal,
   PlDropdown,
   PlDropdownMulti,
@@ -18,6 +20,7 @@ import {
   PlMaskIcon24,
   PlNumberField,
   PlRadioGroup,
+  PlRow,
   PlSlideModal,
   PlTooltip,
   usePlDataTableSettingsV2,
@@ -92,6 +95,13 @@ const tableLoadingText = computed(() => {
 // we will select them in list, being the first one denominator and rest numerators
 const conditionValues = computed(() => {
   return app.model.outputs.conditionValues?.map((v) => ({
+    value: v,
+    label: v,
+  }));
+});
+
+const conditionOrderOptions = computed(() => {
+  return app.model.args.conditionOrder.map((v) => ({
     value: v,
     label: v,
   }));
@@ -172,16 +182,22 @@ const isClusterId = computed(() => {
   return app.model.outputs.datasetSpec?.axesSpec.length >= 1 && app.model.outputs.datasetSpec?.axesSpec[1]?.name === 'pl7.app/vdj/clusterId';
 });
 
-watch(() => [app.model.outputs.datasetSpec], (_) => {
-  if (app.model.outputs.datasetSpec === undefined) return false;
-  // Define default filtering mode depending on input type
-  if (app.model.outputs.datasetSpec?.axesSpec.length >= 1
-    && app.model.outputs.datasetSpec?.axesSpec[1]?.name === 'pl7.app/vdj/clusterId') {
+// Track the dataset spec
+const datasetSpec = computedCached(() => app.model.outputs.datasetSpec);
+
+// Watch for changes in the dataset spec to initialize defaults
+watchEffect(() => {
+  const spec = datasetSpec.value;
+  if (!spec?.axesSpec) return;
+  const isClust = spec.axesSpec.length >= 1 && spec.axesSpec[1]?.name === 'pl7.app/vdj/clusterId';
+  if (isClust) {
     app.model.args.FilteringConfig.baseFilter = 'shared';
+    app.model.args.FilteringConfig.minAbundance.enabled = false;
   } else {
     app.model.args.FilteringConfig.baseFilter = 'none';
+    app.model.args.FilteringConfig.minAbundance.enabled = true;
   }
-}, { deep: true });
+});
 
 // Filtering options
 const filteringOptions = [
@@ -269,22 +285,88 @@ const filteringOptions = [
       required
     />
 
-    <PlRadioGroup
-      v-model="app.model.args.FilteringConfig.baseFilter"
-      :options="filteringOptions"
-    >
-      <template #label>
-        Filtering Options
-        <PlTooltip class="info" :style="{display: 'inline-block'}">
+    <PlAccordionSection label="Filtering Options">
+      <PlRadioGroup
+        v-model="app.model.args.FilteringConfig.baseFilter"
+        :options="filteringOptions"
+      >
+        <template #label>
+          Clonotype Filtering
+          <PlTooltip class="info" :style="{display: 'inline-block'}">
+            <template #tooltip>
+              <strong>Clonotype filtering strategy:</strong><br/>
+              <strong>No filtering:</strong> Analyze all clonotypes, including those specific to individual conditions (may include rare or condition-specific responses)<br/>
+              <strong>Shared (all rounds):</strong> Focus only on clonotypes present in all rounds<br/>
+              <strong>Multiple rounds:</strong> Focus on clonotypes present in more than one condition (excludes condition-specific clonotypes that may represent noise or rare events)
+            </template>
+          </PlTooltip>
+        </template>
+      </PlRadioGroup>
+      <PlCheckbox v-model="app.model.args.FilteringConfig.minAbundance.enabled">
+        Abundance Filtering
+        <PlTooltip class="info">
           <template #tooltip>
-            <strong>Clonotype filtering strategy:</strong><br/>
-            <strong>No filtering:</strong> Analyze all clonotypes, including those specific to individual conditions (may include rare or condition-specific responses)<br/>
-            <strong>Shared (all rounds):</strong> Focus only on clonotypes present in all rounds<br/>
-            <strong>Multiple rounds:</strong> Focus on clonotypes present in more than one condition (excludes condition-specific clonotypes that may represent noise or rare events)
+            <div>
+              Remove clonotypes below a specific threshold based on their maximum abundance across all conditions. Filters sampling noise in display campaigns<br/><br/>
+              <strong>Counts:</strong> Filter by raw number of reads (e.g., 100).<br/>
+              <strong>Frequency:</strong> Filter by fraction of reads aggregated across same condition samples (0 to 1.0).<br/><br/>
+              For <em>in vivo</em> studies with lower sequencing depth, consider lower values (10-50 counts).
+            </div>
           </template>
         </PlTooltip>
-      </template>
-    </PlRadioGroup>
+      </PlCheckbox>
+      <PlRow v-if="app.model.args.FilteringConfig.minAbundance.enabled">
+        <PlNumberField
+          v-if="app.model.args.FilteringConfig.minAbundance.metric === 'count'"
+          v-model="app.model.args.FilteringConfig.minAbundance.threshold"
+          label="Minimum abundance"
+          :minValue="0"
+          :step="1"
+          placeholder="100"
+        />
+        <PlNumberField
+          v-if="app.model.args.FilteringConfig.minAbundance.metric === 'frequency'"
+          v-model="app.model.args.FilteringConfig.minAbundance.threshold"
+          label="Minimum abundance"
+          :minValue="0"
+          :maxValue="1"
+          :step="0.01"
+          placeholder="0.1"
+        />
+        <PlDropdown
+          v-model="app.model.args.FilteringConfig.minAbundance.metric"
+          :options="[{ value: 'count', label: 'Counts' },
+                     { value: 'frequency', label: 'Frequency' }]"
+          label="Metric"
+        />
+      </plrow>
+      <PlCheckbox v-model="app.model.args.FilteringConfig.presentInRounds.enabled">
+        In-round Presence Filtering
+        <PlTooltip class="info">
+          <template #tooltip>
+            <div>
+              Keep only clonotypes based on their presence in selected conditions.<br/><br/>
+              <strong>Any selected (OR):</strong> Keeps clonotypes present in at least one of the selected rounds.<br/>
+              <strong>All selected (AND):</strong> Keeps only clonotypes present in all of the selected rounds.<br/><br/>
+              Useful to focus on clonotypes that reached later selection rounds.
+            </div>
+          </template>
+        </PlTooltip>
+      </PlCheckbox>
+      <PlRow v-if="app.model.args.FilteringConfig.presentInRounds.enabled">
+        <PlDropdownMulti
+          v-model="app.model.args.FilteringConfig.presentInRounds.rounds"
+          label="Conditions"
+          :options="conditionOrderOptions"
+        />
+        <PlDropdown
+          v-model="app.model.args.FilteringConfig.presentInRounds.logic"
+          :options="[{ value: 'OR', label: 'Any selected (OR)' },
+                     { value: 'AND', label: 'All selected (AND)' }]"
+          label="Logic"
+        />
+      </plrow>
+    </PlAccordionSection>
 
     <PlAccordionSection label="Advanced Settings">
       <PlDropdownMulti
