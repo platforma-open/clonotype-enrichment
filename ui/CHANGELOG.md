@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.ui
 
+## 2.13.6
+
+### Patch Changes
+
+- 089279c: Labels migration
+
 ## 2.13.5
 
 ### Patch Changes
