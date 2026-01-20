@@ -277,6 +277,14 @@ export const model = BlockModel.create()
 
   .output('isRunning', (ctx) => ctx.outputs?.getIsReadyOrError() === false)
 
+  .output('filteredTooMuch', (ctx) => {
+    const filteredTooMuch = ctx.outputs?.resolve('filteredTooMuch')?.getDataAsJson() as object;
+    if (typeof filteredTooMuch === 'boolean') {
+      return filteredTooMuch;
+    }
+    return undefined;
+  })
+
   .title(() => 'Clonotype enrichment')
 
   .subtitle((ctx) => ctx.args.customBlockLabel || ctx.args.defaultBlockLabel)

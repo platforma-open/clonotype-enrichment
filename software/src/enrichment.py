@@ -222,7 +222,8 @@ def hybrid_enrichment_analysis(
     min_frequency: float = 0.0,
     present_in_rounds: Optional[List[str]] = None,
     present_in_rounds_logic: str = "OR",
-    clonotype_definition_csv: Optional[str] = None
+    clonotype_definition_csv: Optional[str] = None,
+    filtered_too_much_txt: Optional[str] = None
 ) -> None:
     """
     Optimized hybrid enrichment analysis using polars for better performance and memory efficiency.
@@ -322,6 +323,9 @@ def hybrid_enrichment_analysis(
         .collect()
     )
 
+    # Count unique clonotypes before filtering to detect if filters are too strict
+    unique_clonotypes_before = aggregated_df.select('elementId').n_unique()
+
     # Generate consistent labels BEFORE filtering based on alphabetical elementId order
     # This ensures each clonotype gets the same label regardless of filtering
     all_element_ids = aggregated_df.select(
@@ -339,6 +343,14 @@ def hybrid_enrichment_analysis(
             min_frequency, total_reads_dict,
             present_in_rounds, present_in_rounds_logic
         )
+
+    # Check if we have too few clonotypes only after filtering
+    if filtered_too_much_txt:
+        unique_clonotypes_after = aggregated_df.select('elementId').n_unique()
+        # It's only "filtered too much" if we had at least 2 clonotypes and now we have fewer
+        too_few = "true" if (unique_clonotypes_before >= 2 and unique_clonotypes_after < 2) else "false"
+        with open(filtered_too_much_txt, 'w') as f:
+            f.write(too_few)
 
     # Create pivot table to match pandas behavior exactly (elementId as index)
     pivot_df = (
@@ -804,6 +816,8 @@ if __name__ == "__main__":
                         help="Logic for presence filtering ('OR' or 'AND')")
     parser.add_argument("--clonotype-definition", required=False,
                         help="Path to clonotype definition CSV file.")
+    parser.add_argument("--filtered_too_much", required=False,
+                        help="Path to save whether filters left too few clonotypes (true/false)")
 
     args = parser.parse_args()
 
@@ -828,5 +842,6 @@ if __name__ == "__main__":
         min_frequency=args.min_frequency,
         present_in_rounds=json.loads(args.present_in_rounds) if args.present_in_rounds else None,
         present_in_rounds_logic=args.present_in_rounds_logic,
-        clonotype_definition_csv=args.clonotype_definition
+        clonotype_definition_csv=args.clonotype_definition,
+        filtered_too_much_txt=args.filtered_too_much
     )

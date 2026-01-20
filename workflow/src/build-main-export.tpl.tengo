@@ -6,7 +6,7 @@ assets := import("@platforma-sdk/workflow-tengo:assets")
 
 enrichmentColumnTpl := assets.importTemplate(":enrichment-column")
 
-self.defineOutputs("exports", "outStats")
+self.defineOutputs("exports", "outStats", "filteredTooMuch")
 
 self.body(func(args) {
     outStats := {
@@ -40,8 +40,14 @@ self.body(func(args) {
         exportColumnRender.output("columnData")
     )
 
+    filteredTooMuch := false
+    if string(args.filteredTooMuch.getData()) == "true" {
+        filteredTooMuch = true
+    }
+
     return {
         exports: exports.build(),
-        outStats: outStats
+        outStats: outStats,
+        filteredTooMuch: filteredTooMuch
     }
 })

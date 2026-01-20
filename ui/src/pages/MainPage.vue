@@ -172,6 +172,11 @@ const isEmpty = asyncComputed(async () => {
   return (await getRawPlatformaInstance().pFrameDriver.getShape(app.model.outputs.pt.value.fullTableHandle)).rows === 0;
 });
 
+// Check if the filters removed too many clonotypes
+const filteredTooMuch = asyncComputed(async () => {
+  if (app.model.outputs.filteredTooMuch === true) return true;
+});
+
 // Make sure numerator and denominator are reset when contrast factor is changed
 watch(() => [app.model.args.conditionColumnRef], (_) => {
   app.model.args.conditionOrder = [];
@@ -227,10 +232,15 @@ const filteringOptions = [
         </template>
       </PlBtnGhost>
     </template>
-    <PlAlert v-if="isEmpty === true" type="warn" icon>
+    <PlAlert v-if="isEmpty === true && filteredTooMuch !== true" type="warn" icon>
       <template #title>Empty dataset selection</template>
       The input dataset you have selected is empty or has too few clonotypes.
       Please choose a different dataset.
+    </PlAlert>
+    <PlAlert v-if="filteredTooMuch === true" type="warn" icon>
+      <template #title>Too few clonotypes</template>
+      The selected filters where too strict and there are no clonotypes left.
+      Please consider relaxing the filters.
     </PlAlert>
     <PlAgDataTableV2
       v-model="app.model.ui.tableState"
