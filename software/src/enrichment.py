@@ -14,7 +14,8 @@ def filter_clonotypes_by_criteria(
     total_reads_dict: Optional[Dict[str, int]] = None,
     present_in_rounds: Optional[List[str]] = None,
     present_in_rounds_logic: str = "OR",
-    pseudo_count: float = 0.0
+    pseudo_count: float = 0.0,
+    n_clonotypes: Optional[int] = None
 ) -> pl.DataFrame:
     """
     Filter clonotypes based on specified criteria.
@@ -29,6 +30,8 @@ def filter_clonotypes_by_criteria(
         total_reads_dict: Dictionary mapping condition to total reads (required for min_frequency)
         present_in_rounds: Optional list of rounds to filter clonotypes by presence
         present_in_rounds_logic: Logic for presence filtering ('OR' or 'AND')
+        pseudo_count: Pseudo-count for frequency normalization
+        n_clonotypes: Number of unique clonotypes (for proper pseudo-count normalization)
 
     Returns:
         Filtered DataFrame with same structure as input
@@ -106,7 +109,8 @@ def filter_clonotypes_by_criteria(
             total = total_reads_dict.get(col, 0)
             if total >= 1:
                 # Use same frequency formula with pseudocount as in enrichment calculation
-                freq_filters.append((pl.col(col) + pseudo_count) / (total + pseudo_count) >= min_frequency)
+                # Denominator must include n_clonotypes * pseudo_count to ensure frequencies sum to 1
+                freq_filters.append((pl.col(col) + pseudo_count) / (total + (n_clonotypes * pseudo_count)) >= min_frequency)
         
         if freq_filters:
             min_frequency_filter = pivot_for_filtering.filter(
@@ -331,6 +335,9 @@ def hybrid_enrichment_analysis(
         .collect()
     )
 
+    # Calculate number of unique clonotypes
+    n_clonotypes = aggregated_df.select('elementId').n_unique()
+
     # Generate consistent labels BEFORE filtering based on alphabetical elementId order
     # This ensures each clonotype gets the same label regardless of filtering
     all_element_ids = aggregated_df.select(
@@ -347,7 +354,7 @@ def hybrid_enrichment_analysis(
             filter_single_sample, filter_any_zero, min_abundance,
             min_frequency, total_reads_dict,
             present_in_rounds, present_in_rounds_logic,
-            pseudo_count
+            pseudo_count, n_clonotypes
         )
 
     # Check if we have too few clonotypes after filtering
@@ -383,9 +390,10 @@ def hybrid_enrichment_analysis(
     freq_expressions = []
     for condition in condition_order:
         total = total_reads_dict.get(condition, 1)
-        # Add pseudo_count to both abundance and total reads before normalizing
+        # Add pseudo_count to each clonotype's abundance, so total must be adjusted by n_clonotypes * pseudo_count
+        # This ensures frequencies sum to 1: Σ[(abundance + p) / (total + N*p)] = 1
         freq_expressions.append(
-            ((pl.col(condition) + pseudo_count) / (total + pseudo_count)).alias(f'freq_{condition}')
+            ((pl.col(condition) + pseudo_count) / (total + (n_clonotypes * pseudo_count))).alias(f'freq_{condition}')
         )
 
     # Add frequency columns
