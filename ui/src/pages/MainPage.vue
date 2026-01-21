@@ -239,8 +239,7 @@ const filteringOptions = [
     </PlAlert>
     <PlAlert v-if="filteredTooMuch === true" type="warn" icon>
       <template #title>Too few clonotypes</template>
-      The selected filters where too strict and there are no clonotypes left.
-      Please consider relaxing the filters.
+      Current filters removed all clonotypes. Consider relaxing filter criteria.
     </PlAlert>
     <PlAgDataTableV2
       v-model="app.model.ui.tableState"
