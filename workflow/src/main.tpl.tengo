@@ -87,16 +87,12 @@ wf.body(func(args) {
 	} else {
 		label = "Downsampling: " + downsampling.type
 	}
-	
-	// Add filtering mode to ensure cache differentiation
-	filteringMode := args.filteringMode
-	label = label + " - Filtering: " + filteringMode
 
     trace := pSpec.makeTrace(abundanceSpec,
         {
             type: "milaboratories.clonotype-enrichment",
             importance: 30,
-            label: label
+            label: label + " / " + (args.customBlockLabel || args.defaultBlockLabel)
         })
 
 	// Get abundance table
@@ -162,6 +158,7 @@ wf.body(func(args) {
     }
 
 	// Add filtering flags based on user selection
+	filteringMode := args.filteringMode
 	if filteringMode != "none" {
 		calculateEnrichment = calculateEnrichment.arg("--filter_clonotypes")
 		
