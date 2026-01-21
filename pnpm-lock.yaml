@@ -10,8 +10,8 @@ catalogs:
       specifier: ^2.29.8
       version: 2.29.8
     '@milaboratories/graph-maker':
-      specifier: 1.1.212
-      version: 1.1.212
+      specifier: 1.1.213
+      version: 1.1.213
     '@milaboratories/ts-builder':
       specifier: 1.2.2
       version: 1.2.2
@@ -107,7 +107,7 @@ importers:
     dependencies:
       '@milaboratories/graph-maker':
         specifier: 'catalog:'
-        version: 1.1.212(@milaboratories/pl-model-common@1.23.0)(@platforma-sdk/model@1.51.9)(@platforma-sdk/ui-vue@1.51.9(sortablejs@1.15.6)(typescript@5.6.3))(d3-dispatch@3.0.1)(d3-path@3.1.0)(d3-scale-chromatic@3.1.0)(typescript@5.6.3)
+        version: 1.1.213(@milaboratories/pl-model-common@1.23.0)(@platforma-sdk/model@1.51.9)(@platforma-sdk/ui-vue@1.51.9(sortablejs@1.15.6)(typescript@5.6.3))(d3-dispatch@3.0.1)(d3-path@3.1.0)(d3-scale-chromatic@3.1.0)(typescript@5.6.3)
       '@platforma-sdk/model':
         specifier: 'catalog:'
         version: 1.51.9
@@ -163,7 +163,7 @@ importers:
     dependencies:
       '@milaboratories/graph-maker':
         specifier: 'catalog:'
-        version: 1.1.212(@milaboratories/pl-model-common@1.23.0)(@platforma-sdk/model@1.51.9)(@platforma-sdk/ui-vue@1.51.9(sortablejs@1.15.6)(typescript@5.6.3))(d3-dispatch@3.0.1)(d3-path@3.1.0)(d3-scale-chromatic@3.1.0)(typescript@5.6.3)
+        version: 1.1.213(@milaboratories/pl-model-common@1.23.0)(@platforma-sdk/model@1.51.9)(@platforma-sdk/ui-vue@1.51.9(sortablejs@1.15.6)(typescript@5.6.3))(d3-dispatch@3.0.1)(d3-path@3.1.0)(d3-scale-chromatic@3.1.0)(typescript@5.6.3)
       '@platforma-open/milaboratories.clonotype-enrichment.model':
         specifier: workspace:*
         version: link:../model
@@ -1049,8 +1049,8 @@ packages:
       typescript: ~5.6.3
       typescript-eslint: ^8.17.0
 
-  '@milaboratories/graph-maker@1.1.212':
-    resolution: {integrity: sha512-jpJS/seJhVP8gcmqF3ymOqd+O0BCxAHbMAUUnU08ePcYW7BFxAi7sXDPEzvs7U0F7btAFU9fbNQqvj+AWEQ3mw==}
+  '@milaboratories/graph-maker@1.1.213':
+    resolution: {integrity: sha512-RQQozlO38/9P23oeaI2+k0HqUFFrIcpQjX15rSAKCnGEjtT7Y3a0Sucoba59Jj5OoDzTaNlJvSOaXjxqTmJ/PQ==}
     peerDependencies:
       '@platforma-sdk/model': ^1.51.5
       '@platforma-sdk/ui-vue': ^1.51.5
@@ -1070,8 +1070,8 @@ packages:
     resolution: {integrity: sha512-ZOUrmQRfuuDqbr+l8gFrIH4+e/60qGyMER2ClaiZxLalFiqAAPMc55zZY1o8KuFZ8tm+qt+MD1rPhC0kJnE4Qg==}
     engines: {node: '>=22.19.0'}
 
-  '@milaboratories/pf-plots@1.1.59':
-    resolution: {integrity: sha512-y9cxHSEKjkb0UirqhEO8Xu7cSHoOn8Iw8z8Xwx2ib2kT9lB1du7Oq/Xbaf+txQUsHHrGHCRxAApU21HlhNooFg==}
+  '@milaboratories/pf-plots@1.1.60':
+    resolution: {integrity: sha512-C/CuKa8+TrGoNiJmIhIBE8EUuZ9zmGXkG2FdF+t7hTbDq3C9grrF7YfojOIkvKVFpbOzJDPNBmQrez9sOiNKjA==}
     peerDependencies:
       '@milaboratories/pl-model-common': ^1.23.0
       '@platforma-sdk/model': ^1.51.5
@@ -7262,12 +7262,12 @@ snapshots:
       typescript: 5.6.3
       typescript-eslint: 8.24.0(eslint@9.39.2)(typescript@5.6.3)
 
-  '@milaboratories/graph-maker@1.1.212(@milaboratories/pl-model-common@1.23.0)(@platforma-sdk/model@1.51.9)(@platforma-sdk/ui-vue@1.51.9(sortablejs@1.15.6)(typescript@5.6.3))(d3-dispatch@3.0.1)(d3-path@3.1.0)(d3-scale-chromatic@3.1.0)(typescript@5.6.3)':
+  '@milaboratories/graph-maker@1.1.213(@milaboratories/pl-model-common@1.23.0)(@platforma-sdk/model@1.51.9)(@platforma-sdk/ui-vue@1.51.9(sortablejs@1.15.6)(typescript@5.6.3))(d3-dispatch@3.0.1)(d3-path@3.1.0)(d3-scale-chromatic@3.1.0)(typescript@5.6.3)':
     dependencies:
       '@ag-grid-community/core': 32.3.9
       '@milaboratories/helpers': 1.13.0
       '@milaboratories/miplots4': 1.0.167(d3-dispatch@3.0.1)(d3-path@3.1.0)(d3-scale-chromatic@3.1.0)
-      '@milaboratories/pf-plots': 1.1.59(@milaboratories/pl-model-common@1.23.0)(@platforma-sdk/model@1.51.9)
+      '@milaboratories/pf-plots': 1.1.60(@milaboratories/pl-model-common@1.23.0)(@platforma-sdk/model@1.51.9)
       '@platforma-sdk/model': 1.51.9
       '@platforma-sdk/ui-vue': 1.51.9(sortablejs@1.15.6)(typescript@5.6.3)
       '@types/d3-hierarchy': 3.1.7
@@ -7338,7 +7338,7 @@ snapshots:
       - encoding
       - supports-color
 
-  '@milaboratories/pf-plots@1.1.59(@milaboratories/pl-model-common@1.23.0)(@platforma-sdk/model@1.51.9)':
+  '@milaboratories/pf-plots@1.1.60(@milaboratories/pl-model-common@1.23.0)(@platforma-sdk/model@1.51.9)':
     dependencies:
       '@milaboratories/pl-model-common': 1.23.0
       '@platforma-sdk/model': 1.51.9
