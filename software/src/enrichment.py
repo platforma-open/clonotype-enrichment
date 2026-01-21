@@ -13,7 +13,8 @@ def filter_clonotypes_by_criteria(
     min_frequency: float = 0.0,
     total_reads_dict: Optional[Dict[str, int]] = None,
     present_in_rounds: Optional[List[str]] = None,
-    present_in_rounds_logic: str = "OR"
+    present_in_rounds_logic: str = "OR",
+    pseudo_count: float = 0.0
 ) -> pl.DataFrame:
     """
     Filter clonotypes based on specified criteria.
@@ -104,7 +105,8 @@ def filter_clonotypes_by_criteria(
         for col in condition_cols:
             total = total_reads_dict.get(col, 0)
             if total >= 1:
-                freq_filters.append(pl.col(col) / total >= min_frequency)
+                # Use same frequency formula with pseudocount as in enrichment calculation
+                freq_filters.append((pl.col(col) + pseudo_count) / (total + pseudo_count) >= min_frequency)
         
         if freq_filters:
             min_frequency_filter = pivot_for_filtering.filter(
@@ -215,9 +217,6 @@ def hybrid_enrichment_analysis(
     top_enriched_csv: str,
     top_20_csv: Optional[str] = None,
     highest_enrichment_csv: Optional[str] = None,
-    use_penalty: bool = True,
-    penalty_enrich: int = 2,
-    penalty_deplete: int = 10,
     top_n_bubble: int = 20,
     top_n_enriched: int = 5,
     min_enrichment: float = 3,
@@ -229,7 +228,8 @@ def hybrid_enrichment_analysis(
     present_in_rounds: Optional[List[str]] = None,
     present_in_rounds_logic: str = "OR",
     clonotype_definition_csv: Optional[str] = None,
-    filtered_too_much_txt: Optional[str] = None
+    filtered_too_much_txt: Optional[str] = None,
+    pseudo_count: float = 0.0
 ) -> None:
     """
     Optimized hybrid enrichment analysis using polars for better performance and memory efficiency.
@@ -241,6 +241,7 @@ def hybrid_enrichment_analysis(
     - min_abundance: Minimum abundance threshold for clonotypes (maximum across all conditions >= threshold)
     - present_in_rounds: List of rounds to filter clonotypes by presence
     - present_in_rounds_logic: Logic for presence filtering ('OR' or 'AND')
+    - pseudo_count: Constant to add to abundance values for enrichment and frequency calculation
     """
     # Read data with polars lazy evaluation
     input_df = pl.scan_csv(input_data_csv)
@@ -345,10 +346,11 @@ def hybrid_enrichment_analysis(
             aggregated_df, condition_order, 
             filter_single_sample, filter_any_zero, min_abundance,
             min_frequency, total_reads_dict,
-            present_in_rounds, present_in_rounds_logic
+            present_in_rounds, present_in_rounds_logic,
+            pseudo_count
         )
 
-    # Check if we have too few clonotypes only after filtering
+    # Check if we have too few clonotypes after filtering
     if filtered_too_much_txt:
         unique_clonotypes_count = aggregated_df.select('elementId').n_unique()
         # It's only "filtered too much" if we had at least 2 clonotypes and now we have fewer
@@ -382,10 +384,9 @@ def hybrid_enrichment_analysis(
     freq_expressions = []
     for condition in condition_order:
         total = total_reads_dict.get(condition, 1)
-        if total == 0:
-            total = 1
+        # Add pseudo_count to both abundance and total reads before normalizing
         freq_expressions.append(
-            (pl.col(condition) / total).alias(f'freq_{condition}')
+            ((pl.col(condition) + pseudo_count) / (total + pseudo_count)).alias(f'freq_{condition}')
         )
 
     # Add frequency columns
@@ -393,7 +394,7 @@ def hybrid_enrichment_analysis(
 
     # Calculate enrichments efficiently using vectorized operations
     enrichment_results = _calculate_enrichments_vectorized(
-        pivot_df, condition_order, total_reads_dict, use_penalty, penalty_enrich, penalty_deplete
+        pivot_df, condition_order, total_reads_dict
     )
 
     # Add elementId back as the first column (matching pandas index->column conversion)
@@ -424,27 +425,11 @@ def hybrid_enrichment_analysis(
 def _calculate_enrichments_vectorized(
     pivot_df: pl.DataFrame,
     condition_order: List[str],
-    total_reads_dict: Dict[str, int],
-    use_penalty: bool,
-    penalty_enrich: int,
-    penalty_deplete: int
+    total_reads_dict: Dict[str, int]
 ) -> pl.DataFrame:
     """
     Calculate enrichments using vectorized operations for better performance.
     """
-    # Calculate min non-zero abundance for penalty calculations
-    abundance_cols = [
-        col for col in pivot_df.columns if col in condition_order]
-
-    if use_penalty:
-        # Calculate min non-zero abundance per row efficiently
-        min_nonzero_expr = pl.concat_list([
-            pl.when(pl.col(col) > 0).then(pl.col(col)).otherwise(None)
-            for col in abundance_cols
-        ]).list.min().fill_null(1).alias('min_nonzero_abundance')
-
-        pivot_df = pivot_df.with_columns(min_nonzero_expr)
-
     # Calculate all pairwise enrichments efficiently
     enrichment_exprs = []
     freq_exprs = []
@@ -461,50 +446,12 @@ def _calculate_enrichments_vectorized(
             enrichment_col_name = f'Enrichment {numerator} vs {denominator}'
             enrichment_col_names.append(enrichment_col_name)
 
-            if use_penalty:
-                # This logic has been rewritten to EXACTLY match the original pandas implementation.
-                # The original code creates two separate frequency dictionaries (num_freqs, den_freqs)
-                # and only populates them if certain conditions are met. This vectorized version
-                # replicates that behavior precisely.
+            # Calculate enrichment: only when both numerator and denominator are non-zero
+            num_freq_expr = pl.col(f'freq_{numerator}')
+            den_freq_expr = pl.col(f'freq_{denominator}')
 
-                # Numerator frequency expression:
-                # A penalty is applied only if the clonotype abundance is 0 AND it's not the FIRST condition.
-                num_freq_expr = pl.when(pl.col(numerator) > 0).then(
-                    pl.col(f'freq_{numerator}')
-                ).otherwise(
-                    pl.when(numerator != condition_order[0]).then(
-                        pl.col('min_nonzero_abundance').cast(pl.Float64) /
-                        (penalty_deplete * total_reads_dict.get(numerator, 1))
-                        # Use 0.0 if it's the first condition with 0 abundance
-                    ).otherwise(0.0)
-                )
-
-                # Denominator frequency expression:
-                # A penalty is applied only if the clonotype abundance is 0 AND it's not the LAST condition.
-                den_freq_expr = pl.when(pl.col(denominator) > 0).then(
-                    pl.col(f'freq_{denominator}')
-                ).otherwise(
-                    pl.when(denominator != condition_order[-1]).then(
-                        pl.col('min_nonzero_abundance').cast(
-                            pl.Float64) / (penalty_enrich * total_reads_dict.get(denominator, 1))
-                        # Use 0.0 if it's the last condition with 0 abundance
-                    ).otherwise(0.0)
-                )
-            else:
-                # Fixed bug for no_penalty case: add pseudocount for 0 abundance
-                num_total = total_reads_dict.get(numerator, 1)
-                num_freq_expr = pl.when(pl.col(numerator) > 0).then(
-                    pl.col(f'freq_{numerator}')
-                ).otherwise(1.0 / num_total)
-
-                den_total = total_reads_dict.get(denominator, 1)
-                den_freq_expr = pl.when(pl.col(denominator) > 0).then(
-                    pl.col(f'freq_{denominator}')
-                ).otherwise(1.0 / den_total)
-
-            # Calculate enrichment with proper handling of edge cases
             enrichment_expr = (
-                pl.when(den_freq_expr > 0)
+                pl.when((num_freq_expr > 0) & (den_freq_expr > 0))
                 .then((num_freq_expr / den_freq_expr).log(2))
                 .otherwise(None)
                 .alias(enrichment_col_name)
@@ -797,9 +744,6 @@ if __name__ == "__main__":
     parser.add_argument("--top_20", required=False)
     parser.add_argument("--highest_enrichment_clonotype", required=False,
                         help="Optional CSV output for rows with the highest enrichment per elementId-Label combination.")
-    parser.add_argument("--use_penalty", action="store_true")
-    parser.add_argument("--penalty_enrich", type=int, default=2)
-    parser.add_argument("--penalty_deplete", type=int, default=10)
     parser.add_argument("--top_n_bubble", type=int, default=20)
     parser.add_argument("--top_n_enriched", type=int, default=5)
     parser.add_argument("--min_enrichment", required=False,
@@ -822,6 +766,8 @@ if __name__ == "__main__":
                         help="Path to clonotype definition CSV file.")
     parser.add_argument("--filtered_too_much", required=False,
                         help="Path to save whether filters left too few clonotypes (true/false)")
+    parser.add_argument("--pseudo_count", type=float, default=0.0,
+                        help="Constant to add to abundance values for enrichment and frequency calculations")
 
     args = parser.parse_args()
 
@@ -833,9 +779,6 @@ if __name__ == "__main__":
         top_enriched_csv=args.top_enriched,
         top_20_csv=args.top_20,
         highest_enrichment_csv=args.highest_enrichment_clonotype,
-        use_penalty=args.use_penalty,
-        penalty_enrich=args.penalty_enrich,
-        penalty_deplete=args.penalty_deplete,
         top_n_bubble=args.top_n_bubble,
         top_n_enriched=args.top_n_enriched,
         min_enrichment=args.min_enrichment,
@@ -847,5 +790,6 @@ if __name__ == "__main__":
         present_in_rounds=json.loads(args.present_in_rounds) if args.present_in_rounds else None,
         present_in_rounds_logic=args.present_in_rounds_logic,
         clonotype_definition_csv=args.clonotype_definition,
-        filtered_too_much_txt=args.filtered_too_much
+        filtered_too_much_txt=args.filtered_too_much,
+        pseudo_count=args.pseudo_count
     )

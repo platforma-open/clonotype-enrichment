@@ -92,6 +92,10 @@ wf.body(func(args) {
 	FilteringConfig := args.FilteringConfig
 	label = label + " - Filtering: " + FilteringConfig.baseFilter
 
+	if args.pseudoCount > 0 {
+		label = label + " - Pseudo: " + string(args.pseudoCount)
+	}
+
 	// Get abundance table
 	cloneTable := pframes.csvFileBuilder() 
 	cloneTable.add(columns.getColumn(args.abundanceRef), {header: "abundance"})
@@ -146,6 +150,7 @@ wf.body(func(args) {
 		arg("--bubble").arg("bubble_data.csv").
 		arg("--top_enriched").arg("top_enriched.csv").
 		arg("--top_20").arg("top_20.csv").
+		arg("--pseudo_count").arg(string(args.pseudoCount)).
 		// arg("--min_enrichment").arg(string(enrichmentThreshold)).
 		arg("--highest_enrichment_clonotype").arg("highest_enrichment_clonotype.csv").
 		arg("--filtered_too_much").arg("filtered_too_much.txt")

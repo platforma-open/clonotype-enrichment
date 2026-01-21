@@ -379,6 +379,17 @@ const filteringOptions = [
     </PlAccordionSection>
 
     <PlAccordionSection label="Advanced Settings">
+      <PlNumberField
+        v-model="app.model.args.pseudoCount"
+        label="Pseudo-count"
+        :minValue="0"
+        :step="1"
+        placeholder="100"
+      >
+        <template #tooltip>
+          (Default: 100) Represents detection threshold for display campaigns. For <em>in vivo</em> studies, consider lower values (10-50).
+        </template>
+      </PlNumberField>
       <PlDropdownMulti
         v-if="!isClusterId"
         v-model="app.model.args.clonotypeDefinition"

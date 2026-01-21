@@ -56,6 +56,7 @@ export type BlockArgs = {
   FilteringConfig: FilteringConfig;
   clonotypeDefinition: SUniversalPColumnId[];
   additionalEnrichmentExports: string[];
+  pseudoCount: number; // Default: 100
 };
 
 export const model = BlockModel.create()
@@ -83,6 +84,7 @@ export const model = BlockModel.create()
       },
     },
     additionalEnrichmentExports: [],
+    pseudoCount: 100,
   })
 
   .withUiState<UiState>({
