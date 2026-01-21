@@ -353,8 +353,7 @@ def hybrid_enrichment_analysis(
     # Check if we have too few clonotypes after filtering
     if filtered_too_much_txt:
         unique_clonotypes_count = aggregated_df.select('elementId').n_unique()
-        # It's only "filtered too much" if we had at least 2 clonotypes and now we have fewer
-        too_few = "true" if (unique_clonotypes_count < 2) else "false"
+        too_few = "true" if (unique_clonotypes_count < 1) else "false"
         with open(filtered_too_much_txt, 'w') as f:
             f.write(too_few)
 
