@@ -39,6 +39,16 @@ type FilteringConfig = {
   };
 };
 
+type ControlConfig = {
+  enabled: boolean;
+  antigenColumnRef?: SUniversalPColumnId; // Metadata column for antigen/control
+  targetConditions: string[]; // e.g., ["Target-Antigen"]
+  negativeConditions: string[]; // e.g., ["BSA", "Plastic"]
+  targetThreshold: number; // Default: 2.0 log2 FC
+  controlThreshold: number; // Default: 1.0 log2 FC
+  controlConditionsOrder: string[]; // e.g., ["BSA", "Plastic"]
+};
+
 export type UiState = {
   tableState: PlDataTableStateV2;
   bubbleState: GraphMakerState;
@@ -56,6 +66,7 @@ export type BlockArgs = {
   FilteringConfig: FilteringConfig;
   clonotypeDefinition: SUniversalPColumnId[];
   additionalEnrichmentExports: string[];
+  controlConfig: ControlConfig;
   pseudoCount: number; // Default: 100
 };
 
@@ -84,6 +95,14 @@ export const model = BlockModel.create()
       },
     },
     additionalEnrichmentExports: [],
+    controlConfig: {
+      enabled: false,
+      targetConditions: [],
+      negativeConditions: [],
+      targetThreshold: 2.0,
+      controlThreshold: 1.0,
+      controlConditionsOrder: [],
+    },
     pseudoCount: 100,
   })
 
@@ -116,9 +135,21 @@ export const model = BlockModel.create()
     },
   })
 
-  .argsValid((ctx) => ctx.args.abundanceRef !== undefined
-    && ctx.args.conditionColumnRef !== undefined
-    && ctx.args.conditionOrder.length > 0)
+  .argsValid((ctx) => {
+    const { abundanceRef, conditionColumnRef, conditionOrder, controlConfig } = ctx.args;
+    const basicValid = abundanceRef !== undefined
+      && conditionColumnRef !== undefined
+      && conditionOrder.length > 0;
+
+    if (!basicValid) return false;
+
+    if (controlConfig.enabled) {
+      const { antigenColumnRef, targetConditions, negativeConditions } = controlConfig;
+      if (!antigenColumnRef || !targetConditions.length || !negativeConditions.length) return false;
+    }
+
+    return true;
+  })
 
   .output('abundanceOptions', (ctx) =>
     ctx.resultPool.getOptions([{
@@ -167,11 +198,8 @@ export const model = BlockModel.create()
   })
 
   .output('conditionValues', (ctx) => {
-    const conditionColumnRef = ctx.args.conditionColumnRef;
-    if (!conditionColumnRef) return undefined;
-
-    const anchor = ctx.args.abundanceRef;
-    if (anchor === undefined) return undefined;
+    const { conditionColumnRef, abundanceRef: anchor } = ctx.args;
+    if (!conditionColumnRef || !anchor) return undefined;
 
     const pCols = ctx.resultPool.getAnchoredPColumns({ main: anchor },
       JSON.parse(conditionColumnRef) as AnchoredPColumnSelector,
@@ -182,7 +210,62 @@ export const model = BlockModel.create()
     const values = data?.getDataAsJson<Record<string, string>>()?.['data'];
     if (!values) return undefined;
 
+    // Convert all values to strings for consistency
+    return [...new Set(Object.values(values).map((v) => String(v)))];
+  })
+
+  .output('antigenValues', (ctx) => {
+    const config = ctx.args.controlConfig;
+    if (!config?.enabled || !config.antigenColumnRef) return undefined;
+
+    const anchor = ctx.args.abundanceRef;
+    if (anchor === undefined) return undefined;
+
+    const pCols = ctx.resultPool.getAnchoredPColumns({ main: anchor },
+      JSON.parse(config.antigenColumnRef) as AnchoredPColumnSelector,
+    );
+    const data = pCols?.[0]?.data as TreeNodeAccessor | undefined;
+
+    // @TODO need a convenient method in API
+    const values = data?.getDataAsJson<Record<string, string>>()?.['data'];
+    if (!values) return undefined;
+
     return [...new Set(Object.values(values))];
+  })
+
+  .output('negativeControlConditionValues', (ctx) => {
+    const config = ctx.args.controlConfig;
+    if (!config?.enabled) return undefined;
+
+    const { negativeConditions, antigenColumnRef } = config;
+    if (!negativeConditions?.length || !antigenColumnRef) return undefined;
+
+    const { conditionColumnRef, abundanceRef: anchor } = ctx.args;
+    if (!conditionColumnRef || !anchor) return undefined;
+
+    const getValues = (ref: string) => {
+      const pCols = ctx.resultPool.getAnchoredPColumns({ main: anchor }, JSON.parse(ref) as AnchoredPColumnSelector);
+      return (pCols?.[0]?.data as TreeNodeAccessor | undefined)?.getDataAsJson<{ data: Record<string, string> }>()?.data;
+    };
+
+    const antigenValues = getValues(antigenColumnRef);
+    const conditionValues = getValues(conditionColumnRef);
+
+    if (!antigenValues || !conditionValues) return undefined;
+
+    // Find condition values for samples with negative antigen values
+    const negativeControlConditions = new Set<string>();
+    for (const [sampleId, antigenValue] of Object.entries(antigenValues)) {
+      if (negativeConditions.includes(antigenValue)) {
+        const conditionValue = conditionValues[sampleId];
+        if (conditionValue !== undefined && conditionValue !== null) {
+          // Convert to string immediately
+          negativeControlConditions.add(String(conditionValue));
+        }
+      }
+    }
+
+    return [...negativeControlConditions];
   })
 
   // Get all enrichment statistics
