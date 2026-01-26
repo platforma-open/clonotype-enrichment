@@ -224,7 +224,7 @@ wf.body(func(args) {
 
 	// Convert script outputs to Pframes
 	enrichCsv := calculateEnrichment.getFile("enrichment_results.csv")
-	enrichmentImportParams := pfEnrichmentConv.getColumns(abundanceSpec, conditionOrder, controlConfig.targetCondition)
+	enrichmentImportParams := pfEnrichmentConv.getColumns(abundanceSpec, conditionOrder, controlConfig.enabled)
 	enrichmentPf := xsv.importFile(enrichCsv, "csv", enrichmentImportParams,
 									{ cpu: 1, mem: "32GiB" })
 

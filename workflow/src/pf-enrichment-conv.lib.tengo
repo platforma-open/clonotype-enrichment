@@ -2,7 +2,7 @@ ll := import("@platforma-sdk/workflow-tengo:ll")
 maps := import("@platforma-sdk/workflow-tengo:maps")
 strings := import("@platforma-sdk/workflow-tengo:strings")
 
-getColumns := func(countsSpec, conditionOrder, targetCondition) {
+getColumns := func(countsSpec, conditionOrder, controlEnabled) {
   columns := []
   for idx, condition in conditionOrder {
     columns = columns + [{
@@ -58,7 +58,6 @@ getColumns := func(countsSpec, conditionOrder, targetCondition) {
           domain: {
             "pl7.app/vdj/enrichment/type": "overall",
             "pl7.app/vdj/enrichment/comparison": conditionOrder[len(conditionOrder) - 1] + " vs " + conditionOrder[0],
-            "pl7.app/vdj/antigenType": targetCondition,
             "pl7.app/comparison": "Overall Enrichment"
           },
           annotations: {
@@ -81,7 +80,10 @@ getColumns := func(countsSpec, conditionOrder, targetCondition) {
             "pl7.app/format": ".2f"
           }
         }
-      }, {
+      }]
+
+  if controlEnabled {
+    columns = columns + [{
         column: "MaxNegControlEnrichment",
         id: "maxnegcontrolenrichment",
         allowNA: true,
@@ -96,6 +98,7 @@ getColumns := func(countsSpec, conditionOrder, targetCondition) {
           }
         }
       }]
+  }
     
   return {
     axes: [

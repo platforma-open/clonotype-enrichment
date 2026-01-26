@@ -11,15 +11,8 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, downsampling,
     specLabel = opts[0].label
   }
 
-  return {
-    axes: [
-      {
-        column: "elementId",
-        spec: abundanceSpec.axesSpec[1]
-      }
-      ],
-    columns: [
-      {
+  // Define columns for exports
+  columns := [{
         column: "Enrichment",
         id: "enrichment",
         allowNA: true,
@@ -44,8 +37,10 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, downsampling,
             "pl7.app/format": ".2f"
           }
         }
-      },
-      {
+      }]
+
+  // Overal Log2FC will only have antigenType when it is defined
+  overallColumn := {
         column: "Overall Log2FC",
         id: "overall_log2fc",
         allowNA: true,
@@ -56,7 +51,6 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, downsampling,
             "pl7.app/downsampling": canonical.encode(downsampling),
             "pl7.app/vdj/enrichment/type": "overall",
             "pl7.app/vdj/enrichment/comparison": conditionOrder[len(conditionOrder) - 1] + " vs " + conditionOrder[0],
-            "pl7.app/vdj/antigenType": targetCondition,
             "pl7.app/comparison": "Overall Enrichment"
           },
           annotations: {
@@ -67,7 +61,20 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, downsampling,
           }
         }
       }
-    ],
+  
+  if targetCondition {
+    overallColumn.spec.domain["pl7.app/vdj/antigenType"] = targetCondition
+  }
+  columns = columns + [overallColumn]
+
+  return {
+    axes: [
+      {
+        column: "elementId",
+        spec: abundanceSpec.axesSpec[1]
+      }
+      ],
+    columns: columns,
     storageFormat: "Parquet",
     partitionKeyLength: 0
   }

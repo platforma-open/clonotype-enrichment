@@ -176,6 +176,7 @@ def create_empty_outputs(
             enrichment_schema[f'Enrichment {numerator} vs {denominator}'] = pl.Float64
     ## Add MaxPositiveEnrichment column
     enrichment_schema['MaxPositiveEnrichment'] = pl.Float64
+    enrichment_schema['Overall Log2FC'] = pl.Float64
     
     empty_enrichment = pl.DataFrame(schema=enrichment_schema)
     empty_enrichment.write_csv(enrichment_csv)
@@ -203,7 +204,9 @@ def create_empty_outputs(
         empty_highest = pl.DataFrame(schema={
             'elementId': pl.Utf8, 'Label': pl.Utf8, 'Comparison': pl.Utf8,
             'Numerator': pl.Utf8, 'Denominator': pl.Utf8, 'Enrichment': pl.Float64,
-            'Frequency_Numerator': pl.Float64
+            'Frequency_Numerator': pl.Float64, 
+            'Overall Log2FC': pl.Float64,
+            'MaxPositiveEnrichment': pl.Float64
         })
         empty_highest.write_csv(highest_enrichment_csv)
 
@@ -652,28 +655,11 @@ def _process_outputs(
     enrichment_cols = [
         col for col in enrichment_results.collect_schema().names() if col.startswith('Enrichment ')]
 
-    # Add Overall Log2FC and MaxPositiveEnrichment to the bubble and top enriched logic if they exist
-    extra_cols = []
-    if 'Overall Log2FC' in enrichment_results.collect_schema().names():
-        extra_cols.append('Overall Log2FC')
-    if 'MaxPositiveEnrichment' in enrichment_results.collect_schema().names():
-        extra_cols.append('MaxPositiveEnrichment')
-    if 'MaxNegControlEnrichment' in enrichment_results.collect_schema().names():
-        extra_cols.append('MaxNegControlEnrichment')
-
     if enrichment_cols:
         # Create detailed enrichment table efficiently
         enrichment_detailed = _create_detailed_enrichment_table(
             enrichment_results, enrichment_cols, condition_order
         )
-        
-        # Add extra columns to detailed table if they exist
-        if extra_cols:
-            enrichment_detailed = enrichment_detailed.join(
-                enrichment_results.select(['elementId', 'Label'] + extra_cols),
-                on=['elementId', 'Label'],
-                how='left'
-            )
 
         # Save highest enrichment if requested
         if highest_enrichment_csv:
@@ -707,7 +693,8 @@ def _process_outputs(
     else:
         # Create empty outputs if no enrichment columns
         empty_cols = ['elementId', 'Label', 'Comparison', 'Numerator',
-                      'Denominator', 'Enrichment', 'Frequency_Numerator']
+                      'Denominator', 'Enrichment', 'Frequency_Numerator',
+                      'Overall Log2FC', 'MaxPositiveEnrichment']
         empty_df = pl.DataFrame(schema={col: pl.Utf8 if col in [
                                 'elementId', 'Label', 'Comparison', 'Numerator', 'Denominator'] else pl.Float64 for col in empty_cols})
 
@@ -727,12 +714,19 @@ def _create_detailed_enrichment_table(
     """
     Create detailed enrichment table efficiently using polars operations.
     """
+    # Identify additional columns to preserve
+    extra_cols = []
+    for col in ['Overall Log2FC']:
+        if col in enrichment_results.columns:
+            extra_cols.append(col)
+
     # Melt enrichment data
+    id_vars = ['elementId', 'Label'] + extra_cols
     enrichment_melted = (
         enrichment_results
-        .select(['elementId', 'Label'] + enrichment_cols)
+        .select(id_vars + enrichment_cols)
         .melt(
-            id_vars=['elementId', 'Label'],
+            id_vars=id_vars,
             value_vars=enrichment_cols,
             variable_name='Comparison',
             value_name='Enrichment'
@@ -775,7 +769,7 @@ def _create_detailed_enrichment_table(
         how='left'
     ).select([
         'elementId', 'Label', 'comparison_clean', 'Numerator', 'Denominator', 'Enrichment', 'Frequency_Numerator'
-    ]).rename({'comparison_clean': 'Comparison'})
+    ] + extra_cols).rename({'comparison_clean': 'Comparison'})
 
     return result
 
