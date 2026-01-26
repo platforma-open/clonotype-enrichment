@@ -89,12 +89,12 @@ self.body(func(args) {
         overallData: exportFile["overall_log2fc.data"]
     }
 
-    if controlConfig.enabled == true {
+    if controlConfig != undefined && controlConfig.enabled == true {
         res.bindingSpecificitySpec = trace.inject(exportFile["binding_specificity.spec"])
         res.bindingSpecificityData = exportFile["binding_specificity.data"]
     } else {
-        res.bindingSpecificitySpec = undefined
-        res.bindingSpecificityData = undefined
+        res.bindingSpecificitySpec = "empty"
+        res.bindingSpecificityData = "empty"
     }
 
     return res

@@ -15,7 +15,7 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, downsampling,
   targetCondition := undefined
   targetThreshold := undefined
   controlThreshold := undefined
-  if controlConfig.enabled == true {
+  if controlConfig != undefined && controlConfig.enabled == true {
     targetCondition = controlConfig.targetCondition
     targetThreshold = string(controlConfig.targetThreshold)
     controlThreshold = string(controlConfig.controlThreshold)
