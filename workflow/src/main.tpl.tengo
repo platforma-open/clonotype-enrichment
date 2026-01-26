@@ -18,6 +18,7 @@ pfEnrichmentConv := import(":pf-enrichment-conv")
 pfFrequencyConv := import(":pf-frequency-conv")
 pfBubbleConv := import(":pf-bubble-conv")
 pfStackedConv := import(":pf-stacked-conv")
+pfControlScatterConv := import(":pf-control-scatter-conv")
 
 // Helper function to calculate annotation values for enrichment data
 calculateAnnotationValues := func(inputFile, enrichmentColumn) {
@@ -229,6 +230,12 @@ wf.body(func(args) {
 	enrichmentImportParams := pfEnrichmentConv.getColumns(abundanceSpec, conditionOrder, controlConfig.enabled)
 	enrichmentPf := xsv.importFile(enrichCsv, "csv", enrichmentImportParams,
 									{ cpu: 1, mem: "32GiB" })
+	controlScatterPf := undefined
+	if controlConfig.enabled {
+		controlScatterImportParams := pfControlScatterConv.getColumns(abundanceSpec)
+		controlScatterPf = xsv.importFile(enrichCsv, "csv", controlScatterImportParams,
+			{ cpu: 1, mem: "32GiB" })
+	}
 
 	bubbleImportParams := pfBubbleConv.getColumns(abundanceSpec)
 	bubblePf := xsv.importFile(calculateEnrichment.getFile("bubble_data.csv"), "csv", bubbleImportParams,
@@ -335,15 +342,21 @@ wf.body(func(args) {
 	exports := buildExports.output("exports")
 	outStats := buildExports.output("outStats")
 
-	return {
-		outputs: {
+	// Define outputs
+	outputs := {
 			outStats: outStats,
 			enrichmentPf: pframes.exportFrame(enrichmentPf),
 			bubblePf: pframes.exportFrame(bubblePf),
 			stackedPf: pframes.exportFrame(stackedPf),
 			linePf: pframes.exportFrame(linePf),
 			filteredTooMuch: buildExports.output("filteredTooMuch")
-		},
+		}
+	if controlConfig.enabled {
+		outputs.controlScatterPf = pframes.exportFrame(controlScatterPf)
+	}
+
+	return {
+		outputs: outputs,
 		exports: {
 			pf: exports,
 			frequency: exportsFreq.build(),
