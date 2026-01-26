@@ -33,6 +33,7 @@ calculateAnnotationValues := func(inputFile, enrichmentColumn) {
 		saveFileContent("enrichment_median.txt").
 		saveFileContent("enrichment_mean.txt").
 		saveFileContent("enrichment_75.txt").
+		saveFileContent("overall_75.txt").
 		printErrStreamToStdout().
 		saveStdoutContent().
 		cache(24 * 60 * 60 * 1000).
@@ -43,7 +44,8 @@ calculateAnnotationValues := func(inputFile, enrichmentColumn) {
 		max: annotationValues.getFileContent("enrichment_max.txt"),
 		median: annotationValues.getFileContent("enrichment_median.txt"),
 		mean: annotationValues.getFileContent("enrichment_mean.txt"),
-		cutoff: annotationValues.getFileContent("enrichment_75.txt")
+		cutoff: annotationValues.getFileContent("enrichment_75.txt"),
+		overall75Percentile: annotationValues.getFileContent("overall_75.txt")
 	}
 }
 
@@ -287,6 +289,7 @@ wf.body(func(args) {
 				median: annotationStats.median,
 				mean: annotationStats.mean,
 				cutoff: annotationStats.cutoff,
+				overall75Percentile: annotationStats.overall75Percentile,
 				abundanceSpec: abundanceSpec,
 				inputType: inputType,
 				topEnrichedColCsv: enrichCsv,
@@ -319,6 +322,7 @@ wf.body(func(args) {
 		median: mainAnnotationStats.median,
 		mean: mainAnnotationStats.mean,
 		cutoff: mainAnnotationStats.cutoff,
+		overall75Percentile: mainAnnotationStats.overall75Percentile,
 		downsampling: downsampling,
 		conditionOrder: conditionOrder,
 		controlConfig: controlConfig,

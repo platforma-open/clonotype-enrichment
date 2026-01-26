@@ -1,7 +1,7 @@
 ll := import("@platforma-sdk/workflow-tengo:ll")
 canonical := import("@platforma-sdk/workflow-tengo:canonical")
 
-getColumns := func(abundanceSpec, inputType, min, max, cutoff, downsampling, 
+getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percentile, downsampling, 
                   conditionOrder, controlConfig, blockId, ...opts) {
   ll.assert(len(opts) <= 1, "expected at most one options map")
 
@@ -65,8 +65,11 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, downsampling,
           },
           annotations: {
             "pl7.app/label": "Overall Log2FC",
-            "pl7.app/table/orderPriority": "9000",
-            "pl7.app/table/visibility": "optional",
+            "pl7.app/table/orderPriority": "90",
+            "pl7.app/table/visibility": "default",
+            "pl7.app/isScore": "true",
+            "pl7.app/score/rankValues": "increasing",
+            "pl7.app/score/defaultCutoff": overall75Percentile,
             "pl7.app/format": ".2f"
           }
         }

@@ -21,6 +21,7 @@ self.body(func(args) {
         min: args.min,
         max: args.max,
         cutoff: args.cutoff,
+        overall75Percentile: args.overall75Percentile,
         downsampling: args.downsampling,
         abundanceSpec: args.abundanceSpec,
         inputType: args.inputType,
