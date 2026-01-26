@@ -26,7 +26,7 @@ self.body(func(args) {
         inputType: args.inputType,
         topEnrichedColCsv: args.topEnrichedColCsv,
         conditionOrder: args.conditionOrder,
-        targetCondition: args.targetCondition,
+        controlConfig: args.controlConfig,
         blockId: args.blockId,
         customBlockLabel: args.customBlockLabel,
         defaultBlockLabel: args.defaultBlockLabel
@@ -40,6 +40,13 @@ self.body(func(args) {
         exportColumnRender.output("columnSpec"),
         exportColumnRender.output("columnData")
     )
+    if args.controlConfig.enabled == true {
+        exports.add(
+            "Binding Specificity", 
+            exportColumnRender.output("bindingSpecificitySpec"),
+            exportColumnRender.output("bindingSpecificityData")
+        )
+    }
     exports.add(
         "Enrichment - Overall", 
         exportColumnRender.output("overallSpec"),

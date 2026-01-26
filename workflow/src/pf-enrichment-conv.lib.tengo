@@ -84,6 +84,19 @@ getColumns := func(countsSpec, conditionOrder, controlEnabled) {
 
   if controlEnabled {
     columns = columns + [{
+        column: "Binding Specificity",
+        id: "binding_specificity",
+        allowNA: true,
+        spec: {
+          name: "pl7.app/vdj/bindingSpecificity",
+          valueType: "String",
+          domain: {},
+          annotations: {
+            "pl7.app/label": "Binding Specificity",
+            "pl7.app/table/visibility": "default"
+          }
+        }
+      }, {
         column: "MaxNegControlEnrichment",
         id: "maxnegcontrolenrichment",
         allowNA: true,

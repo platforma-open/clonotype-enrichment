@@ -177,6 +177,8 @@ def create_empty_outputs(
     ## Add MaxPositiveEnrichment column
     enrichment_schema['MaxPositiveEnrichment'] = pl.Float64
     enrichment_schema['Overall Log2FC'] = pl.Float64
+    enrichment_schema['MaxNegControlEnrichment'] = pl.Float64
+    enrichment_schema['Binding Specificity'] = pl.Utf8
     
     empty_enrichment = pl.DataFrame(schema=enrichment_schema)
     empty_enrichment.write_csv(enrichment_csv)
@@ -206,7 +208,8 @@ def create_empty_outputs(
             'Numerator': pl.Utf8, 'Denominator': pl.Utf8, 'Enrichment': pl.Float64,
             'Frequency_Numerator': pl.Float64, 
             'Overall Log2FC': pl.Float64,
-            'MaxPositiveEnrichment': pl.Float64
+            'MaxPositiveEnrichment': pl.Float64,
+            'Binding Specificity': pl.Utf8
         })
         empty_highest.write_csv(highest_enrichment_csv)
 
@@ -553,11 +556,27 @@ def hybrid_enrichment_analysis(
             pl.lit(0.0).alias('MaxNegControlEnrichment')
         )
 
+    # Calculate Binding Specificity if control is enabled
+    if control_enabled:
+        target_expr = pl.col('MaxPositiveEnrichment')
+        control_expr = pl.col('MaxNegControlEnrichment')
+        
+        enrichment_results = enrichment_results.with_columns(
+            pl.when((target_expr >= target_threshold) & (control_expr < control_threshold))
+            .then(pl.lit("Antigen-Specific"))
+            .when((target_expr >= target_threshold) & (control_expr >= control_threshold))
+            .then(pl.lit("Non-Specific"))
+            .when((target_expr < target_threshold) & (control_expr >= control_threshold))
+            .then(pl.lit("Negative-Control"))
+            .otherwise(pl.lit("Not-Enriched"))
+            .alias('Binding Specificity')
+        )
+
     # Apply label mapping
     enrichment_results = enrichment_results.join(
         label_mapping, on='elementId', how='left')
 
-    # Reorder columns: elementId, Label, Overall Log2FC, MaxPositiveEnrichment, MaxNegControlEnrichment, then others
+    # Reorder columns: elementId, Label, then others
     cols_to_front = ['elementId', 'Label']
     other_cols = [col for col in enrichment_results.collect_schema().names() if col not in cols_to_front]
     enrichment_results = enrichment_results.select(cols_to_front + other_cols)
@@ -716,7 +735,7 @@ def _create_detailed_enrichment_table(
     """
     # Identify additional columns to preserve
     extra_cols = []
-    for col in ['Overall Log2FC']:
+    for col in ['Overall Log2FC', 'Binding Specificity']:
         if col in enrichment_results.columns:
             extra_cols.append(col)
 

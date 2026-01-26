@@ -2,13 +2,23 @@ ll := import("@platforma-sdk/workflow-tengo:ll")
 canonical := import("@platforma-sdk/workflow-tengo:canonical")
 
 getColumns := func(abundanceSpec, inputType, min, max, cutoff, downsampling, 
-                  conditionOrder, targetCondition, blockId, ...opts) {
+                  conditionOrder, controlConfig, blockId, ...opts) {
   ll.assert(len(opts) <= 1, "expected at most one options map")
 
   specLabel := "Max Log2FC"
 
   if len(opts) == 1 {
     specLabel = opts[0].label
+  }
+
+  // Extract control info
+  targetCondition := undefined
+  targetThreshold := undefined
+  controlThreshold := undefined
+  if controlConfig.enabled == true {
+    targetCondition = controlConfig.targetCondition
+    targetThreshold = string(controlConfig.targetThreshold)
+    controlThreshold = string(controlConfig.controlThreshold)
   }
 
   // Define columns for exports
@@ -64,6 +74,33 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, downsampling,
   
   if targetCondition {
     overallColumn.spec.domain["pl7.app/vdj/antigenType"] = targetCondition
+
+    columns = columns + [{
+        column: "Binding Specificity",
+        id: "binding_specificity",
+        allowNA: true,
+        spec: {
+          name: "pl7.app/vdj/bindingSpecificity",
+          valueType: "String",
+          domain: {
+            "pl7.app/downsampling": canonical.encode(downsampling),
+            "pl7.app/conditionsOrder": canonical.encode(conditionOrder),
+            "pl7.app/vdj/enrichment/targetThreshold": targetThreshold,
+            "pl7.app/vdj/enrichment/controlThreshold": controlThreshold,
+            "pl7.app/blockId": blockId
+          },
+          annotations: {
+            "pl7.app/label": "Binding Specificity",
+            "pl7.app/isDiscreteFilter": "true",
+            "pl7.app/discreteValues": "[\"Antigen-Specific\", \"Non-Specific\", \"Negative-Control\", \"Not-Enriched\"]",
+            "pl7.app/isScore": "true",
+            "pl7.app/score/rankValues": "decreasing",
+            "pl7.app/score/defaultCutoff": "[\"Antigen-Specific\"]",
+            "pl7.app/table/visibility": "default",
+            "pl7.app/table/orderPriority": "100"
+          }
+        }
+      }]
   }
   columns = columns + [overallColumn]
 

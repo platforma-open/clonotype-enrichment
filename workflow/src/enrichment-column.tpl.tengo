@@ -7,7 +7,7 @@ text := import("text")
 
 pfEnrichmentConvExport := import(":pf-enrichment-conv-export")
 
-self.defineOutputs("columnSpec", "columnData", "overallSpec", "overallData")
+self.defineOutputs("columnSpec", "columnData", "bindingSpecificitySpec", "bindingSpecificityData", "overallSpec", "overallData")
 
 self.body(func(args) {
     min := args.min
@@ -18,7 +18,7 @@ self.body(func(args) {
     inputType := args.inputType
     topEnrichedColCsv := args.topEnrichedColCsv
     conditionOrder := args.conditionOrder
-    targetCondition := args.targetCondition
+    controlConfig := args.controlConfig
     blockId := args.blockId
     specOpts := args.specOpts
     customBlockLabel := args.customBlockLabel
@@ -34,7 +34,7 @@ self.body(func(args) {
                                                                 string(cutoff.getData()),
                                                                 downsampling,
                                                                 conditionOrder,
-                                                                targetCondition,
+                                                                controlConfig,
                                                                 blockId,
                                                                 specOpts)
     } else {
@@ -45,7 +45,7 @@ self.body(func(args) {
                                                                 string(cutoff.getData()),
                                                                 downsampling,
                                                                 conditionOrder,
-                                                                targetCondition,
+                                                                controlConfig,
                                                                 blockId)
     }
 
@@ -82,10 +82,20 @@ self.body(func(args) {
             label: label
         })
 
-    return {
+    res := {
         columnSpec: trace.inject(exportFile["enrichment.spec"]),
         columnData: exportFile["enrichment.data"],
         overallSpec: trace.inject(exportFile["overall_log2fc.spec"]),
         overallData: exportFile["overall_log2fc.data"]
     }
+
+    if controlConfig.enabled == true {
+        res.bindingSpecificitySpec = trace.inject(exportFile["binding_specificity.spec"])
+        res.bindingSpecificityData = exportFile["binding_specificity.data"]
+    } else {
+        res.bindingSpecificitySpec = undefined
+        res.bindingSpecificityData = undefined
+    }
+
+    return res
 })
