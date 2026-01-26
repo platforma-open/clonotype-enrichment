@@ -232,7 +232,7 @@ wf.body(func(args) {
 									{ cpu: 1, mem: "32GiB" })
 	controlScatterPf := undefined
 	if controlConfig.enabled {
-		controlScatterImportParams := pfControlScatterConv.getColumns(abundanceSpec)
+		controlScatterImportParams := pfControlScatterConv.getColumns(abundanceSpec, conditionOrder)
 		controlScatterPf = xsv.importFile(enrichCsv, "csv", controlScatterImportParams,
 			{ cpu: 1, mem: "32GiB" })
 	}

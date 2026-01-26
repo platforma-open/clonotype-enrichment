@@ -2,7 +2,8 @@ ll := import("@platforma-sdk/workflow-tengo:ll")
 maps := import("@platforma-sdk/workflow-tengo:maps")
 strings := import("@platforma-sdk/workflow-tengo:strings")
 
-getColumns := func(countsSpec) {
+getColumns := func(countsSpec, conditionOrder) {
+  lastCondition := conditionOrder[len(conditionOrder) - 1]
   columns := []
   
   // Add remaining fixed-name columns
@@ -60,6 +61,24 @@ getColumns := func(countsSpec) {
             "pl7.app/label": "Max control Log2FC",
             "pl7.app/table/visibility": "optional",
             "pl7.app/format": ".2f"
+          }
+        }
+      },
+      {
+        column: "Frequency " + lastCondition,
+        id: strings.substituteSpecialCharacters("frequency_" + lastCondition),
+        allowNA: true,
+        spec: {
+          name: "pl7.app/vdj/frequency",
+          valueType: "Double",
+          domain: {},
+          annotations: {
+            "pl7.app/label": "Frequency " + lastCondition,
+            // add isScore only in exports to ease plots
+            // "pl7.app/vdj/isScore": "true",
+            "pl7.app/table/orderPriority": "8000",
+            "pl7.app/table/visibility": "optional",
+            "pl7.app/format": ".2e"
           }
         }
       }]

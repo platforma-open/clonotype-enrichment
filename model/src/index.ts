@@ -54,6 +54,7 @@ export type UiState = {
   bubbleState: GraphMakerState;
   lineState: GraphMakerState;
   stackedState: GraphMakerState;
+  scatterState: GraphMakerState;
 };
 
 export type BlockArgs = {
@@ -130,6 +131,11 @@ export const model = BlockModel.create()
     stackedState: {
       title: 'Top 5 enriched clonotype frequencies',
       template: 'stackedBar',
+      currentTab: null,
+    },
+    scatterState: {
+      title: 'Binding specificity',
+      template: 'dots',
       currentTab: null,
     },
   })
@@ -400,11 +406,18 @@ export const model = BlockModel.create()
 
   .subtitle((ctx) => ctx.args.customBlockLabel || ctx.args.defaultBlockLabel)
 
-  .sections((_ctx) => ([
-    { type: 'link', href: '/', label: 'Main' },
-    { type: 'link', href: '/buble', label: 'Enriched bubble plot' },
-    { type: 'link', href: '/line', label: 'Frequency line plot' },
-    { type: 'link', href: '/stacked', label: 'Frequency bar plot' },
-  ]))
+  .sections((ctx) => {
+    const sections: Array<{ type: 'link'; href: `/${string}`; label: string }> = [
+      { type: 'link', href: '/', label: 'Main' },
+      { type: 'link', href: '/buble', label: 'Enriched bubble plot' },
+      { type: 'link', href: '/line', label: 'Frequency line plot' },
+      { type: 'link', href: '/stacked', label: 'Frequency bar plot' },
+    ];
+
+    if (ctx.args.controlConfig.enabled) {
+      sections.push({ type: 'link', href: '/scatter', label: 'Control scatter plot' });
+    }
+    return sections;
+  })
 
   .done(2);
