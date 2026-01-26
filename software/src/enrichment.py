@@ -49,13 +49,13 @@ def filter_clonotypes_by_criteria(
 
     # Ensure all conditions are present
     for condition in condition_order:
-        if condition not in pivot_for_filtering.columns:
+        if condition not in pivot_for_filtering.collect_schema().names():
             pivot_for_filtering = pivot_for_filtering.with_columns(
                 pl.lit(0).alias(condition))
 
     # Select condition columns in the specified order
     condition_cols = [
-        col for col in condition_order if col in pivot_for_filtering.columns]
+        col for col in condition_order if col in pivot_for_filtering.collect_schema().names()]
     pivot_for_filtering = pivot_for_filtering.select(
         ['elementId'] + condition_cols)
 
@@ -122,7 +122,7 @@ def filter_clonotypes_by_criteria(
     if present_in_rounds and len(present_in_rounds) > 0:
         # Filter by presence in specific rounds
         # Ensure selected rounds exist in data
-        existing_rounds = [r for r in present_in_rounds if r in pivot_for_filtering.columns and r in condition_order]
+        existing_rounds = [r for r in present_in_rounds if r in pivot_for_filtering.collect_schema().names() and r in condition_order]
         
         if existing_rounds:
             logic = present_in_rounds_logic.upper()
@@ -233,7 +233,13 @@ def hybrid_enrichment_analysis(
     present_in_rounds_logic: str = "OR",
     clonotype_definition_csv: Optional[str] = None,
     filtered_too_much_txt: Optional[str] = None,
-    pseudo_count: float = 0.0
+    pseudo_count: float = 0.0,
+    control_enabled: bool = False,
+    negative_conditions: Optional[List[str]] = None,
+    control_conditions_order: Optional[List[str]] = None,
+    target_threshold: float = 2.0,
+    control_threshold: float = 1.0,
+    current_target: Optional[str] = None
 ) -> None:
     """
     Optimized hybrid enrichment analysis using polars for better performance and memory efficiency.
@@ -249,6 +255,7 @@ def hybrid_enrichment_analysis(
     """
     # Read data with polars lazy evaluation
     input_df = pl.scan_csv(input_data_csv)
+    schema = input_df.collect_schema()
     
     # Check if input data is empty (no clonotypes)
     ## Check if there are any non-null, non-empty elementId value in lazy frame
@@ -274,7 +281,7 @@ def hybrid_enrichment_analysis(
         input_df = input_df.join(clonotype_def_df, on='elementId', how='left')
 
         clonotype_def_cols = [
-            col for col in input_df.columns if col.startswith('clonotypeDefinition_')]
+            col for col in input_df.collect_schema().names() if col.startswith('clonotypeDefinition_')]
 
         if clonotype_def_cols:
             # Calculate new abundance
@@ -300,12 +307,11 @@ def hybrid_enrichment_analysis(
         present_in_rounds = [str(cond) for cond in present_in_rounds]
 
     # Rename and validate columns
-    if "abundance" in input_df.columns:
+    if "abundance" in input_df.collect_schema().names():
         input_df = input_df.drop("abundance")
     input_df = input_df.rename({"downsampledAbundance": "abundance"})
 
     # Validate expected columns - collect only schema to avoid loading full data
-    schema = input_df.collect_schema()
     expected_cols = {'sampleId', 'elementId', 'abundance', 'condition'}
     missing_cols = expected_cols - set(schema.names())
     if missing_cols:
@@ -313,30 +319,38 @@ def hybrid_enrichment_analysis(
             f"Missing expected columns: {', '.join(missing_cols)}")
 
     # Select only needed columns to reduce memory and ensure condition is string type
-    input_df = input_df.select(['elementId', 'abundance', 'condition']).with_columns(
+    needed_cols = ['sampleId', 'elementId', 'abundance', 'condition']
+    has_antigen = "antigen" in input_df.collect_schema().names()
+    if has_antigen:
+        needed_cols.append("antigen")
+    
+    input_df = input_df.select(needed_cols).with_columns(
         pl.col('condition').cast(pl.Utf8))
 
-    # Calculate total reads per condition efficiently
-    total_reads = (
+    # Calculate total reads per condition and antigen if applicable
+    group_total_reads = ['condition']
+    if has_antigen:
+        group_total_reads.append('antigen')
+
+    total_reads_df = (
         input_df
-        .group_by('condition')
+        .group_by(group_total_reads)
         .agg(pl.col('abundance').sum().alias('total_reads'))
         .collect()
-        .to_dict(as_series=False)
     )
-    total_reads_dict = dict(
-        zip(total_reads['condition'], total_reads['total_reads']))
 
     # Create aggregated data first, then pivot (pivot requires DataFrame, not LazyFrame)
+    # We need to keep sampleId and antigen if we want to use them in filtering
+    group_cols = ['sampleId', 'elementId', 'condition']
+    if has_antigen:
+        group_cols.append("antigen")
+
     aggregated_df = (
         input_df
-        .group_by(['elementId', 'condition'])
+        .group_by(group_cols)
         .agg(pl.col('abundance').sum().alias('abundance'))
         .collect()
     )
-
-    # Calculate number of unique clonotypes
-    n_clonotypes = aggregated_df.select('elementId').n_unique()
 
     # Generate consistent labels BEFORE filtering based on alphabetical elementId order
     # This ensures each clonotype gets the same label regardless of filtering
@@ -347,77 +361,203 @@ def hybrid_enrichment_analysis(
          1).map_elements(lambda x: f"C{int(x)}", return_dtype=pl.Utf8).alias('Label')
     ).select(['elementId', 'Label'])
 
-    # Apply clonotype filtering if requested
+    # --- Target Track Processing ---
+    # Get total reads for target track frequencies and filtering
+    if has_antigen and control_enabled and current_target:
+        target_reads = total_reads_df.filter(pl.col('antigen') == current_target)
+        target_total_reads_dict = dict(zip(target_reads['condition'], target_reads['total_reads']))
+    else:
+        # Fallback to global totals if no antigen or control disabled
+        global_reads = total_reads_df.group_by('condition').agg(pl.col('total_reads').sum())
+        target_total_reads_dict = dict(zip(global_reads['condition'], global_reads['total_reads']))
+
+    target_track_df = aggregated_df
+    if has_antigen and control_enabled and current_target:
+        target_track_df = aggregated_df.filter(pl.col('antigen') == current_target)
+
+    # Calculate track-specific n_clonotypes for normalization
+    target_n_clonotypes = target_track_df.select('elementId').n_unique()
+
+    # Apply clonotype filtering if requested on the target track
     if filter_clonotypes:
-        aggregated_df = filter_clonotypes_by_criteria(
-            aggregated_df, condition_order, 
+        target_track_df = filter_clonotypes_by_criteria(
+            target_track_df, condition_order, 
             filter_single_sample, filter_any_zero, min_abundance,
-            min_frequency, total_reads_dict,
+            min_frequency, target_total_reads_dict,
             present_in_rounds, present_in_rounds_logic,
-            pseudo_count, n_clonotypes
+            pseudo_count, target_n_clonotypes
         )
+
+    # After filtering, aggregate away sampleId and antigen for the pivot
+    target_track_pivot_ready = (
+        target_track_df
+        .group_by(['elementId', 'condition'])
+        .agg(pl.col('abundance').sum().alias('abundance'))
+    )
 
     # Check if we have too few clonotypes after filtering
     if filtered_too_much_txt:
-        unique_clonotypes_count = aggregated_df.select('elementId').n_unique()
+        unique_clonotypes_count = target_track_pivot_ready.select('elementId').n_unique()
         too_few = "true" if (unique_clonotypes_count < 1) else "false"
         with open(filtered_too_much_txt, 'w') as f:
             f.write(too_few)
 
-    # Create pivot table to match pandas behavior exactly (elementId as index)
+    # Create pivot table for target track
     pivot_df = (
-        aggregated_df
+        target_track_pivot_ready
         .pivot(values='abundance', index='elementId', on='condition', aggregate_function='sum')
         .fill_null(0)
     )
 
     # Ensure all conditions are present in pivot
     for condition in condition_order:
-        if condition not in pivot_df.columns:
+        if condition not in pivot_df.collect_schema().names():
             pivot_df = pivot_df.with_columns(pl.lit(0).alias(condition))
 
-    # Convert elementId to index by setting it aside (to match pandas index behavior)
-    pivot_df = pivot_df.sort('elementId')  # Ensure consistent ordering
-    element_ids = pivot_df.select('elementId').to_series()
+    # Convert elementId to index by setting it aside
+    pivot_df = pivot_df.sort('elementId')
 
-    # CRITICAL: Ensure column order matches pandas exactly (pandas unstack creates alphabetical order)
-    condition_cols = [col for col in pivot_df.columns if col != 'elementId']
-    # pandas unstack creates alphabetical order
-    condition_cols_sorted = sorted(condition_cols)
-    pivot_df = pivot_df.select(condition_cols_sorted)
+    # Sort columns alphabetically but keep elementId
+    condition_cols = sorted([col for col in pivot_df.collect_schema().names() if col != 'elementId'])
+    pivot_df = pivot_df.select(['elementId'] + condition_cols)
 
-    # Pre-calculate frequencies for all conditions efficiently
+    # Pre-calculate frequencies for target track
     freq_expressions = []
     for condition in condition_order:
-        total = total_reads_dict.get(condition, 1)
-        # Add pseudo_count to each clonotype's abundance, so total must be adjusted by n_clonotypes * pseudo_count
+        total = target_total_reads_dict.get(condition, 1)
         # This ensures frequencies sum to 1: Σ[(abundance + p) / (total + N*p)] = 1
         freq_expressions.append(
-            ((pl.col(condition) + pseudo_count) / (total + (n_clonotypes * pseudo_count))).alias(f'freq_{condition}')
+            ((pl.col(condition) + pseudo_count) / (total + (target_n_clonotypes * pseudo_count))).alias(f'freq_{condition}')
         )
 
     # Add frequency columns
     pivot_df = pivot_df.with_columns(freq_expressions)
 
-    # Calculate enrichments efficiently using vectorized operations
+    # Calculate Overall Log2FC (last vs first)
+    if len(condition_order) >= 2:
+        first_cond = condition_order[0]
+        last_cond = condition_order[-1]
+        
+        # Formula: log2((last_freq) / (first_freq))
+        # Since freq_last = (abundance_last + p) / (total_last + N*p)
+        # This matches the pairwise enrichment logic
+        overall_expr = (
+            pl.when((pl.col(f'freq_{last_cond}') > 0) & (pl.col(f'freq_{first_cond}') > 0))
+            .then((pl.col(f'freq_{last_cond}') / pl.col(f'freq_{first_cond}')).log(2))
+            .otherwise(None)
+            .alias('Overall Log2FC')
+        )
+        pivot_df = pivot_df.with_columns(overall_expr)
+
+    # Calculate pairwise enrichments
     enrichment_results = _calculate_enrichments_vectorized(
-        pivot_df, condition_order, total_reads_dict
+        pivot_df, condition_order, target_total_reads_dict
     )
 
-    # Add elementId back as the first column (matching pandas index->column conversion)
-    enrichment_results = enrichment_results.with_columns(
-        pl.Series('elementId', element_ids)
-    )
+    # --- Negative Control Track Processing ---
+    max_neg_enrichment_df = None
+    if has_antigen and control_enabled and negative_conditions:
+        # Filter for all negative antigens
+        neg_track_df = aggregated_df.filter(pl.col('antigen').is_in(negative_conditions))
 
-    # Apply label mapping to the enriched results
+        # Use control-specific order if provided, otherwise fallback to main order
+        base_order = control_conditions_order if control_conditions_order is not None else condition_order
+        
+        if neg_track_df.height > 0:
+            # We need to calculate enrichment independently for each negative 
+            # antigen (only the ones which where provided and are present in the data)
+            unique_neg_antigens = neg_track_df.select('antigen').unique().to_series().to_list()
+            
+            neg_enrichments = []
+            for neg_antigen in unique_neg_antigens:
+                antigen_df = neg_track_df.filter(pl.col('antigen') == neg_antigen)
+                
+                # Pivot for this specific negative antigen
+                antigen_pivot = (
+                    antigen_df
+                    .group_by(['elementId', 'condition'])
+                    .agg(pl.col('abundance').sum().alias('abundance'))
+                    .pivot(values='abundance', index='elementId', on='condition', aggregate_function='sum')
+                    .fill_null(0)
+                )
+                
+                # Only use conditions that are actually present for this antigen
+                # to avoid spurious enrichments from missing/synthetic conditions
+                available_conditions = [c for c in base_order if c in antigen_pivot.collect_schema().names()]
+                
+                antigen_pivot = antigen_pivot.sort('elementId')
+                # Keep elementId in the selection
+                antigen_pivot = antigen_pivot.select(['elementId'] + available_conditions)
+                
+                # Get total reads for this negative antigen
+                neg_reads = total_reads_df.filter(pl.col('antigen') == neg_antigen)
+                neg_total_reads_dict = dict(zip(neg_reads['condition'], neg_reads['total_reads']))
+                
+                # Calculate track-specific n_clonotypes for this negative antigen
+                neg_n_clonotypes = antigen_df.select('elementId').n_unique()
+                
+                # Calculate frequencies
+                neg_freq_exprs = []
+                for condition in available_conditions:
+                    total = neg_total_reads_dict.get(condition, 1)
+                    neg_freq_exprs.append(
+                        ((pl.col(condition) + pseudo_count) / (total + (neg_n_clonotypes * pseudo_count))).alias(f'freq_{condition}')
+                    )
+                antigen_pivot = antigen_pivot.with_columns(neg_freq_exprs)
+                
+                # Calculate pairwise enrichments
+                antigen_enrichment = _calculate_enrichments_vectorized(
+                    antigen_pivot, available_conditions, neg_total_reads_dict
+                )
+                
+                # SAFETY: If no pairwise comparisons were possible, create a 0-filled max column
+                if 'MaxPositiveEnrichment' not in antigen_enrichment.collect_schema().names():
+                    antigen_enrichment = antigen_enrichment.with_columns(
+                        pl.lit(0.0).alias('MaxPositiveEnrichment')
+                    )
+
+                # We only care about the MaxPositiveEnrichment for negative controls
+                antigen_max = antigen_enrichment.select(['elementId', 'MaxPositiveEnrichment'])
+                neg_enrichments.append(antigen_max)
+            
+            if neg_enrichments:
+                # Combine all negative antigen max enrichments and take the max across antigens
+                combined_neg = pl.concat(neg_enrichments)
+                max_neg_enrichment_df = (
+                    combined_neg
+                    .group_by('elementId')
+                    .agg(pl.col('MaxPositiveEnrichment').max().alias('MaxNegControlEnrichment'))
+                )
+
+    # Join with Overall Log2FC if it was calculated
+    if 'Overall Log2FC' in pivot_df.collect_schema().names():
+        enrichment_results = enrichment_results.join(
+            pivot_df.select(['elementId', 'Overall Log2FC']),
+            on='elementId',
+            how='left'
+        )
+
+    # Join with MaxNegControlEnrichment if calculated
+    if max_neg_enrichment_df is not None:
+        enrichment_results = enrichment_results.join(
+            max_neg_enrichment_df, on='elementId', how='left'
+        ).with_columns(
+            pl.col('MaxNegControlEnrichment').fill_null(0)
+        )
+    elif control_enabled:
+        # If control enabled but no data found, add column with 0
+        enrichment_results = enrichment_results.with_columns(
+            pl.lit(0.0).alias('MaxNegControlEnrichment')
+        )
+
+    # Apply label mapping
     enrichment_results = enrichment_results.join(
         label_mapping, on='elementId', how='left')
 
-    # Reorder columns to match original pandas implementation: elementId, Label, then other columns
-    other_cols = [col for col in enrichment_results.columns if col not in [
-        'elementId', 'Label']]
-    enrichment_results = enrichment_results.select(
-        ['elementId', 'Label'] + other_cols)
+    # Reorder columns: elementId, Label, Overall Log2FC, MaxPositiveEnrichment, MaxNegControlEnrichment, then others
+    cols_to_front = ['elementId', 'Label']
+    other_cols = [col for col in enrichment_results.collect_schema().names() if col not in cols_to_front]
+    enrichment_results = enrichment_results.select(cols_to_front + other_cols)
 
     # Save main enrichment results
     enrichment_results.write_csv(enrichment_csv)
@@ -480,12 +620,17 @@ def _calculate_enrichments_vectorized(
 
         result_df = result_df.with_columns(max_pos_enrich_expr)
 
-    # Select only needed columns (elementId will be added back in main function)
+    # Select only needed columns
     freq_col_names = [
         f'Frequency {condition}' for condition in condition_order]
     result_cols = freq_col_names + enrichment_col_names
     if enrichment_col_names:  # Only add MaxPositiveEnrichment if we have enrichment columns
         result_cols.append('MaxPositiveEnrichment')
+    
+    # Safely include elementId if it exists in the input
+    if 'elementId' in result_df.collect_schema().names():
+        result_cols = ['elementId'] + result_cols
+        
     return result_df.select(result_cols)
 
 
@@ -505,13 +650,30 @@ def _process_outputs(
     """
     # Process enrichment data for detailed output
     enrichment_cols = [
-        col for col in enrichment_results.columns if col.startswith('Enrichment ')]
+        col for col in enrichment_results.collect_schema().names() if col.startswith('Enrichment ')]
+
+    # Add Overall Log2FC and MaxPositiveEnrichment to the bubble and top enriched logic if they exist
+    extra_cols = []
+    if 'Overall Log2FC' in enrichment_results.collect_schema().names():
+        extra_cols.append('Overall Log2FC')
+    if 'MaxPositiveEnrichment' in enrichment_results.collect_schema().names():
+        extra_cols.append('MaxPositiveEnrichment')
+    if 'MaxNegControlEnrichment' in enrichment_results.collect_schema().names():
+        extra_cols.append('MaxNegControlEnrichment')
 
     if enrichment_cols:
         # Create detailed enrichment table efficiently
         enrichment_detailed = _create_detailed_enrichment_table(
             enrichment_results, enrichment_cols, condition_order
         )
+        
+        # Add extra columns to detailed table if they exist
+        if extra_cols:
+            enrichment_detailed = enrichment_detailed.join(
+                enrichment_results.select(['elementId', 'Label'] + extra_cols),
+                on=['elementId', 'Label'],
+                how='left'
+            )
 
         # Save highest enrichment if requested
         if highest_enrichment_csv:
@@ -628,23 +790,26 @@ def _create_bubble_data(
     Create bubble plot data efficiently.
     """
     # Filter by minimum enrichment
+    max_col = 'MaxPositiveEnrichment'
+    
     filtered_data = enrichment_results.filter(
-        pl.col('MaxPositiveEnrichment') >= min_enrichment
+        pl.col(max_col) >= min_enrichment
     )
 
     if filtered_data.height == 0:
-        return pl.DataFrame(schema={
+        schema = {
             'elementId': pl.Utf8, 'Label': pl.Utf8, 'Numerator': pl.Utf8,
             'Denominator': pl.Utf8, 'Enrichment': pl.Float64,
-            'Frequency_Numerator': pl.Float64, 'MaxPositiveEnrichment': pl.Float64
-        })
+            'Frequency_Numerator': pl.Float64, max_col: pl.Float64
+        }
+        return pl.DataFrame(schema=schema)
 
     # Get top clonotypes
     top_clonotypes = (
         filtered_data
         .group_by('elementId')
-        .agg(pl.col('MaxPositiveEnrichment').max())
-        .sort(['MaxPositiveEnrichment', 'elementId'], descending=[True, False])
+        .agg(pl.col(max_col).max())
+        .sort([max_col, 'elementId'], descending=[True, False])
         .head(top_n_bubble)
         .select('elementId')
     )
@@ -655,13 +820,13 @@ def _create_bubble_data(
 
     # Create bubble data efficiently
     enrichment_cols = [
-        col for col in bubble_data.columns if col.startswith('Enrichment ')]
+        col for col in bubble_data.collect_schema().names() if col.startswith('Enrichment ')]
     bubble_rows = []
 
     for row in bubble_data.iter_rows(named=True):
         element_id = row['elementId']
         label = row['Label']
-        max_pos_enrich = row['MaxPositiveEnrichment']
+        max_val = row[max_col]
 
         for col in enrichment_cols:
             enrich_val = row[col]
@@ -678,7 +843,7 @@ def _create_bubble_data(
                     'Denominator': denominator,
                     'Enrichment': enrich_val,
                     'Frequency_Numerator': freq_val,
-                    'MaxPositiveEnrichment': max_pos_enrich
+                    max_col: max_val
                 })
 
     if bubble_rows:
@@ -706,11 +871,13 @@ def _create_top_enriched_data(
         })
 
     # Get top element IDs
+    max_col = 'MaxPositiveEnrichment'
+
     top_ids = (
         bubble_data
         .group_by('elementId')
-        .agg(pl.col('MaxPositiveEnrichment').max())
-        .sort(['MaxPositiveEnrichment', 'elementId'], descending=[True, False])
+        .agg(pl.col(max_col).max())
+        .sort([max_col, 'elementId'], descending=[True, False])
         .head(top_n)
         .select('elementId')
     )
@@ -775,6 +942,18 @@ if __name__ == "__main__":
                         help="Path to save whether filters left too few clonotypes (true/false)")
     parser.add_argument("--pseudo_count", type=float, default=0.0,
                         help="Constant to add to abundance values for enrichment and frequency calculations")
+    parser.add_argument("--control_enabled", action="store_true",
+                        help="Enable negative control specificity filtering")
+    parser.add_argument("--negative_conditions", type=str, required=False,
+                        help="JSON list of negative antigen conditions")
+    parser.add_argument("--control_conditions_order", type=str, required=False,
+                        help="JSON list of conditions where negative antigens are present")
+    parser.add_argument("--target_threshold", type=float, default=2.0,
+                        help="Log2 fold change threshold for target conditions")
+    parser.add_argument("--control_threshold", type=float, default=1.0,
+                        help="Log2 fold change threshold for control conditions")
+    parser.add_argument("--current_target", type=str, required=False,
+                        help="The current target antigen for this iteration")
 
     args = parser.parse_args()
 
@@ -798,5 +977,11 @@ if __name__ == "__main__":
         present_in_rounds_logic=args.present_in_rounds_logic,
         clonotype_definition_csv=args.clonotype_definition,
         filtered_too_much_txt=args.filtered_too_much,
-        pseudo_count=args.pseudo_count
+        pseudo_count=args.pseudo_count,
+        control_enabled=args.control_enabled,
+        negative_conditions=json.loads(args.negative_conditions) if args.negative_conditions else None,
+        control_conditions_order=json.loads(args.control_conditions_order) if args.control_conditions_order else None,
+        target_threshold=args.target_threshold,
+        control_threshold=args.control_threshold,
+        current_target=args.current_target
     )

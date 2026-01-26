@@ -42,7 +42,7 @@ type FilteringConfig = {
 type ControlConfig = {
   enabled: boolean;
   antigenColumnRef?: SUniversalPColumnId; // Metadata column for antigen/control
-  targetConditions: string[]; // e.g., ["Target-Antigen"]
+  targetCondition?: string; // e.g., ["Target-Antigen"]
   negativeConditions: string[]; // e.g., ["BSA", "Plastic"]
   targetThreshold: number; // Default: 2.0 log2 FC
   controlThreshold: number; // Default: 1.0 log2 FC
@@ -97,7 +97,6 @@ export const model = BlockModel.create()
     additionalEnrichmentExports: [],
     controlConfig: {
       enabled: false,
-      targetConditions: [],
       negativeConditions: [],
       targetThreshold: 2.0,
       controlThreshold: 1.0,
@@ -144,9 +143,12 @@ export const model = BlockModel.create()
     if (!basicValid) return false;
 
     if (controlConfig.enabled) {
-      const { antigenColumnRef, targetConditions, negativeConditions } = controlConfig;
-      if (!antigenColumnRef || !targetConditions.length || !negativeConditions.length) return false;
+      const { antigenColumnRef, targetCondition, negativeConditions } = controlConfig;
+      if (!antigenColumnRef || !targetCondition || !negativeConditions.length) return false;
     }
+
+    // Need to include check for non empty controlConditionsOrder
+    // Need to include check for at least two samples with negative and positive control conditions
 
     return true;
   })

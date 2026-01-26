@@ -7,7 +7,7 @@ text := import("text")
 
 pfEnrichmentConvExport := import(":pf-enrichment-conv-export")
 
-self.defineOutputs("columnSpec", "columnData")
+self.defineOutputs("columnSpec", "columnData", "overallSpec", "overallData")
 
 self.body(func(args) {
     min := args.min
@@ -18,6 +18,7 @@ self.body(func(args) {
     inputType := args.inputType
     topEnrichedColCsv := args.topEnrichedColCsv
     conditionOrder := args.conditionOrder
+    targetCondition := args.targetCondition
     blockId := args.blockId
     specOpts := args.specOpts
     customBlockLabel := args.customBlockLabel
@@ -33,6 +34,7 @@ self.body(func(args) {
                                                                 string(cutoff.getData()),
                                                                 downsampling,
                                                                 conditionOrder,
+                                                                targetCondition,
                                                                 blockId,
                                                                 specOpts)
     } else {
@@ -43,6 +45,7 @@ self.body(func(args) {
                                                                 string(cutoff.getData()),
                                                                 downsampling,
                                                                 conditionOrder,
+                                                                targetCondition,
                                                                 blockId)
     }
 
@@ -81,6 +84,8 @@ self.body(func(args) {
 
     return {
         columnSpec: trace.inject(exportFile["enrichment.spec"]),
-        columnData: exportFile["enrichment.data"]
+        columnData: exportFile["enrichment.data"],
+        overallSpec: trace.inject(exportFile["overall_log2fc.spec"]),
+        overallData: exportFile["overall_log2fc.data"]
     }
 })

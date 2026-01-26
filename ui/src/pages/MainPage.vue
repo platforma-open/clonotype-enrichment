@@ -17,6 +17,7 @@ import {
   PlDropdown,
   PlDropdownMulti,
   PlDropdownRef,
+  PlElementList,
   PlMaskIcon24,
   PlNumberField,
   PlRadioGroup,
@@ -104,21 +105,21 @@ const antigenValues = computed(() => mapToOptions(app.model.outputs.antigenValue
 
 // Get list of available values within antigen column (no selected as target) for negative control selection
 const negativeAntigenValues = computed(() => {
-  const targetConditions = new Set(app.model.args.controlConfig.targetConditions);
-  const filtered = app.model.outputs.antigenValues?.filter((v) => !targetConditions.has(v));
+  const targetCondition = new Set(app.model.args.controlConfig.targetCondition);
+  const filtered = app.model.outputs.antigenValues?.filter((v) => !targetCondition.has(v));
   return mapToOptions(filtered);
 });
 
 // Check if there are condition values for negative control samples that are not in the main condition order
-const hasExtraNegativeControlConditions = computed(() => {
-  const negValues = app.model.outputs.negativeControlConditionValues;
-  const order = app.model.args.conditionOrder;
-  if (!negValues?.length || !order) return false;
+// const hasExtraNegativeControlConditions = computed(() => {
+//   const negValues = app.model.outputs.negativeControlConditionValues;
+//   const order = app.model.args.conditionOrder;
+//   if (!negValues?.length || !order) return false;
 
-  // Check if any negative control condition is NOT in the main condition order
-  const orderSet = new Set(order);
-  return negValues.some((v) => !orderSet.has(v));
-});
+//   // Check if any negative control condition is NOT in the main condition order
+//   const orderSet = new Set(order);
+//   return negValues.some((v) => !orderSet.has(v));
+// });
 
 // Get condition values from samples that have negative antigen values
 const negativeControlConditionOptions = computed(() => mapToOptions(app.model.outputs.negativeControlConditionValues));
@@ -193,10 +194,49 @@ const filteredTooMuch = asyncComputed(async () => {
   if (app.model.outputs.filteredTooMuch === true) return true;
 });
 
-// Make sure numerator and denominator are reset when contrast factor is changed
-watch(() => [app.model.args.conditionColumnRef], (_) => {
-  app.model.args.conditionOrder = [];
+// Sync conditionOrder when values change OR column changes
+watch(
+  [() => app.model.args.conditionColumnRef, () => app.model.outputs.conditionValues],
+  ([col, vals], [oldCol]) => {
+    if (vals && vals.length > 0 && (col !== oldCol || app.model.args.conditionOrder.length === 0)) {
+      app.model.args.conditionOrder = [...vals];
+    }
+  },
+  { immediate: true },
+);
+
+// Sync controlConditionsOrder when values change OR antigen column changes
+watch(
+  [() => app.model.args.controlConfig.antigenColumnRef, () => app.model.outputs.negativeControlConditionValues],
+  ([col, vals], [oldCol]) => {
+    if (vals && vals.length > 0 && (col !== oldCol || app.model.args.controlConfig.controlConditionsOrder.length === 0)) {
+      app.model.args.controlConfig.controlConditionsOrder = [...vals];
+    }
+  },
+  { immediate: true },
+);
+
+const availableToAdd = computed(() => {
+  const current = new Set(app.model.args.conditionOrder);
+  return conditionValues.value.filter((opt) => !current.has(opt.value));
 });
+
+const availableToAddToControl = computed(() => {
+  const current = new Set(app.model.args.controlConfig.controlConditionsOrder);
+  return negativeControlConditionOptions.value.filter((opt) => !current.has(opt.value));
+});
+
+const resetConditionOrder = () => {
+  if (app.model.outputs.conditionValues) {
+    app.model.args.conditionOrder = [...app.model.outputs.conditionValues];
+  }
+};
+
+const resetControlConditionOrder = () => {
+  if (app.model.outputs.negativeControlConditionValues) {
+    app.model.args.controlConfig.controlConditionsOrder = [...app.model.outputs.negativeControlConditionValues];
+  }
+};
 
 const isClusterId = computed(() => {
   if (app.model.outputs.datasetSpec === undefined) return false;
@@ -274,13 +314,105 @@ const filteringOptions = [
       @update:model-value="setInput"
     />
     <PlDropdown v-model="app.model.args.conditionColumnRef" :options="app.model.outputs.metadataOptions" label="Condition column" required />
-    <PlDropdownMulti v-model="app.model.args.conditionOrder" :options="conditionValues" label="Condition order" required >
-      <template #tooltip>
-        Order aware selection. Calculate contrast between an element (numerator) and each of its preceding elements (denominators).
-        Example: if you select "Cond 1", "Cond 2" and "Cond 3" as order, the contrasts will be "Cond 2 vs Cond 1", "Cond 3 vs Cond 1" and "Cond 3 vs Cond 2".
-        The block will export the highest Enrichment value from all comparisons
-      </template>
-    </PlDropdownMulti>
+
+    <PlAccordionSection label="Condition Order">
+      <div style="display: flex; margin-bottom: -15px;">
+        Define condition order
+        <PlTooltip class="info">
+          <template #label>Define condition order</template>
+          <template #tooltip>
+            Order aware selection. Calculate contrast between an element (numerator) and each of its preceding elements (denominators).
+            Example: if you select "Cond 1", "Cond 2" and "Cond 3" as order, the contrasts will be "Cond 2 vs Cond 1", "Cond 3 vs Cond 1" and "Cond 3 vs Cond 2".
+            The block will export the highest Enrichment value from all comparisons
+          </template>
+        </PlTooltip>
+      </div>
+      <PlElementList
+        v-model:items="app.model.args.conditionOrder"
+      >
+        <template #item-title="{ item }">
+          {{ item }}
+        </template>
+      </PlElementList>
+      <PlBtnGhost
+        v-if="availableToAdd.length > 0"
+        @click="resetConditionOrder"
+      >
+        Reset to default
+        <template #append>
+          <PlMaskIcon24 name="reverse" />
+        </template>
+      </PlBtnGhost>
+    </PlAccordionSection>
+
+    <PlAccordionSection label="Target antigen & negative controls">
+      <PlCheckbox v-model="app.model.args.controlConfig.enabled">
+        Enable target selection & negative controls
+        <PlTooltip class="info">
+          <template #tooltip>
+            <div>
+              Enable negative control analysis to distinguish antigen-specific binders from background binders.
+            </div>
+          </template>
+        </PlTooltip>
+      </PlCheckbox>
+      <PlDropdown
+        v-if="app.model.args.controlConfig.enabled"
+        v-model="app.model.args.controlConfig.antigenColumnRef"
+        :options="app.model.outputs.metadataOptions"
+        label="Antigen column" required
+      />
+      <PlRow v-if="app.model.args.controlConfig.enabled">
+        <PlDropdown
+          v-model="app.model.args.controlConfig.targetCondition"
+          :options="antigenValues"
+          label="Target"
+        />
+        <PlDropdownMulti
+          v-model="app.model.args.controlConfig.negativeConditions"
+          :options="negativeAntigenValues"
+          label="Negative control(s)"
+        />
+      </PlRow>
+      <PlRow v-if="app.model.args.controlConfig.enabled">
+        <div style="flex: 1">
+          <div class="pl-dropdown-multi__label" style="margin-bottom: 8px;">Negative condition order</div>
+          <PlElementList
+            v-model:items="app.model.args.controlConfig.controlConditionsOrder"
+          >
+            <template #item-title="{ item }">
+              {{ item }}
+            </template>
+          </PlElementList>
+          <PlBtnGhost
+            v-if="availableToAddToControl.length > 0"
+            @click="resetControlConditionOrder"
+          >
+            Reset to default
+            <template #append>
+              <PlMaskIcon24 name="reverse" />
+            </template>
+          </PlBtnGhost>
+        </div>
+      </PlRow>
+      <PlRow v-if="app.model.args.controlConfig.enabled">
+        <PlNumberField
+          v-model="app.model.args.controlConfig.targetThreshold"
+          label="Target threshold"
+          :minValue="0"
+          :step="0.1"
+          placeholder="2.0"
+        />
+        <PlNumberField
+          v-model="app.model.args.controlConfig.controlThreshold"
+          label="Control threshold"
+          :minValue="0"
+          :step="0.1"
+          placeholder="1.0"
+        />
+      </PlRow>
+      <div v-if="app.model.args.controlConfig.enabled" style="height: 1px; background-color: #e2e2e2; margin: 16px 0;" />
+    </PlAccordionSection>
 
     <PlBtnGroup
       v-model="app.model.args.downsampling.type" :options="downsamplingOptions"
@@ -389,63 +521,6 @@ const filteringOptions = [
           :options="[{ value: 'OR', label: 'Any selected (OR)' },
                      { value: 'AND', label: 'All selected (AND)' }]"
           label="Logic"
-        />
-      </PlRow>
-    </PlAccordionSection>
-
-    <PlAccordionSection label="Negative Controls">
-      <PlCheckbox v-model="app.model.args.controlConfig.enabled">
-        Negative control selection
-        <PlTooltip class="info">
-          <template #tooltip>
-            <div>
-              Enable negative control analysis to distinguish antigen-specific binders from background binders.
-            </div>
-          </template>
-        </PlTooltip>
-      </PlCheckbox>
-      <PlDropdown
-        v-if="app.model.args.controlConfig.enabled"
-        v-model="app.model.args.controlConfig.antigenColumnRef"
-        :options="app.model.outputs.metadataOptions"
-        label="Antigen column" required
-      />
-      <PlRow v-if="app.model.args.controlConfig.enabled">
-        <PlDropdownMulti
-          v-model="app.model.args.controlConfig.targetConditions"
-          :options="antigenValues"
-          label="Target antigens"
-        />
-        <PlDropdownMulti
-          v-model="app.model.args.controlConfig.negativeConditions"
-          :options="negativeAntigenValues"
-          label="Negative antigens"
-        />
-      </PlRow>
-      <PlDropdownMulti
-        v-if="app.model.args.controlConfig.enabled && hasExtraNegativeControlConditions"
-        v-model="app.model.args.controlConfig.controlConditionsOrder"
-        :options="negativeControlConditionOptions"
-        label="Negative condition order"
-      >
-        <template #tooltip>
-          At least one negative control condition is missing from the main condition order. Please select the correct order for conditions where the chosen Negative antigens are present.
-        </template>
-      </PlDropdownMulti>
-      <PlRow v-if="app.model.args.controlConfig.enabled">
-        <PlNumberField
-          v-model="app.model.args.controlConfig.targetThreshold"
-          label="Target threshold"
-          :minValue="0"
-          :step="0.1"
-          placeholder="2.0"
-        />
-        <PlNumberField
-          v-model="app.model.args.controlConfig.controlThreshold"
-          label="Control threshold"
-          :minValue="0"
-          :step="0.1"
-          placeholder="1.0"
         />
       </PlRow>
     </PlAccordionSection>

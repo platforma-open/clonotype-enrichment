@@ -53,6 +53,10 @@ wf.prepare(func(args){
 	bundleBuilder.addAnchor("main", args.abundanceRef) 
 	bundleBuilder.addSingle(args.conditionColumnRef)
 
+	if args.controlConfig.enabled && args.controlConfig.antigenColumnRef != undefined {
+		bundleBuilder.addSingle(args.controlConfig.antigenColumnRef)
+	}
+
 	if args.clonotypeDefinition != undefined {
         for columnRef in args.clonotypeDefinition {
             bundleBuilder.addSingle(columnRef)
@@ -73,6 +77,7 @@ wf.body(func(args) {
 	abundanceSpec := columns.getSpec(args.abundanceRef)
 	downsampling:= args.downsampling
 	additionalEnrichmentExports := args.additionalEnrichmentExports
+	controlConfig := args.controlConfig
 
 	// Prepare trace label (Frequencies are always the same, so we don't need to add the condition order)
 	// Downsampling will cause it to change, so lets add it
@@ -100,6 +105,9 @@ wf.body(func(args) {
 	cloneTable := pframes.csvFileBuilder() 
 	cloneTable.add(columns.getColumn(args.abundanceRef), {header: "abundance"})
 	cloneTable.add(columns.getColumn(args.conditionColumnRef), {header: "condition"})
+	if controlConfig.enabled {
+		cloneTable.add(columns.getColumn(controlConfig.antigenColumnRef), {header: "antigen"})
+	}
 	cloneTable.setAxisHeader(abundanceSpec.axesSpec[0].name, "sampleId")
 	cloneTable.setAxisHeader(abundanceSpec.axesSpec[1].name, "elementId")
 	cloneTable.mem("32GiB")
@@ -160,6 +168,16 @@ wf.body(func(args) {
 		    arg("--clonotype-definition").arg("clonotypeDefinition.csv")
     }
 
+	if controlConfig.enabled {
+		calculateEnrichment = calculateEnrichment.
+			arg("--control_enabled").
+			arg("--current_target").arg(string(controlConfig.targetCondition)).
+			arg("--negative_conditions").arg(string(controlConfig.negativeConditions)).
+			arg("--control_conditions_order").arg(string(controlConfig.controlConditionsOrder)).
+			arg("--target_threshold").arg(string(controlConfig.targetThreshold)).
+			arg("--control_threshold").arg(string(controlConfig.controlThreshold))
+	}
+
 	// Add filtering flags based on user selection
 	if FilteringConfig.baseFilter != "none" {
 		calculateEnrichment = calculateEnrichment.arg("--filter_clonotypes")
@@ -206,7 +224,7 @@ wf.body(func(args) {
 
 	// Convert script outputs to Pframes
 	enrichCsv := calculateEnrichment.getFile("enrichment_results.csv")
-	enrichmentImportParams := pfEnrichmentConv.getColumns(abundanceSpec, conditionOrder)
+	enrichmentImportParams := pfEnrichmentConv.getColumns(abundanceSpec, conditionOrder, controlConfig.targetCondition)
 	enrichmentPf := xsv.importFile(enrichCsv, "csv", enrichmentImportParams,
 									{ cpu: 1, mem: "32GiB" })
 
@@ -274,6 +292,7 @@ wf.body(func(args) {
 				topEnrichedColCsv: enrichCsv,
 				downsampling: downsampling,
 				conditionOrder: conditionOrder,
+				targetCondition: controlConfig.targetCondition,
 				blockId: blockId,
 				specOpts: specOpts,
 				customBlockLabel: args.customBlockLabel,
@@ -302,6 +321,7 @@ wf.body(func(args) {
 		cutoff: mainAnnotationStats.cutoff,
 		downsampling: downsampling,
 		conditionOrder: conditionOrder,
+		targetCondition: controlConfig.targetCondition,
 		blockId: blockId,
 		customBlockLabel: args.customBlockLabel,
 		defaultBlockLabel: args.defaultBlockLabel,

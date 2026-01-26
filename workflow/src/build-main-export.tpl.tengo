@@ -26,6 +26,7 @@ self.body(func(args) {
         inputType: args.inputType,
         topEnrichedColCsv: args.topEnrichedColCsv,
         conditionOrder: args.conditionOrder,
+        targetCondition: args.targetCondition,
         blockId: args.blockId,
         customBlockLabel: args.customBlockLabel,
         defaultBlockLabel: args.defaultBlockLabel
@@ -38,6 +39,11 @@ self.body(func(args) {
         "Enrichment - Highest", 
         exportColumnRender.output("columnSpec"),
         exportColumnRender.output("columnData")
+    )
+    exports.add(
+        "Enrichment - Overall", 
+        exportColumnRender.output("overallSpec"),
+        exportColumnRender.output("overallData")
     )
 
     filteredTooMuch := false

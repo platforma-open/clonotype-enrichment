@@ -2,10 +2,10 @@ ll := import("@platforma-sdk/workflow-tengo:ll")
 canonical := import("@platforma-sdk/workflow-tengo:canonical")
 
 getColumns := func(abundanceSpec, inputType, min, max, cutoff, downsampling, 
-                  conditionOrder, blockId, ...opts) {
+                  conditionOrder, targetCondition, blockId, ...opts) {
   ll.assert(len(opts) <= 1, "expected at most one options map")
 
-  specLabel := "Maximum " + inputType + " Enrichment"
+  specLabel := "Max Log2FC"
 
   if len(opts) == 1 {
     specLabel = opts[0].label
@@ -33,7 +33,7 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, downsampling,
             "pl7.app/comparison": specLabel
           },
           annotations: {
-            "pl7.app/label": specLabel,
+            "pl7.app/label": "Max Log2FC",
             "pl7.app/table/orderPriority": "9000",
             "pl7.app/table/visibility": "default",
             "pl7.app/min": min,
@@ -44,7 +44,30 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, downsampling,
             "pl7.app/format": ".2f"
           }
         }
-      }],
+      },
+      {
+        column: "Overall Log2FC",
+        id: "overall_log2fc",
+        allowNA: true,
+        spec: {
+          name: "pl7.app/vdj/enrichment",
+          valueType: "Double",
+          domain: {
+            "pl7.app/downsampling": canonical.encode(downsampling),
+            "pl7.app/vdj/enrichment/type": "overall",
+            "pl7.app/vdj/enrichment/comparison": conditionOrder[len(conditionOrder) - 1] + " vs " + conditionOrder[0],
+            "pl7.app/vdj/antigenType": targetCondition,
+            "pl7.app/comparison": "Overall Enrichment"
+          },
+          annotations: {
+            "pl7.app/label": "Overall Log2FC",
+            "pl7.app/table/orderPriority": "9000",
+            "pl7.app/table/visibility": "optional",
+            "pl7.app/format": ".2f"
+          }
+        }
+      }
+    ],
     storageFormat: "Parquet",
     partitionKeyLength: 0
   }
