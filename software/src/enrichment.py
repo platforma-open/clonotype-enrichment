@@ -228,8 +228,8 @@ def hybrid_enrichment_analysis(
     top_enriched_csv: str,
     top_20_csv: Optional[str] = None,
     highest_enrichment_csv: Optional[str] = None,
-    top_n_bubble: int = 20,
-    top_n_enriched: int = 5,
+    top_n_bubble: int = 10,
+    top_n_enriched: int = 10,
     min_enrichment: float = 3,
     filter_clonotypes: bool = False,
     filter_single_sample: bool = False,
@@ -965,8 +965,8 @@ if __name__ == "__main__":
     parser.add_argument("--top_20", required=False)
     parser.add_argument("--highest_enrichment_clonotype", required=False,
                         help="Optional CSV output for rows with the highest enrichment per elementId-Label combination.")
-    parser.add_argument("--top_n_bubble", type=int, default=20)
-    parser.add_argument("--top_n_enriched", type=int, default=5)
+    parser.add_argument("--top_n_bubble", type=int, default=10)
+    parser.add_argument("--top_n_enriched", type=int, default=10)
     parser.add_argument("--min_enrichment", required=False,
                         type=float, default=0)
     parser.add_argument("--filter_clonotypes", action="store_true",

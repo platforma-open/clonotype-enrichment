@@ -119,7 +119,7 @@ export const model = BlockModel.create()
       currentTab: null,
     },
     lineState: {
-      title: 'Top 20 enriched clonotype frequencies',
+      title: 'Top 10 enriched clonotype frequencies',
       template: 'curve_dots',
       currentTab: null,
       layersSettings: {
@@ -129,7 +129,7 @@ export const model = BlockModel.create()
       },
     },
     stackedState: {
-      title: 'Top 5 enriched clonotype frequencies',
+      title: 'Top 10 enriched clonotype frequencies',
       template: 'stackedBar',
       currentTab: null,
     },
