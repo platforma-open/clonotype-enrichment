@@ -130,7 +130,7 @@ export const model = BlockModel.create()
     },
     stackedState: {
       title: 'Top 10 enriched clonotype frequencies',
-      template: 'stackedBar',
+      template: 'stackedArea',
       currentTab: null,
     },
     scatterState: {
