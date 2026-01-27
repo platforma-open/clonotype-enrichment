@@ -60,6 +60,10 @@ def downsample_sample(sample_df, downsampling):
 
 downsampling_params = parse_params()
 data = pl.read_csv(input_file)
+# Check if abundance column is string type and filter empty strings before casting
+if data.schema['abundance'] in [pl.Utf8, pl.String]:
+    data = data.filter(pl.col('abundance').ne(""))
+data = data.with_columns(pl.col("abundance").cast(pl.Int64))
 
 # If there are no clonotypes, return empty dataframe
 if data.count()["elementId"].item() == 0:
