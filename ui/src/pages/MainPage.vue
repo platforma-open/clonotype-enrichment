@@ -321,9 +321,17 @@ const filteringOptions = [
         <PlTooltip class="info">
           <template #label>Define condition order</template>
           <template #tooltip>
-            Order aware selection. Calculate contrast between an element (numerator) and each of its preceding elements (denominators).
-            Example: if you select "Cond 1", "Cond 2" and "Cond 3" as order, the contrasts will be "Cond 2 vs Cond 1", "Cond 3 vs Cond 1" and "Cond 3 vs Cond 2".
-            The block will export the highest Enrichment value from all comparisons
+            <div>
+              <strong>Order aware selection:</strong> Calculates contrast between an element (numerator) and each of its preceding elements (denominators).
+              <br/><br/>
+              <strong>Example:</strong> If you select "Cond 1", "Cond 2" and "Cond 3", the contrasts will be:
+              <ul>
+                <li>Cond 2 vs Cond 1</li>
+                <li>Cond 3 vs Cond 1</li>
+                <li>Cond 3 vs Cond 2</li>
+              </ul>
+              The block will export the highest Enrichment value from all comparisons.
+            </div>
           </template>
         </PlTooltip>
       </div>
@@ -374,27 +382,42 @@ const filteringOptions = [
           label="Negative control(s)"
         />
       </PlRow>
-      <PlRow v-if="app.model.args.controlConfig.enabled">
-        <div style="flex: 1">
-          <div class="pl-dropdown-multi__label" style="margin-bottom: 8px;">Negative condition order</div>
-          <PlElementList
-            v-model:items="app.model.args.controlConfig.controlConditionsOrder"
-          >
-            <template #item-title="{ item }">
-              {{ item }}
+      <PlAccordionSection v-if="app.model.args.controlConfig.enabled" label="Negative Condition Order">
+        <div style="display: flex; margin-bottom: -15px;">
+          Define negative condition order
+          <PlTooltip class="info">
+            <template #label>Define condition order</template>
+            <template #tooltip>
+              <div>
+                <strong>Order aware selection:</strong> Calculates contrast between an element (numerator) and each of its preceding elements (denominators).
+                <br/><br/>
+                <strong>Example:</strong> If you select "Cond 1", "Cond 2" and "Cond 3", the contrasts will be:
+                <ul>
+                  <li>Cond 2 vs Cond 1</li>
+                  <li>Cond 3 vs Cond 1</li>
+                  <li>Cond 3 vs Cond 2</li>
+                </ul>
+              </div>
             </template>
-          </PlElementList>
-          <PlBtnGhost
-            v-if="availableToAddToControl.length > 0"
-            @click="resetControlConditionOrder"
-          >
-            Reset to default
-            <template #append>
-              <PlMaskIcon24 name="reverse" />
-            </template>
-          </PlBtnGhost>
+          </PlTooltip>
         </div>
-      </PlRow>
+        <PlElementList
+          v-model:items="app.model.args.controlConfig.controlConditionsOrder"
+        >
+          <template #item-title="{ item }">
+            {{ item }}
+          </template>
+        </PlElementList>
+        <PlBtnGhost
+          v-if="availableToAddToControl.length > 0"
+          @click="resetControlConditionOrder"
+        >
+          Reset to default
+          <template #append>
+            <PlMaskIcon24 name="reverse" />
+          </template>
+        </PlBtnGhost>
+      </PlAccordionSection>
       <PlRow v-if="app.model.args.controlConfig.enabled">
         <PlNumberField
           v-model="app.model.args.controlConfig.targetThreshold"
@@ -452,8 +475,8 @@ const filteringOptions = [
           <PlTooltip class="info" :style="{display: 'inline-block'}">
             <template #tooltip>
               <strong>Clonotype filtering strategy:</strong><br/>
-              <strong>No filtering:</strong> Analyze all clonotypes, including those specific to individual conditions (may include rare or condition-specific responses)<br/>
-              <strong>Shared (all rounds):</strong> Focus only on clonotypes present in all rounds<br/>
+              <strong>No filtering:</strong> Analyze all clonotypes, including those specific to individual conditions (may include rare or condition-specific responses)<br/><br/>
+              <strong>Shared (all rounds):</strong> Focus only on clonotypes present in all rounds<br/><br/>
               <strong>Multiple rounds:</strong> Focus on clonotypes present in more than one condition (excludes condition-specific clonotypes that may represent noise or rare events)
             </template>
           </PlTooltip>
