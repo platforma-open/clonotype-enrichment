@@ -43,7 +43,7 @@ export type BlockArgs = {
 export const model = BlockModel.create()
 
   .withArgs<BlockArgs>({
-    defaultBlockLabel: '',
+    defaultBlockLabel: 'Select Abundance',
     customBlockLabel: '',
     conditionOrder: [],
     downsampling: {
