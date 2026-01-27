@@ -179,6 +179,7 @@ def create_empty_outputs(
     enrichment_schema['Overall Log2FC'] = pl.Float64
     enrichment_schema['MaxNegControlEnrichment'] = pl.Float64
     enrichment_schema['Binding Specificity'] = pl.Utf8
+    enrichment_schema['EnrichmentQuality'] = pl.Utf8
     
     empty_enrichment = pl.DataFrame(schema=enrichment_schema)
     empty_enrichment.write_csv(enrichment_csv)
@@ -572,6 +573,39 @@ def hybrid_enrichment_analysis(
             .alias('Binding Specificity')
         )
 
+    # Calculate Enrichment Quality
+    if enrichment_results.height > 0:
+        # Max frequency across all conditions for each clonotype
+        freq_cols = [f'Frequency {c}' for c in condition_order]
+        
+        # Generate max frequency column
+        enrichment_results = enrichment_results.with_columns(
+            pl.concat_list(freq_cols).list.max().alias('_max_freq')
+        )
+        
+        # Calculate thresholds (percentiles) from the current data
+        # Handle cases where columns might have nulls by using fill_null(0) for percentile calculation if needed
+        high_threshold = enrichment_results.select(pl.col('MaxPositiveEnrichment').fill_null(0).quantile(0.75)).item()
+        stable_threshold = enrichment_results.select(pl.col('Overall Log2FC').fill_null(0).quantile(0.50)).item()
+        low_threshold = enrichment_results.select(pl.col('MaxPositiveEnrichment').fill_null(0).quantile(0.25)).item()
+        freq_threshold = enrichment_results.select(pl.col('_max_freq').fill_null(0).quantile(0.75)).item()
+        
+        enrichment_results = enrichment_results.with_columns(
+            pl.when((pl.col('MaxPositiveEnrichment') >= high_threshold) & (pl.col('Overall Log2FC') >= stable_threshold))
+            .then(pl.lit("Stable Binder"))
+            .when((pl.col('MaxPositiveEnrichment') >= high_threshold) & (pl.col('Overall Log2FC') < stable_threshold))
+            .then(pl.lit("Rescuer"))
+            .when((pl.col('MaxPositiveEnrichment') < low_threshold) & (pl.col('_max_freq') >= freq_threshold))
+            .then(pl.lit("Parasite"))
+            .otherwise(pl.lit("Weak Binder"))
+            .alias('EnrichmentQuality')
+        )
+    else:
+        # For empty dataframe, add the column with correct type
+        enrichment_results = enrichment_results.with_columns(
+            pl.lit(None).cast(pl.Utf8).alias('EnrichmentQuality')
+        )
+
     # Apply label mapping
     enrichment_results = enrichment_results.join(
         label_mapping, on='elementId', how='left')
@@ -735,7 +769,7 @@ def _create_detailed_enrichment_table(
     """
     # Identify additional columns to preserve
     extra_cols = []
-    for col in ['Overall Log2FC', 'Binding Specificity']:
+    for col in ['Overall Log2FC', 'Binding Specificity', 'EnrichmentQuality']:
         if col in enrichment_results.columns:
             extra_cols.append(col)
 

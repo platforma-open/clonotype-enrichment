@@ -80,6 +80,20 @@ getColumns := func(countsSpec, conditionOrder, controlEnabled) {
             "pl7.app/format": ".2f"
           }
         }
+      }, {
+        column: "EnrichmentQuality",
+        id: "enrichment_quality",
+        allowNA: true,
+        spec: {
+          name: "pl7.app/vdj/enrichmentQuality",
+          valueType: "String",
+          domain: {},
+          annotations: {
+            "pl7.app/label": "Enrichment Quality",
+            "pl7.app/table/visibility": "default",
+            "pl7.app/table/orderPriority": "95"
+          }
+        }
       }]
 
   if controlEnabled {

@@ -7,7 +7,7 @@ text := import("text")
 
 pfEnrichmentConvExport := import(":pf-enrichment-conv-export")
 
-self.defineOutputs("columnSpec", "columnData", "bindingSpecificitySpec", "bindingSpecificityData", "overallSpec", "overallData")
+self.defineOutputs("columnSpec", "columnData", "bindingSpecificitySpec", "bindingSpecificityData", "overallSpec", "overallData", "enrichmentQualitySpec", "enrichmentQualityData")
 
 self.body(func(args) {
     min := args.min
@@ -89,7 +89,9 @@ self.body(func(args) {
         columnSpec: trace.inject(exportFile["enrichment.spec"]),
         columnData: exportFile["enrichment.data"],
         overallSpec: trace.inject(exportFile["overall_log2fc.spec"]),
-        overallData: exportFile["overall_log2fc.data"]
+        overallData: exportFile["overall_log2fc.data"],
+        enrichmentQualitySpec: trace.inject(exportFile["enrichment_quality.spec"]),
+        enrichmentQualityData: exportFile["enrichment_quality.data"]
     }
 
     if controlConfig != undefined && controlConfig.enabled == true {

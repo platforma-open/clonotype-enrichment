@@ -47,9 +47,32 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percenti
             "pl7.app/format": ".2f"
           }
         }
+      }, {
+        column: "EnrichmentQuality",
+        id: "enrichment_quality",
+        allowNA: true,
+        spec: {
+          name: "pl7.app/vdj/enrichmentQuality",
+          valueType: "String",
+          domain: {
+            "pl7.app/downsampling": canonical.encode(downsampling),
+            "pl7.app/conditionsOrder": canonical.encode(conditionOrder),
+            "pl7.app/blockId": blockId
+          },
+          annotations: {
+            "pl7.app/label": "Enrichment Quality",
+            "pl7.app/isDiscreteFilter": "true",
+            "pl7.app/discreteValues": "[\"Stable Binder\", \"Rescuer\", \"Parasite\", \"Weak Binder\"]",
+            "pl7.app/isScore": "true",
+            "pl7.app/score/rankValues": "decreasing",
+            "pl7.app/score/defaultCutoff": "[\"Stable Binder\", \"Rescuer\"]",
+            "pl7.app/table/visibility": "default",
+            "pl7.app/table/orderPriority": "95"
+          }
+        }
       }]
 
-  // Overal Log2FC will only have antigenType when it is defined
+  // Overall Log2FC columns will have additional specs if target was selected
   overallColumn := {
         column: "Overall Log2FC",
         id: "overall_log2fc",
@@ -74,7 +97,7 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percenti
           }
         }
       }
-  
+
   if targetCondition {
     overallColumn.spec.domain["pl7.app/vdj/antigenType"] = targetCondition
 

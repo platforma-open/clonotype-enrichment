@@ -53,6 +53,11 @@ self.body(func(args) {
         exportColumnRender.output("overallSpec"),
         exportColumnRender.output("overallData")
     )
+    exports.add(
+        "Enrichment Quality", 
+        exportColumnRender.output("enrichmentQualitySpec"),
+        exportColumnRender.output("enrichmentQualityData")
+    )
 
     filteredTooMuch := false
     if string(args.filteredTooMuch.getData()) == "true" {
