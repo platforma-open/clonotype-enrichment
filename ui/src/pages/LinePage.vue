@@ -33,6 +33,14 @@ const defaultOptions = computed((): PredefinedGraphOption<'scatterplot'>[] | und
       inputName: 'grouping',
       selectedSource: frequencyColSpec.axesSpec[0],
     },
+    {
+      inputName: 'tooltipContent',
+      selectedSource: frequencyColSpec.axesSpec[0],
+    },
+    {
+      inputName: 'size',
+      selectedSource: frequencyColSpec,
+    },
   ];
   return defaults;
 });
