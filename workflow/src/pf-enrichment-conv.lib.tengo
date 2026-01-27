@@ -5,6 +5,13 @@ strings := import("@platforma-sdk/workflow-tengo:strings")
 getColumns := func(countsSpec, conditionOrder, controlEnabled) {
   columns := []
   for idx, condition in conditionOrder {
+    // Set last round's frequency always visible
+    visibility := "optional"
+    if idx == len(conditionOrder) - 1 {
+      visibility = "default"
+    } else {
+      visibility = "optional"
+    }
     columns = columns + [{
                           column: "Frequency " + condition,
                           id: strings.substituteSpecialCharacters("frequency_" + condition),
@@ -18,7 +25,7 @@ getColumns := func(countsSpec, conditionOrder, controlEnabled) {
                               // add isScore only in exports to ease plots
                               // "pl7.app/vdj/isScore": "true",
                               "pl7.app/table/orderPriority": "8000",
-                              "pl7.app/table/visibility": "optional",
+                              "pl7.app/table/visibility": visibility,
                               "pl7.app/format": ".2e"
                             }
                           }
@@ -38,7 +45,7 @@ getColumns := func(countsSpec, conditionOrder, controlEnabled) {
                                 // add isScore only in exports to ease plots
                                 // "pl7.app/vdj/isScore": "true",
                                 "pl7.app/table/orderPriority": "9000",
-                                "pl7.app/table/visibility": "default",
+                                "pl7.app/table/visibility": "optional",
                                 "pl7.app/format": ".2f"
                               }
                             }
@@ -62,7 +69,7 @@ getColumns := func(countsSpec, conditionOrder, controlEnabled) {
           },
           annotations: {
             "pl7.app/label": "Overall Log2FC",
-            "pl7.app/table/visibility": "optional",
+            "pl7.app/table/visibility": "default",
             "pl7.app/format": ".2f"
           }
         }
@@ -76,7 +83,7 @@ getColumns := func(countsSpec, conditionOrder, controlEnabled) {
           domain: {},
           annotations: {
             "pl7.app/label": "Max Log2FC",
-            "pl7.app/table/visibility": "optional",
+            "pl7.app/table/visibility": "default",
             "pl7.app/format": ".2f"
           }
         }
