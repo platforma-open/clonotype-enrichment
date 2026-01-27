@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.software
 
+## 2.17.3
+
+### Patch Changes
+
+- f02f9f7: Fix block with multiple datasets in project
+
 ## 2.17.2
 
 ### Patch Changes
