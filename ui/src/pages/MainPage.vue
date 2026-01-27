@@ -442,13 +442,21 @@ const filteringOptions = [
       label="Downsampling" :compact="true"
     >
       <template #tooltip>
-        Select Downsampling strategy (count-based)
+        <div>
+          <strong>Downsampling Strategy:</strong><br/>
+          Normalizes sequencing depth across samples to ensure fair comparison of diversity and abundance.
+          Without normalization, samples with more reads may appear to have higher diversity or enriched clonotypes simply due to higher coverage.
+          <br/><br/>
+          <strong>None:</strong> Use raw abundance values. Recommended only if sequencing depth is already uniform.<br/><br/>
+          <strong>Random Sampling:</strong> Samples a fixed number of reads from each sample (using <strong>Fixed</strong> (user defined), <strong>Min</strong> (smallest sample), or <strong>Auto</strong> modes below), maintaining the original relative distribution of clonotypes.
+        </div>
       </template>
     </PlBtnGroup>
 
     <PlBtnGroup
       v-if="app.model.args.downsampling.type === 'hypergeometric'"
       v-model="app.model.args.downsampling.valueChooser"
+      style="margin-top: -18px"
       :options="[
         { value: 'fixed', label: 'Fixed' },
         { value: 'min', label: 'Min', },
