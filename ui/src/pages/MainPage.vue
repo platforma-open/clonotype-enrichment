@@ -27,7 +27,7 @@ import {
   usePlDataTableSettingsV2,
 } from '@platforma-sdk/ui-vue';
 import { asyncComputed } from '@vueuse/core';
-import { computed, ref, watch, watchEffect } from 'vue';
+import { computed, ref, watchEffect } from 'vue';
 import { useApp } from '../app';
 
 const app = useApp();
@@ -98,15 +98,15 @@ const tableLoadingText = computed(() => {
 // we will select them in list, being the first one denominator and rest numerators
 const conditionValues = computed(() => mapToOptions(app.model.outputs.conditionValues));
 
-const conditionOrderOptions = computed(() => mapToOptions(app.model.args.conditionOrder));
+const conditionOrderOptions = computed(() => mapToOptions([...app.model.args.conditionOrder]));
 
 // Get list of available values within antigen column for target selection
 const antigenValues = computed(() => mapToOptions(app.model.outputs.antigenValues));
 
 // Get list of available values within antigen column (no selected as target) for negative control selection
 const negativeAntigenValues = computed(() => {
-  const targetCondition = new Set(app.model.args.controlConfig.targetCondition);
-  const filtered = app.model.outputs.antigenValues?.filter((v) => !targetCondition.has(v));
+  const target = app.model.args.controlConfig.targetCondition;
+  const filtered = app.model.outputs.antigenValues?.filter((v) => v !== target);
   return mapToOptions(filtered);
 });
 
@@ -127,14 +127,14 @@ const negativeControlConditionOptions = computed(() => mapToOptions(app.model.ou
 // Generate comparison options based on condition order
 // Creates all possible numerator-denominator pairs where numerator comes after denominator
 const comparisonOptions = computed(() => {
-  const conditionOrder = app.model.args.conditionOrder;
-  if (!conditionOrder || conditionOrder.length < 2) return [];
+  const order = [...app.model.args.conditionOrder];
+  if (order.length < 2) return [];
 
   const comparisons = [];
-  for (let num_i = 1; num_i < conditionOrder.length; num_i++) {
+  for (let num_i = 1; num_i < order.length; num_i++) {
     for (let den_j = 0; den_j < num_i; den_j++) {
-      const numerator = conditionOrder[num_i];
-      const denominator = conditionOrder[den_j];
+      const numerator = order[num_i];
+      const denominator = order[den_j];
       const comparisonName = `${numerator} vs ${denominator}`;
       comparisons.push({
         value: comparisonName,
@@ -143,6 +143,39 @@ const comparisonOptions = computed(() => {
     }
   }
   return comparisons;
+});
+
+const comparisonsMessage = computed(() => {
+  if (comparisonOptions.value.length === 0) {
+    return '';
+  }
+  return `Will calculate: ${comparisonOptions.value.map((c) => c.label).join(', ')}`;
+});
+
+const negativeComparisonOptions = computed(() => {
+  const order = [...app.model.args.controlConfig.controlConditionsOrder];
+  if (order.length < 2) return [];
+
+  const comparisons = [];
+  for (let num_i = 1; num_i < order.length; num_i++) {
+    for (let den_j = 0; den_j < num_i; den_j++) {
+      const numerator = order[num_i];
+      const denominator = order[den_j];
+      const comparisonName = `${numerator} vs ${denominator}`;
+      comparisons.push({
+        value: comparisonName,
+        label: comparisonName,
+      });
+    }
+  }
+  return comparisons;
+});
+
+const negativeComparisonsMessage = computed(() => {
+  if (negativeComparisonOptions.value.length === 0) {
+    return '';
+  }
+  return `Will calculate: ${negativeComparisonOptions.value.map((c) => c.label).join(', ')}`;
 });
 
 // Downsampling options
@@ -194,28 +227,6 @@ const filteredTooMuch = asyncComputed(async () => {
   if (app.model.outputs.filteredTooMuch === true) return true;
 });
 
-// Sync conditionOrder when values change OR column changes
-watch(
-  [() => app.model.args.conditionColumnRef, () => app.model.outputs.conditionValues],
-  ([col, vals], [oldCol]) => {
-    if (vals && vals.length > 0 && (col !== oldCol || app.model.args.conditionOrder.length === 0)) {
-      app.model.args.conditionOrder = [...vals];
-    }
-  },
-  { immediate: true },
-);
-
-// Sync controlConditionsOrder when values change OR antigen column changes
-watch(
-  [() => app.model.args.controlConfig.antigenColumnRef, () => app.model.outputs.negativeControlConditionValues],
-  ([col, vals], [oldCol]) => {
-    if (vals && vals.length > 0 && (col !== oldCol || app.model.args.controlConfig.controlConditionsOrder.length === 0)) {
-      app.model.args.controlConfig.controlConditionsOrder = [...vals];
-    }
-  },
-  { immediate: true },
-);
-
 const availableToAdd = computed(() => {
   const current = new Set(app.model.args.conditionOrder);
   return conditionValues.value.filter((opt) => !current.has(opt.value));
@@ -241,6 +252,61 @@ const resetControlConditionOrder = () => {
 const isClusterId = computed(() => {
   if (app.model.outputs.datasetSpec === undefined) return false;
   return app.model.outputs.datasetSpec?.axesSpec.length >= 1 && app.model.outputs.datasetSpec?.axesSpec[1]?.name === 'pl7.app/vdj/clusterId';
+});
+
+/**
+ * Synchronization logic to initialize and validate condition orders.
+ *
+ * We need to distinguish between two scenarios:
+ * 1. Component remounting (e.g., switching pages in UI): We MUST preserve any custom order
+ *    the user previously defined. The tracking refs (`conditionSyncCol`, `controlSyncCol`)
+ *    are initialized with the current model values to prevent a reset when the page is reopened.
+ *
+ * 2. Active user changes (e.g., selecting a new column or dataset): We MUST reset the order
+ *    to default values (all available categories) because the previous order is no longer
+ *    relevant or contains invalid entries from a different column.
+ */
+
+const conditionSyncCol = ref<string | undefined>(app.model.args.conditionColumnRef);
+watchEffect(() => {
+  const col = app.model.args.conditionColumnRef;
+  const vals = app.model.outputs.conditionValues;
+
+  if (vals && vals.length > 0) {
+    const current = app.model.args.conditionOrder;
+    const valSet = new Set(vals);
+
+    // If the current order contains values that are no longer in the selected column,
+    // it's "invalid" (likely due to a dataset change or column value update).
+    const hasInvalidItems = current.some((v) => !valSet.has(v));
+
+    // Reset to default (all available values) if:
+    // 1. The user switched to a DIFFERENT column in conditionColumnRef.
+    // 2. The order is completely empty (fresh block initialization).
+    // 3. The current order contains values that no longer exist in the selected column.
+    if (col !== conditionSyncCol.value || current.length === 0 || hasInvalidItems) {
+      app.model.args.conditionOrder = [...vals];
+      conditionSyncCol.value = col;
+    }
+  }
+});
+
+const controlSyncCol = ref<string | undefined>(app.model.args.controlConfig.antigenColumnRef);
+watchEffect(() => {
+  const col = app.model.args.controlConfig.antigenColumnRef;
+  const vals = app.model.outputs.negativeControlConditionValues;
+
+  if (vals && vals.length > 0) {
+    const current = app.model.args.controlConfig.controlConditionsOrder;
+    const valSet = new Set(vals);
+
+    const hasInvalidItems = current.some((v) => !valSet.has(v));
+
+    if (col !== controlSyncCol.value || current.length === 0 || hasInvalidItems) {
+      app.model.args.controlConfig.controlConditionsOrder = [...vals];
+      controlSyncCol.value = col;
+    }
+  }
 });
 
 // Track the dataset spec
@@ -351,6 +417,9 @@ const filteringOptions = [
           <PlMaskIcon24 name="reverse" />
         </template>
       </PlBtnGhost>
+      <div v-if="comparisonsMessage" style="color: #6b7280; font-size: 13px; margin-top: 8px;">
+        {{ comparisonsMessage }}
+      </div>
     </PlAccordionSection>
 
     <PlAccordionSection label="Target antigen & negative controls">
@@ -417,6 +486,9 @@ const filteringOptions = [
             <PlMaskIcon24 name="reverse" />
           </template>
         </PlBtnGhost>
+        <div v-if="negativeComparisonsMessage" style="color: #6b7280; font-size: 13px; margin-top: 8px;">
+          {{ negativeComparisonsMessage }}
+        </div>
       </PlAccordionSection>
       <PlRow v-if="app.model.args.controlConfig.enabled">
         <PlNumberField
@@ -445,10 +517,9 @@ const filteringOptions = [
         <div>
           <strong>Downsampling Strategy:</strong><br/>
           Normalizes sequencing depth across samples to ensure fair comparison of diversity and abundance.
-          Without normalization, samples with more reads may appear to have higher diversity or enriched clonotypes simply due to higher coverage.
           <br/><br/>
           <strong>None:</strong> Use raw abundance values. Recommended only if sequencing depth is already uniform.<br/><br/>
-          <strong>Random Sampling:</strong> Samples a fixed number of reads from each sample (using <strong>Fixed</strong> (user defined), <strong>Min</strong> (smallest sample), or <strong>Auto</strong> modes below), maintaining the original relative distribution of clonotypes.
+          <strong>Random Sampling:</strong> Resamples all samples to a target read depth (total number of reads) while maintaining relative clonotype proportions. Choose <strong>Fixed</strong> (manual), <strong>Min</strong> (smallest sample), or <strong>Auto</strong> to set the target depth.
         </div>
       </template>
     </PlBtnGroup>
