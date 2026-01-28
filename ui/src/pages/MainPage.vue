@@ -5,7 +5,6 @@ import type {
   ListOption,
 } from '@platforma-sdk/ui-vue';
 import {
-  computedCached,
   PlAccordionSection,
   PlAgDataTableV2,
   PlAlert,
@@ -309,20 +308,39 @@ watchEffect(() => {
   }
 });
 
-// Track the dataset spec
-const datasetSpec = computedCached(() => app.model.outputs.datasetSpec);
+// Track datasets and spec to prevent unwanted updates of values
+const datasetSpec = computed(() => app.model.outputs.datasetSpec);
+
+const syncAbundanceRef = ref(app.model.args.abundanceRef ? JSON.stringify(app.model.args.abundanceRef) : undefined);
+const syncIsClustered = ref<boolean | undefined>(
+  datasetSpec.value?.axesSpec
+    ? datasetSpec.value.axesSpec.length >= 1 && datasetSpec.value.axesSpec[1]?.name === 'pl7.app/vdj/clusterId'
+    : undefined,
+);
 
 // Watch for changes in the dataset spec to initialize defaults
 watchEffect(() => {
+  const abundanceRef = app.model.args.abundanceRef;
   const spec = datasetSpec.value;
-  if (!spec?.axesSpec) return;
-  const isClust = spec.axesSpec.length >= 1 && spec.axesSpec[1]?.name === 'pl7.app/vdj/clusterId';
-  if (isClust) {
-    app.model.args.FilteringConfig.baseFilter = 'shared';
-    app.model.args.FilteringConfig.minAbundance.enabled = false;
-  } else {
-    app.model.args.FilteringConfig.baseFilter = 'none';
-    app.model.args.FilteringConfig.minAbundance.enabled = true;
+
+  if (abundanceRef && spec?.axesSpec) {
+    const abundanceRefStr = JSON.stringify(abundanceRef);
+    const isClustered = spec.axesSpec.length >= 1 && spec.axesSpec[1]?.name === 'pl7.app/vdj/clusterId';
+
+    // Reset to default if:
+    // 1. The user switched to a DIFFERENT dataset.
+    // 2. The dataset type (clustered vs regular) has changed (self-correction for lag).
+    if (abundanceRefStr !== syncAbundanceRef.value || isClustered !== syncIsClustered.value) {
+      if (isClustered) {
+        app.model.args.FilteringConfig.baseFilter = 'shared';
+        app.model.args.FilteringConfig.minAbundance.enabled = false;
+      } else {
+        app.model.args.FilteringConfig.baseFilter = 'none';
+        app.model.args.FilteringConfig.minAbundance.enabled = true;
+      }
+      syncAbundanceRef.value = abundanceRefStr;
+      syncIsClustered.value = isClustered;
+    }
   }
 });
 
