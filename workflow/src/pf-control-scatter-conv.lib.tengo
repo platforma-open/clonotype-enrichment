@@ -48,7 +48,8 @@ getColumns := func(countsSpec, conditionOrder) {
           domain: {},
           annotations: {
             "pl7.app/label": "Binding Specificity",
-            "pl7.app/table/visibility": "default"
+            "pl7.app/table/visibility": "default",
+            "pl7.app/toPlot": "true"
           }
         }
       }, {
