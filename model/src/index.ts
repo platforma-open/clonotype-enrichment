@@ -149,8 +149,8 @@ export const model = BlockModel.create()
     if (!basicValid) return false;
 
     if (controlConfig.enabled) {
-      const { antigenColumnRef, targetCondition, negativeConditions } = controlConfig;
-      if (!antigenColumnRef || !targetCondition || !negativeConditions.length) return false;
+      const { antigenColumnRef, targetCondition, negativeConditions, controlConditionsOrder } = controlConfig;
+      if (!antigenColumnRef || !targetCondition || !negativeConditions.length || controlConditionsOrder.length < 2) return false;
     }
 
     // Need to include check for non empty controlConditionsOrder

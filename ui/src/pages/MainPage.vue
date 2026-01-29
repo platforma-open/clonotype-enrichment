@@ -459,97 +459,94 @@ const isControlOrderOpen = ref(true); // Open by default
       </PlAccordionSection>
     </PlAccordion>
 
-    <PlAccordionSection label="Target antigen & negative controls">
-      <PlCheckbox v-model="app.model.args.controlConfig.enabled">
-        Enable target selection & negative controls
-        <PlTooltip class="info">
-          <template #tooltip>
-            <div>
-              Enable negative control analysis to distinguish antigen-specific binders from background binders.
-            </div>
-          </template>
-        </PlTooltip>
-      </PlCheckbox>
+    <PlCheckbox v-model="app.model.args.controlConfig.enabled">
+      Enable target selection & negative controls
+      <PlTooltip class="info">
+        <template #tooltip>
+          <div>
+            Enable negative control analysis to distinguish antigen-specific binders from background binders.
+          </div>
+        </template>
+      </PlTooltip>
+    </PlCheckbox>
+    <PlDropdown
+      v-if="app.model.args.controlConfig.enabled"
+      v-model="app.model.args.controlConfig.antigenColumnRef"
+      :options="app.model.outputs.metadataOptions"
+      label="Antigen column" required
+    />
+    <PlRow v-if="app.model.args.controlConfig.enabled">
       <PlDropdown
-        v-if="app.model.args.controlConfig.enabled"
-        v-model="app.model.args.controlConfig.antigenColumnRef"
-        :options="app.model.outputs.metadataOptions"
-        label="Antigen column" required
+        v-model="app.model.args.controlConfig.targetCondition"
+        :options="antigenValues"
+        label="Target"
       />
-      <PlRow v-if="app.model.args.controlConfig.enabled">
-        <PlDropdown
-          v-model="app.model.args.controlConfig.targetCondition"
-          :options="antigenValues"
-          label="Target"
-        />
-        <PlDropdownMulti
-          v-model="app.model.args.controlConfig.negativeConditions"
-          :options="negativeAntigenValues"
-          label="Negative control(s)"
-        />
-      </PlRow>
-      <PlAccordion multiple>
-        <PlAccordionSection
-          v-if="app.model.args.controlConfig.enabled"
-          v-model="isControlOrderOpen" label="Negative Condition Order"
+      <PlDropdownMulti
+        v-model="app.model.args.controlConfig.negativeConditions"
+        :options="negativeAntigenValues"
+        label="Negative control(s)"
+      />
+    </PlRow>
+    <PlAccordion multiple>
+      <PlAccordionSection
+        v-if="app.model.args.controlConfig.enabled"
+        v-model="isControlOrderOpen" label="Negative Condition Order"
+      >
+        <div style="display: flex; margin-bottom: -15px;">
+          Define negative condition order
+          <PlTooltip class="info">
+            <template #label>Define condition order</template>
+            <template #tooltip>
+              <div>
+                <strong>Order aware selection:</strong> Calculates contrast between an element (numerator) and each of its preceding elements (denominators).
+                <br/><br/>
+                <strong>Example:</strong> If you select "Cond 1", "Cond 2" and "Cond 3", the contrasts will be:
+                <ul>
+                  <li>Cond 2 vs Cond 1</li>
+                  <li>Cond 3 vs Cond 1</li>
+                  <li>Cond 3 vs Cond 2</li>
+                </ul>
+              </div>
+            </template>
+          </PlTooltip>
+        </div>
+        <PlElementList
+          v-model:items="app.model.args.controlConfig.controlConditionsOrder"
         >
-          <div style="display: flex; margin-bottom: -15px;">
-            Define negative condition order
-            <PlTooltip class="info">
-              <template #label>Define condition order</template>
-              <template #tooltip>
-                <div>
-                  <strong>Order aware selection:</strong> Calculates contrast between an element (numerator) and each of its preceding elements (denominators).
-                  <br/><br/>
-                  <strong>Example:</strong> If you select "Cond 1", "Cond 2" and "Cond 3", the contrasts will be:
-                  <ul>
-                    <li>Cond 2 vs Cond 1</li>
-                    <li>Cond 3 vs Cond 1</li>
-                    <li>Cond 3 vs Cond 2</li>
-                  </ul>
-                </div>
-              </template>
-            </PlTooltip>
-          </div>
-          <PlElementList
-            v-model:items="app.model.args.controlConfig.controlConditionsOrder"
-          >
-            <template #item-title="{ item }">
-              {{ item }}
-            </template>
-          </PlElementList>
-          <PlBtnGhost
-            v-if="availableToAddToControl.length > 0"
-            @click="resetControlConditionOrder"
-          >
-            Reset to default
-            <template #append>
-              <PlMaskIcon24 name="reverse" />
-            </template>
-          </PlBtnGhost>
-          <div v-if="negativeComparisonsMessage" style="color: #6b7280; font-size: 13px; margin-top: 8px;">
-            {{ negativeComparisonsMessage }}
-          </div>
-        </PlAccordionSection>
-      </PlAccordion>
-      <PlRow v-if="app.model.args.controlConfig.enabled">
-        <PlNumberField
-          v-model="app.model.args.controlConfig.targetThreshold"
-          label="Target threshold"
-          :minValue="0"
-          :step="0.1"
-          placeholder="2.0"
-        />
-        <PlNumberField
-          v-model="app.model.args.controlConfig.controlThreshold"
-          label="Control threshold"
-          :minValue="0"
-          :step="0.1"
-          placeholder="1.0"
-        />
-      </PlRow>
-      <div v-if="app.model.args.controlConfig.enabled" style="height: 1px; background-color: #e2e2e2; margin: 16px 0;" />
-    </PlAccordionSection>
+          <template #item-title="{ item }">
+            {{ item }}
+          </template>
+        </PlElementList>
+        <PlBtnGhost
+          v-if="availableToAddToControl.length > 0"
+          @click="resetControlConditionOrder"
+        >
+          Reset to default
+          <template #append>
+            <PlMaskIcon24 name="reverse" />
+          </template>
+        </PlBtnGhost>
+        <div v-if="negativeComparisonsMessage" style="color: #6b7280; font-size: 13px; margin-top: 8px;">
+          {{ negativeComparisonsMessage }}
+        </div>
+      </PlAccordionSection>
+    </PlAccordion>
+    <PlRow v-if="app.model.args.controlConfig.enabled">
+      <PlNumberField
+        v-model="app.model.args.controlConfig.targetThreshold"
+        label="Target threshold"
+        :minValue="0"
+        :step="0.1"
+        placeholder="2.0"
+      />
+      <PlNumberField
+        v-model="app.model.args.controlConfig.controlThreshold"
+        label="Control threshold"
+        :minValue="0"
+        :step="0.1"
+        placeholder="1.0"
+      />
+    </PlRow>
 
     <PlAccordionSection label="Downsampling">
       <PlBtnGroup
