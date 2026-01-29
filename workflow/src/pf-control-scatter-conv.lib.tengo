@@ -18,7 +18,8 @@ getColumns := func(countsSpec, conditionOrder) {
           annotations: {
             "pl7.app/label": "Overall Log2FC",
             "pl7.app/table/visibility": "optional",
-            "pl7.app/format": ".2f"
+            "pl7.app/format": ".2f",
+            "pl7.app/toPlot": "true"
           }
         }
       }, {
@@ -32,7 +33,8 @@ getColumns := func(countsSpec, conditionOrder) {
           annotations: {
             "pl7.app/label": "Max Log2FC",
             "pl7.app/table/visibility": "optional",
-            "pl7.app/format": ".2f"
+            "pl7.app/format": ".2f",
+            "pl7.app/toPlot": "true"
           }
         }
       },
@@ -60,7 +62,8 @@ getColumns := func(countsSpec, conditionOrder) {
           annotations: {
             "pl7.app/label": "Max control Log2FC",
             "pl7.app/table/visibility": "optional",
-            "pl7.app/format": ".2f"
+            "pl7.app/format": ".2f",
+            "pl7.app/toPlot": "true"
           }
         }
       },
@@ -78,7 +81,8 @@ getColumns := func(countsSpec, conditionOrder) {
             // "pl7.app/vdj/isScore": "true",
             "pl7.app/table/orderPriority": "8000",
             "pl7.app/table/visibility": "optional",
-            "pl7.app/format": ".2e"
+            "pl7.app/format": ".2e",
+            "pl7.app/toPlot": "true"
           }
         }
       }]

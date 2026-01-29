@@ -5,6 +5,7 @@ import type {
   ListOption,
 } from '@platforma-sdk/ui-vue';
 import {
+  PlAccordion,
   PlAccordionSection,
   PlAgDataTableV2,
   PlAlert,
@@ -75,7 +76,7 @@ watchEffect(() => {
 
   // Add filtering mode at the end
   if (baseFilter) {
-    const filteringLabel = baseFilter === 'none' ? 'No filtering' : (baseFilter === 'shared' ? 'Shared (all rounds)' : 'Multiple rounds');
+    const filteringLabel = baseFilter === 'none' ? 'No filtering' : (baseFilter === 'shared' ? 'Shared (all conditions)' : 'Multiple conditions');
     label = label ? `${label}, ${filteringLabel}` : filteringLabel;
   }
 
@@ -244,13 +245,21 @@ const resetConditionOrder = () => {
 
 const resetControlConditionOrder = () => {
   if (app.model.outputs.negativeControlConditionValues) {
-    app.model.args.controlConfig.controlConditionsOrder = [...app.model.outputs.negativeControlConditionValues];
+    const vals = app.model.outputs.negativeControlConditionValues;
+    const mainOrder = app.model.args.conditionOrder;
+    const orderMap = new Map(mainOrder.map((v, i) => [v, i]));
+    const sorted = [...vals].sort((a, b) => {
+      const aIdx = orderMap.get(a) ?? Number.MAX_SAFE_INTEGER;
+      const bIdx = orderMap.get(b) ?? Number.MAX_SAFE_INTEGER;
+      return aIdx - bIdx;
+    });
+    app.model.args.controlConfig.controlConditionsOrder = sorted;
   }
 };
 
 const isClusterId = computed(() => {
   if (app.model.outputs.datasetSpec === undefined) return false;
-  return app.model.outputs.datasetSpec?.axesSpec.length >= 1 && app.model.outputs.datasetSpec?.axesSpec[1]?.name === 'pl7.app/vdj/clusterId';
+  return app.model.outputs.datasetSpec?.axesSpec.length >= 2 && app.model.outputs.datasetSpec?.axesSpec[1]?.name === 'pl7.app/vdj/clusterId';
 });
 
 /**
@@ -302,30 +311,35 @@ watchEffect(() => {
     const hasInvalidItems = current.some((v) => !valSet.has(v));
 
     if (col !== controlSyncCol.value || current.length === 0 || hasInvalidItems) {
-      app.model.args.controlConfig.controlConditionsOrder = [...vals];
+      const mainOrder = app.model.args.conditionOrder;
+      const orderMap = new Map(mainOrder.map((v, i) => [v, i]));
+      const sorted = [...vals].sort((a, b) => {
+        const aIdx = orderMap.get(a) ?? Number.MAX_SAFE_INTEGER;
+        const bIdx = orderMap.get(b) ?? Number.MAX_SAFE_INTEGER;
+        return aIdx - bIdx;
+      });
+      app.model.args.controlConfig.controlConditionsOrder = sorted;
       controlSyncCol.value = col;
     }
   }
 });
 
 // Track datasets and spec to prevent unwanted updates of values
-const datasetSpec = computed(() => app.model.outputs.datasetSpec);
-
 const syncAbundanceRef = ref(app.model.args.abundanceRef ? JSON.stringify(app.model.args.abundanceRef) : undefined);
 const syncIsClustered = ref<boolean | undefined>(
-  datasetSpec.value?.axesSpec
-    ? datasetSpec.value.axesSpec.length >= 1 && datasetSpec.value.axesSpec[1]?.name === 'pl7.app/vdj/clusterId'
-    : undefined,
+  app.model.outputs.datasetSpec?.axesSpec !== undefined
+  && app.model.outputs.datasetSpec.axesSpec.length >= 2
+  && app.model.outputs.datasetSpec.axesSpec[1].name === 'pl7.app/vdj/clusterId',
 );
 
 // Watch for changes in the dataset spec to initialize defaults
 watchEffect(() => {
   const abundanceRef = app.model.args.abundanceRef;
-  const spec = datasetSpec.value;
+  const spec = app.model.outputs.datasetSpec;
 
   if (abundanceRef && spec?.axesSpec) {
     const abundanceRefStr = JSON.stringify(abundanceRef);
-    const isClustered = spec.axesSpec.length >= 1 && spec.axesSpec[1]?.name === 'pl7.app/vdj/clusterId';
+    const isClustered = spec.axesSpec.length >= 2 && spec.axesSpec[1]?.name === 'pl7.app/vdj/clusterId';
 
     // Reset to default if:
     // 1. The user switched to a DIFFERENT dataset.
@@ -347,9 +361,12 @@ watchEffect(() => {
 // Filtering options
 const filteringOptions = [
   { value: 'none', label: 'No filtering' },
-  { value: 'shared', label: 'Shared (all rounds)' },
-  { value: 'single-sample', label: 'Multiple rounds' },
+  { value: 'shared', label: 'Shared (all conditions)' },
+  { value: 'single-sample', label: 'Multiple conditions' },
 ];
+
+const isConditionOrderOpen = ref(true); // Open by default
+
 </script>
 
 <template>
@@ -399,46 +416,48 @@ const filteringOptions = [
     />
     <PlDropdown v-model="app.model.args.conditionColumnRef" :options="app.model.outputs.metadataOptions" label="Condition column" required />
 
-    <PlAccordionSection label="Condition Order">
-      <div style="display: flex; margin-bottom: -15px;">
-        Define condition order
-        <PlTooltip class="info">
-          <template #label>Define condition order</template>
-          <template #tooltip>
-            <div>
-              <strong>Order aware selection:</strong> Calculates contrast between an element (numerator) and each of its preceding elements (denominators).
-              <br/><br/>
-              <strong>Example:</strong> If you select "Cond 1", "Cond 2" and "Cond 3", the contrasts will be:
-              <ul>
-                <li>Cond 2 vs Cond 1</li>
-                <li>Cond 3 vs Cond 1</li>
-                <li>Cond 3 vs Cond 2</li>
-              </ul>
-              The block will export the highest Enrichment value from all comparisons.
-            </div>
+    <PlAccordion multiple>
+      <PlAccordionSection v-model="isConditionOrderOpen" label="Condition Order">
+        <div style="display: flex; margin-bottom: -15px;">
+          Define condition order
+          <PlTooltip class="info">
+            <template #label>Define condition order</template>
+            <template #tooltip>
+              <div>
+                <strong>Order aware selection:</strong> Calculates contrast between an element (numerator) and each of its preceding elements (denominators).
+                <br/><br/>
+                <strong>Example:</strong> If you select "Cond 1", "Cond 2" and "Cond 3", the contrasts will be:
+                <ul>
+                  <li>Cond 2 vs Cond 1</li>
+                  <li>Cond 3 vs Cond 1</li>
+                  <li>Cond 3 vs Cond 2</li>
+                </ul>
+                The block will export the highest Enrichment value from all comparisons.
+              </div>
+            </template>
+          </PlTooltip>
+        </div>
+        <PlElementList
+          v-model:items="app.model.args.conditionOrder"
+        >
+          <template #item-title="{ item }">
+            {{ item }}
           </template>
-        </PlTooltip>
-      </div>
-      <PlElementList
-        v-model:items="app.model.args.conditionOrder"
-      >
-        <template #item-title="{ item }">
-          {{ item }}
-        </template>
-      </PlElementList>
-      <PlBtnGhost
-        v-if="availableToAdd.length > 0"
-        @click="resetConditionOrder"
-      >
-        Reset to default
-        <template #append>
-          <PlMaskIcon24 name="reverse" />
-        </template>
-      </PlBtnGhost>
-      <div v-if="comparisonsMessage" style="color: #6b7280; font-size: 13px; margin-top: 8px;">
-        {{ comparisonsMessage }}
-      </div>
-    </PlAccordionSection>
+        </PlElementList>
+        <PlBtnGhost
+          v-if="availableToAdd.length > 0"
+          @click="resetConditionOrder"
+        >
+          Reset to default
+          <template #append>
+            <PlMaskIcon24 name="reverse" />
+          </template>
+        </PlBtnGhost>
+        <div v-if="comparisonsMessage" style="color: #6b7280; font-size: 13px; margin-top: 8px;">
+          {{ comparisonsMessage }}
+        </div>
+      </PlAccordionSection>
+    </PlAccordion>
 
     <PlAccordionSection label="Target antigen & negative controls">
       <PlCheckbox v-model="app.model.args.controlConfig.enabled">
@@ -469,45 +488,50 @@ const filteringOptions = [
           label="Negative control(s)"
         />
       </PlRow>
-      <PlAccordionSection v-if="app.model.args.controlConfig.enabled" label="Negative Condition Order">
-        <div style="display: flex; margin-bottom: -15px;">
-          Define negative condition order
-          <PlTooltip class="info">
-            <template #label>Define condition order</template>
-            <template #tooltip>
-              <div>
-                <strong>Order aware selection:</strong> Calculates contrast between an element (numerator) and each of its preceding elements (denominators).
-                <br/><br/>
-                <strong>Example:</strong> If you select "Cond 1", "Cond 2" and "Cond 3", the contrasts will be:
-                <ul>
-                  <li>Cond 2 vs Cond 1</li>
-                  <li>Cond 3 vs Cond 1</li>
-                  <li>Cond 3 vs Cond 2</li>
-                </ul>
-              </div>
+      <PlAccordion multiple>
+        <PlAccordionSection
+          v-if="app.model.args.controlConfig.enabled"
+          v-model="isConditionOrderOpen" label="Negative Condition Order"
+        >
+          <div style="display: flex; margin-bottom: -15px;">
+            Define negative condition order
+            <PlTooltip class="info">
+              <template #label>Define condition order</template>
+              <template #tooltip>
+                <div>
+                  <strong>Order aware selection:</strong> Calculates contrast between an element (numerator) and each of its preceding elements (denominators).
+                  <br/><br/>
+                  <strong>Example:</strong> If you select "Cond 1", "Cond 2" and "Cond 3", the contrasts will be:
+                  <ul>
+                    <li>Cond 2 vs Cond 1</li>
+                    <li>Cond 3 vs Cond 1</li>
+                    <li>Cond 3 vs Cond 2</li>
+                  </ul>
+                </div>
+              </template>
+            </PlTooltip>
+          </div>
+          <PlElementList
+            v-model:items="app.model.args.controlConfig.controlConditionsOrder"
+          >
+            <template #item-title="{ item }">
+              {{ item }}
             </template>
-          </PlTooltip>
-        </div>
-        <PlElementList
-          v-model:items="app.model.args.controlConfig.controlConditionsOrder"
-        >
-          <template #item-title="{ item }">
-            {{ item }}
-          </template>
-        </PlElementList>
-        <PlBtnGhost
-          v-if="availableToAddToControl.length > 0"
-          @click="resetControlConditionOrder"
-        >
-          Reset to default
-          <template #append>
-            <PlMaskIcon24 name="reverse" />
-          </template>
-        </PlBtnGhost>
-        <div v-if="negativeComparisonsMessage" style="color: #6b7280; font-size: 13px; margin-top: 8px;">
-          {{ negativeComparisonsMessage }}
-        </div>
-      </PlAccordionSection>
+          </PlElementList>
+          <PlBtnGhost
+            v-if="availableToAddToControl.length > 0"
+            @click="resetControlConditionOrder"
+          >
+            Reset to default
+            <template #append>
+              <PlMaskIcon24 name="reverse" />
+            </template>
+          </PlBtnGhost>
+          <div v-if="negativeComparisonsMessage" style="color: #6b7280; font-size: 13px; margin-top: 8px;">
+            {{ negativeComparisonsMessage }}
+          </div>
+        </PlAccordionSection>
+      </PlAccordion>
       <PlRow v-if="app.model.args.controlConfig.enabled">
         <PlNumberField
           v-model="app.model.args.controlConfig.targetThreshold"
@@ -527,65 +551,66 @@ const filteringOptions = [
       <div v-if="app.model.args.controlConfig.enabled" style="height: 1px; background-color: #e2e2e2; margin: 16px 0;" />
     </PlAccordionSection>
 
-    <PlBtnGroup
-      v-model="app.model.args.downsampling.type" :options="downsamplingOptions"
-      label="Downsampling" :compact="true"
-    >
-      <template #tooltip>
-        <div>
-          <strong>Downsampling Strategy:</strong><br/>
-          Normalizes sequencing depth across samples to ensure fair comparison of diversity and abundance.
-          <br/><br/>
-          <strong>None:</strong> Use raw abundance values. Recommended only if sequencing depth is already uniform.<br/><br/>
-          <strong>Random Sampling:</strong> Resamples all samples to a target read depth (total number of reads) while maintaining relative clonotype proportions. Choose <strong>Fixed</strong> (manual), <strong>Min</strong> (smallest sample), or <strong>Auto</strong> to set the target depth.
-        </div>
-      </template>
-    </PlBtnGroup>
+    <PlAccordionSection label="Downsampling">
+      <PlBtnGroup
+        v-model="app.model.args.downsampling.type" :options="downsamplingOptions"
+        label="Downsampling options" :compact="true"
+      >
+        <template #tooltip>
+          <div>
+            <strong>Downsampling Strategy:</strong><br/>
+            Normalizes sequencing depth across samples to ensure fair comparison of diversity and abundance.
+            <br/><br/>
+            <strong>None:</strong> Use raw abundance values. Recommended only if sequencing depth is already uniform.<br/><br/>
+            <strong>Random Sampling:</strong> Resamples all samples to a target read depth (total number of reads) while maintaining relative clonotype proportions. Choose <strong>Fixed</strong> (manual), <strong>Min</strong> (smallest sample), or <strong>Auto</strong> to set the target depth.
+          </div>
+        </template>
+      </PlBtnGroup>
+      <PlBtnGroup
+        v-if="app.model.args.downsampling.type === 'hypergeometric'"
+        v-model="app.model.args.downsampling.valueChooser"
+        style="margin-top: -18px"
+        :options="[
+          { value: 'fixed', label: 'Fixed' },
+          { value: 'min', label: 'Min', },
+          { value: 'auto', label: 'Auto', },
+        ]"
+      />
 
-    <PlBtnGroup
-      v-if="app.model.args.downsampling.type === 'hypergeometric'"
-      v-model="app.model.args.downsampling.valueChooser"
-      style="margin-top: -18px"
-      :options="[
-        { value: 'fixed', label: 'Fixed' },
-        { value: 'min', label: 'Min', },
-        { value: 'auto', label: 'Auto', },
-      ]"
-    />
+      <PlNumberField
+        v-if="app.model.args.downsampling.type === 'hypergeometric'
+          && app.model.args.downsampling.valueChooser === 'fixed'"
+        v-model="app.model.args.downsampling.n"
+        label="Select N"
+        :minValue="0"
+        required
+      />
+    </PlAccordionSection>
 
-    <PlNumberField
-      v-if="app.model.args.downsampling.type === 'hypergeometric'
-        && app.model.args.downsampling.valueChooser === 'fixed'"
-      v-model="app.model.args.downsampling.n"
-      label="Select N"
-      :minValue="0"
-      required
-    />
-
-    <PlAccordionSection label="Filtering Options">
+    <PlAccordionSection label="Clonotype Filtering Options">
       <PlRadioGroup
         v-model="app.model.args.FilteringConfig.baseFilter"
         :options="filteringOptions"
       >
         <template #label>
-          Clonotype Filtering
+          Based on condition overlap
           <PlTooltip class="info" :style="{display: 'inline-block'}">
             <template #tooltip>
-              <strong>Clonotype filtering strategy:</strong><br/>
+              <strong>Condition-based filtering strategy:</strong><br/>
               <strong>No filtering:</strong> Analyze all clonotypes, including those specific to individual conditions (may include rare or condition-specific responses)<br/><br/>
-              <strong>Shared (all rounds):</strong> Focus only on clonotypes present in all rounds<br/><br/>
-              <strong>Multiple rounds:</strong> Focus on clonotypes present in more than one condition (excludes condition-specific clonotypes that may represent noise or rare events)
+              <strong>Shared (all conditions):</strong> Focus only on clonotypes present in all conditions<br/><br/>
+              <strong>Multiple conditions:</strong> Focus on clonotypes present in more than one condition (excludes condition-specific clonotypes that may represent noise or rare events)
             </template>
           </PlTooltip>
         </template>
       </PlRadioGroup>
       <PlCheckbox v-model="app.model.args.FilteringConfig.minAbundance.enabled">
-        Abundance Filtering
+        Based on abundance
         <PlTooltip class="info">
           <template #tooltip>
             <div>
               Remove clonotypes below a specific threshold based on their maximum abundance across all conditions. Filters sampling noise in display campaigns<br/><br/>
-              <strong>Counts:</strong> Filter by raw number of reads (e.g., 100).<br/>
+              <strong>Counts:</strong> Filter by raw/downsampled number of reads (e.g., 100).<br/>
               <strong>Frequency:</strong> Filter by fraction of reads aggregated across same condition samples (0 to 1.0).<br/><br/>
               For <em>in vivo</em> studies with lower sequencing depth, consider lower values (10-50 counts).
             </div>
@@ -618,13 +643,13 @@ const filteringOptions = [
         />
       </PlRow>
       <PlCheckbox v-model="app.model.args.FilteringConfig.presentInRounds.enabled">
-        In-round Presence Filtering
+        Based on specific conditions
         <PlTooltip class="info">
           <template #tooltip>
             <div>
-              Keep only clonotypes based on their presence in selected conditions.<br/><br/>
-              <strong>Any selected (OR):</strong> Keeps clonotypes present in at least one of the selected rounds.<br/>
-              <strong>All selected (AND):</strong> Keeps only clonotypes present in all of the selected rounds.<br/><br/>
+              Keep clonotypes present in selected conditions.<br/><br/>
+              <strong>Any selected (OR):</strong> Only keeps clonotypes present in at least one of the selected rounds.<br/>
+              <strong>All selected (AND):</strong> Only keeps clonotypes present in all of the selected rounds.<br/><br/>
               Useful to focus on clonotypes that reached later selection rounds.
             </div>
           </template>
