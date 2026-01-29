@@ -47,17 +47,21 @@ const defaultOptions = computed((): PredefinedGraphOption<'scatterplot'>[] | und
   return defaults;
 });
 
-const metaColumnPredicate = (spec: PColumnSpec) => {
-  const isClustered = app.model.outputs.datasetSpec?.axesSpec !== undefined
-    && app.model.outputs.datasetSpec.axesSpec.length >= 2
-    && app.model.outputs.datasetSpec.axesSpec[1].name === 'pl7.app/vdj/clusterId';
-  if (isClustered) {
-    return spec.axesSpec[0]?.name !== 'pl7.app/vdj/clonotypeKey';
-  } else {
-    return spec.axesSpec[0]?.name === 'pl7.app/vdj/clonotypeKey';
-  }
-};
+const isClustered = computed(() => {
+  const spec = app.model.outputs.datasetSpec;
+  return spec?.axesSpec !== undefined
+    && spec.axesSpec.length >= 2
+    && spec.axesSpec[1].name === 'pl7.app/vdj/clusterId';
+});
 
+const primaryAxis = computed(() => isClustered.value ? 'pl7.app/vdj/clusterId' : 'pl7.app/vdj/clonotypeKey');
+
+const dataColumnPredicate = (spec: PColumnSpec) =>
+  spec.axesSpec.length === 1
+  && spec.axesSpec[0].name === primaryAxis.value
+  && spec.annotations?.['pl7.app/toPlot'] === 'true';
+
+const metaColumnPredicate = (spec: PColumnSpec) => spec.axesSpec[0]?.name === primaryAxis.value;
 </script>
 
 <template>
@@ -67,7 +71,7 @@ const metaColumnPredicate = (spec: PColumnSpec) => {
     :data-state-key="app.model.args.abundanceRef"
     :p-frame="app.model.outputs.controlScatterPf"
     :default-options="defaultOptions"
-    :dataColumnPredicate="(spec: PColumnSpec) => spec.axesSpec.length === 1 && spec.axesSpec[0].name === 'pl7.app/vdj/clonotypeKey' && spec.annotations?.['pl7.app/toPlot'] === 'true'"
+    :dataColumnPredicate="dataColumnPredicate"
     :meta-column-predicate="metaColumnPredicate"
   />
 </template>

@@ -366,7 +366,7 @@ const filteringOptions = [
 ];
 
 const isConditionOrderOpen = ref(true); // Open by default
-
+const isControlOrderOpen = ref(true); // Open by default
 </script>
 
 <template>
@@ -491,7 +491,7 @@ const isConditionOrderOpen = ref(true); // Open by default
       <PlAccordion multiple>
         <PlAccordionSection
           v-if="app.model.args.controlConfig.enabled"
-          v-model="isConditionOrderOpen" label="Negative Condition Order"
+          v-model="isControlOrderOpen" label="Negative Condition Order"
         >
           <div style="display: flex; margin-bottom: -15px;">
             Define negative condition order
