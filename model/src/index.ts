@@ -2,7 +2,6 @@ import type { GraphMakerState } from '@milaboratories/graph-maker';
 import type {
   AnchoredPColumnSelector,
   PColumnIdAndSpec,
-  PDataColumnSpec,
   PFrameHandle,
   PlDataTableStateV2,
   PlRef,
@@ -14,9 +13,6 @@ import {
   createPFrameForGraphs,
   createPlDataTableStateV2,
   createPlDataTableV2,
-  getRelatedColumns,
-  isHiddenFromGraphColumn,
-  isHiddenFromUIColumn,
 } from '@platforma-sdk/model';
 
 export type DownsamplingParameters = {
@@ -360,13 +356,7 @@ export const model = BlockModel.create()
       return undefined;
     }
 
-    // we use this chunk instead of createPFrameForGraphs to skip clonotype-enrichment block exports
-    const suitableSpec = (spec: PDataColumnSpec) => {
-      const trace = spec.annotations?.['pl7.app/trace'];
-      const hasEnrichment = typeof trace === 'string' && trace.includes('clonotype-enrichment');
-      return !hasEnrichment && !isHiddenFromUIColumn(spec) && !isHiddenFromGraphColumn(spec);
-    };
-    return ctx.createPFrame(getRelatedColumns(ctx, { columns: pCols, predicate: suitableSpec }));
+    return createPFrameForGraphs(ctx, pCols);
   })
 
   .output('stackedPCols', (ctx) => {
@@ -390,13 +380,7 @@ export const model = BlockModel.create()
       return undefined;
     }
 
-    // we use this chunk instead of createPFrameForGraphs to skip clonotype-enrichment block exports
-    const suitableSpec = (spec: PDataColumnSpec) => {
-      const trace = spec.annotations?.['pl7.app/trace'];
-      const hasEnrichment = typeof trace === 'string' && trace.includes('clonotype-enrichment');
-      return !hasEnrichment && !isHiddenFromUIColumn(spec) && !isHiddenFromGraphColumn(spec);
-    };
-    return ctx.createPFrame(getRelatedColumns(ctx, { columns: pCols, predicate: suitableSpec }));
+    return createPFrameForGraphs(ctx, pCols);
   })
 
   .output('isRunning', (ctx) => ctx.outputs?.getIsReadyOrError() === false)
@@ -407,13 +391,7 @@ export const model = BlockModel.create()
       return undefined;
     }
 
-    // we use this chunk instead of createPFrameForGraphs to skip clonotype-enrichment block exports
-    const suitableSpec = (spec: PDataColumnSpec) => {
-      const trace = spec.annotations?.['pl7.app/trace'];
-      const hasEnrichment = typeof trace === 'string' && trace.includes('clonotype-enrichment');
-      return !hasEnrichment && !isHiddenFromUIColumn(spec) && !isHiddenFromGraphColumn(spec);
-    };
-    return ctx.createPFrame(getRelatedColumns(ctx, { columns: pCols, predicate: suitableSpec }));
+    return createPFrameForGraphs(ctx, pCols);
   })
 
   .output('controlScatterPCols', (ctx) => {

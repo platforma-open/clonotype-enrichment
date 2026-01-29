@@ -60,7 +60,8 @@ const dataColumnPredicate = (spec: PColumnSpec) =>
   && spec.axesSpec[0].name === primaryAxis.value
   && spec.axesSpec[1].name === 'pl7.app/vdj/condition';
 
-const metaColumnPredicate = (spec: PColumnSpec) => spec.axesSpec[0]?.name === primaryAxis.value;
+const metaColumnPredicate = (spec: PColumnSpec) => spec.axesSpec[0]?.name === primaryAxis.value
+  && !spec.annotations?.['pl7.app/trace']?.includes('clonotype-enrichment');
 </script>
 
 <template>
