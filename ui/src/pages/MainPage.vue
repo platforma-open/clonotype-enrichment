@@ -538,7 +538,22 @@ const isControlOrderOpen = ref(true); // Open by default
         :minValue="0"
         :step="0.1"
         placeholder="2.0"
-      />
+      >
+        <template #tooltip>
+          <div>
+            Log2 Fold Change (Log2FC) thresholds used to define <strong>Binding Specificity</strong> categories.<br/>
+            Being Target<sub>Max</sub> and Control<sub>Max</sub> the maximum Log2FC values for the target and control conditions respectively:
+            <br/><br/>
+            - <strong>Antigen-Specific:</strong> Target<sub>Max</sub> ≥ Target Threshold and Control<sub>Max</sub> &lt; Control Threshold.
+            <br/>
+            - <strong>Non-Specific:</strong> Both Target<sub>Max</sub> and Control<sub>Max</sub> ≥ thresholds (indicates "sticky" binders).
+            <br/>
+            - <strong>Negative-Control:</strong> Target<sub>Max</sub> &lt; Target Threshold and Control<sub>Max</sub> ≥ Control Threshold.
+            <br/>
+            - <strong>Not-Enriched:</strong> Both below thresholds.
+          </div>
+        </template>
+      </PlNumberField>
       <PlNumberField
         v-model="app.model.args.controlConfig.controlThreshold"
         label="Control threshold"
