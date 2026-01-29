@@ -2,6 +2,7 @@
 import type { PredefinedGraphOption } from '@milaboratories/graph-maker';
 import { GraphMaker } from '@milaboratories/graph-maker';
 import '@milaboratories/graph-maker/styles';
+import type { PColumnSpec } from '@platforma-sdk/model';
 import { computed } from 'vue';
 import { useApp } from '../app';
 
@@ -37,6 +38,21 @@ const defaultOptions = computed((): PredefinedGraphOption<'discrete'>[] | undefi
   return defaults;
 });
 
+const isClustered = computed(() => {
+  const spec = app.model.outputs.datasetSpec;
+  return spec?.axesSpec !== undefined
+    && spec.axesSpec.length >= 2
+    && spec.axesSpec[1].name === 'pl7.app/vdj/clusterId';
+});
+
+const primaryAxis = computed(() => isClustered.value ? 'pl7.app/vdj/clusterId' : 'pl7.app/vdj/clonotypeKey');
+
+const dataColumnPredicate = (spec: PColumnSpec) =>
+  spec.axesSpec.length === 2
+  && spec.axesSpec[0].name === primaryAxis.value
+  && spec.axesSpec[1].name === 'pl7.app/vdj/condition';
+
+const metaColumnPredicate = (spec: PColumnSpec) => spec.axesSpec[0]?.name === primaryAxis.value;
 </script>
 
 <template>
@@ -46,5 +62,7 @@ const defaultOptions = computed((): PredefinedGraphOption<'discrete'>[] | undefi
     :data-state-key="app.model.args.abundanceRef"
     :p-frame="app.model.outputs.stackedPf"
     :default-options="defaultOptions"
+    :dataColumnPredicate="dataColumnPredicate"
+    :meta-column-predicate="metaColumnPredicate"
   />
 </template>

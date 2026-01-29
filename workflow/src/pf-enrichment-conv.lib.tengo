@@ -2,9 +2,16 @@ ll := import("@platforma-sdk/workflow-tengo:ll")
 maps := import("@platforma-sdk/workflow-tengo:maps")
 strings := import("@platforma-sdk/workflow-tengo:strings")
 
-getColumns := func(countsSpec, conditionOrder) {
+getColumns := func(countsSpec, conditionOrder, controlEnabled) {
   columns := []
   for idx, condition in conditionOrder {
+    // Set last round's frequency always visible
+    visibility := "optional"
+    if idx == len(conditionOrder) - 1 {
+      visibility = "default"
+    } else {
+      visibility = "optional"
+    }
     columns = columns + [{
                           column: "Frequency " + condition,
                           id: strings.substituteSpecialCharacters("frequency_" + condition),
@@ -18,7 +25,7 @@ getColumns := func(countsSpec, conditionOrder) {
                               // add isScore only in exports to ease plots
                               // "pl7.app/vdj/isScore": "true",
                               "pl7.app/table/orderPriority": "8000",
-                              "pl7.app/table/visibility": "optional",
+                              "pl7.app/table/visibility": visibility,
                               "pl7.app/format": ".2e"
                             }
                           }
@@ -38,7 +45,7 @@ getColumns := func(countsSpec, conditionOrder) {
                                 // add isScore only in exports to ease plots
                                 // "pl7.app/vdj/isScore": "true",
                                 "pl7.app/table/orderPriority": "9000",
-                                "pl7.app/table/visibility": "default",
+                                "pl7.app/table/visibility": "optional",
                                 "pl7.app/format": ".2f"
                               }
                             }
@@ -49,6 +56,24 @@ getColumns := func(countsSpec, conditionOrder) {
 
   // Add remaining fixed-name columns
   columns = columns + [{
+        column: "Overall Log2FC",
+        id: "overall_log2fc",
+        allowNA: true,
+        spec: {
+          name: "pl7.app/vdj/enrichment",
+          valueType: "Double",
+          domain: {
+            "pl7.app/vdj/enrichment/type": "overall",
+            "pl7.app/vdj/enrichment/comparison": conditionOrder[len(conditionOrder) - 1] + " vs " + conditionOrder[0],
+            "pl7.app/comparison": "Overall Enrichment"
+          },
+          annotations: {
+            "pl7.app/label": "Overall Log2FC",
+            "pl7.app/table/visibility": "default",
+            "pl7.app/format": ".2f"
+          }
+        }
+      }, {
         column: "MaxPositiveEnrichment",
         id: "maxenrichment",
         allowNA: false,
@@ -57,12 +82,57 @@ getColumns := func(countsSpec, conditionOrder) {
           valueType: "Double",
           domain: {},
           annotations: {
-            "pl7.app/label": "Maximum Enrichment",
-            "pl7.app/table/visibility": "optional",
-            "pl7.app/format": ".2e"
+            "pl7.app/label": "Max Log2FC",
+            "pl7.app/table/visibility": "default",
+            "pl7.app/format": ".2f"
+          }
+        }
+      }, {
+        column: "EnrichmentQuality",
+        id: "enrichment_quality",
+        allowNA: true,
+        spec: {
+          name: "pl7.app/vdj/enrichmentQuality",
+          valueType: "String",
+          domain: {},
+          annotations: {
+            "pl7.app/label": "Enrichment Quality",
+            "pl7.app/table/visibility": "default",
+            "pl7.app/table/orderPriority": "95"
           }
         }
       }]
+
+  if controlEnabled {
+    columns = columns + [{
+        column: "Binding Specificity",
+        id: "binding_specificity",
+        allowNA: true,
+        spec: {
+          name: "pl7.app/vdj/bindingSpecificity",
+          valueType: "String",
+          domain: {},
+          annotations: {
+            "pl7.app/label": "Binding Specificity",
+            "pl7.app/table/visibility": "default"
+          }
+        }
+      }, {
+        column: "MaxNegControlEnrichment",
+        id: "maxnegcontrolenrichment",
+        allowNA: true,
+        spec: {
+          name: "pl7.app/vdj/maxNegControlEnrichment",
+          valueType: "Double",
+          domain: {},
+          annotations: {
+            "pl7.app/label": "Max control Log2FC",
+            "pl7.app/table/visibility": "optional",
+            "pl7.app/format": ".2f"
+          }
+        }
+      }]
+  }
     
   return {
     axes: [

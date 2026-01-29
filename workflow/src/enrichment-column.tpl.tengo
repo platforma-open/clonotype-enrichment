@@ -7,17 +7,19 @@ text := import("text")
 
 pfEnrichmentConvExport := import(":pf-enrichment-conv-export")
 
-self.defineOutputs("columnSpec", "columnData")
+self.defineOutputs("columnSpec", "columnData", "bindingSpecificitySpec", "bindingSpecificityData", "overallSpec", "overallData", "enrichmentQualitySpec", "enrichmentQualityData")
 
 self.body(func(args) {
     min := args.min
     max := args.max
     cutoff := args.cutoff
+    overall75Percentile := args.overall75Percentile
     downsampling := args.downsampling
     abundanceSpec := args.abundanceSpec
     inputType := args.inputType
     topEnrichedColCsv := args.topEnrichedColCsv
     conditionOrder := args.conditionOrder
+    controlConfig := args.controlConfig
     blockId := args.blockId
     specOpts := args.specOpts
     customBlockLabel := args.customBlockLabel
@@ -31,8 +33,10 @@ self.body(func(args) {
                                                                 string(min.getData()),
                                                                 string(max.getData()),
                                                                 string(cutoff.getData()),
+                                                                string(overall75Percentile.getData()),
                                                                 downsampling,
                                                                 conditionOrder,
+                                                                controlConfig,
                                                                 blockId,
                                                                 specOpts)
     } else {
@@ -41,8 +45,10 @@ self.body(func(args) {
                                                                 string(min.getData()),
                                                                 string(max.getData()),
                                                                 string(cutoff.getData()),
+                                                                string(overall75Percentile.getData()),
                                                                 downsampling,
                                                                 conditionOrder,
+                                                                controlConfig,
                                                                 blockId)
     }
 
@@ -79,8 +85,22 @@ self.body(func(args) {
             label: label
         })
 
-    return {
+    res := {
         columnSpec: trace.inject(exportFile["enrichment.spec"]),
-        columnData: exportFile["enrichment.data"]
+        columnData: exportFile["enrichment.data"],
+        overallSpec: trace.inject(exportFile["overall_log2fc.spec"]),
+        overallData: exportFile["overall_log2fc.data"],
+        enrichmentQualitySpec: trace.inject(exportFile["enrichment_quality.spec"]),
+        enrichmentQualityData: exportFile["enrichment_quality.data"]
     }
+
+    if controlConfig != undefined && controlConfig.enabled == true {
+        res.bindingSpecificitySpec = trace.inject(exportFile["binding_specificity.spec"])
+        res.bindingSpecificityData = exportFile["binding_specificity.data"]
+    } else {
+        res.bindingSpecificitySpec = "empty"
+        res.bindingSpecificityData = "empty"
+    }
+
+    return res
 })

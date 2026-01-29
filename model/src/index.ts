@@ -21,11 +21,40 @@ export type DownsamplingParameters = {
   n?: number;
 };
 
+type FilteringConfig = {
+  // Mutually exclusive base filter
+  baseFilter: 'none' | 'shared' | 'single-sample';
+
+  // Combinatory filters (apply on top of base)
+  minAbundance: {
+    enabled: boolean;
+    threshold: number;
+    metric: 'count' | 'frequency';
+  };
+
+  presentInRounds: {
+    enabled: boolean;
+    rounds: string[];
+    logic: 'OR' | 'AND';
+  };
+};
+
+type ControlConfig = {
+  enabled: boolean;
+  antigenColumnRef?: SUniversalPColumnId; // Metadata column for antigen/control
+  targetCondition?: string; // e.g., ["Target-Antigen"]
+  negativeConditions: string[]; // e.g., ["BSA", "Plastic"]
+  targetThreshold: number; // Default: 2.0 log2 FC
+  controlThreshold: number; // Default: 1.0 log2 FC
+  controlConditionsOrder: string[]; // e.g., ["BSA", "Plastic"]
+};
+
 export type UiState = {
   tableState: PlDataTableStateV2;
   bubbleState: GraphMakerState;
   lineState: GraphMakerState;
   stackedState: GraphMakerState;
+  scatterState: GraphMakerState;
 };
 
 export type BlockArgs = {
@@ -35,9 +64,11 @@ export type BlockArgs = {
   conditionColumnRef?: SUniversalPColumnId;
   conditionOrder: string[];
   downsampling: DownsamplingParameters;
-  filteringMode: 'none' | 'single-sample';
+  FilteringConfig: FilteringConfig;
   clonotypeDefinition: SUniversalPColumnId[];
   additionalEnrichmentExports: string[];
+  controlConfig: ControlConfig;
+  pseudoCount: number; // Default: 100
 };
 
 export const model = BlockModel.create()
@@ -51,8 +82,28 @@ export const model = BlockModel.create()
       valueChooser: 'auto',
     },
     clonotypeDefinition: [],
-    filteringMode: 'single-sample',
+    FilteringConfig: {
+      baseFilter: 'none',
+      minAbundance: {
+        enabled: false,
+        threshold: 100,
+        metric: 'count',
+      },
+      presentInRounds: {
+        enabled: false,
+        rounds: [],
+        logic: 'OR',
+      },
+    },
     additionalEnrichmentExports: [],
+    controlConfig: {
+      enabled: false,
+      negativeConditions: [],
+      targetThreshold: 2.0,
+      controlThreshold: 1.0,
+      controlConditionsOrder: [],
+    },
+    pseudoCount: 100,
   })
 
   .withUiState<UiState>({
@@ -68,7 +119,7 @@ export const model = BlockModel.create()
       currentTab: null,
     },
     lineState: {
-      title: 'Top 20 enriched clonotype frequencies',
+      title: 'Top 10 enriched clonotype frequencies',
       template: 'curve_dots',
       currentTab: null,
       layersSettings: {
@@ -78,15 +129,35 @@ export const model = BlockModel.create()
       },
     },
     stackedState: {
-      title: 'Top 5 enriched clonotype frequencies',
-      template: 'stackedBar',
+      title: 'Top 10 enriched clonotype frequencies',
+      template: 'stackedArea',
+      currentTab: null,
+    },
+    scatterState: {
+      title: 'Binding specificity',
+      template: 'dots',
       currentTab: null,
     },
   })
 
-  .argsValid((ctx) => ctx.args.abundanceRef !== undefined
-    && ctx.args.conditionColumnRef !== undefined
-    && ctx.args.conditionOrder.length > 0)
+  .argsValid((ctx) => {
+    const { abundanceRef, conditionColumnRef, conditionOrder, controlConfig } = ctx.args;
+    const basicValid = abundanceRef !== undefined
+      && conditionColumnRef !== undefined
+      && conditionOrder.length > 0;
+
+    if (!basicValid) return false;
+
+    if (controlConfig.enabled) {
+      const { antigenColumnRef, targetCondition, negativeConditions, controlConditionsOrder } = controlConfig;
+      if (!antigenColumnRef || !targetCondition || !negativeConditions.length || controlConditionsOrder.length < 2) return false;
+    }
+
+    // Need to include check for non empty controlConditionsOrder
+    // Need to include check for at least two samples with negative and positive control conditions
+
+    return true;
+  })
 
   .output('abundanceOptions', (ctx) =>
     ctx.resultPool.getOptions([{
@@ -135,11 +206,8 @@ export const model = BlockModel.create()
   })
 
   .output('conditionValues', (ctx) => {
-    const conditionColumnRef = ctx.args.conditionColumnRef;
-    if (!conditionColumnRef) return undefined;
-
-    const anchor = ctx.args.abundanceRef;
-    if (anchor === undefined) return undefined;
+    const { conditionColumnRef, abundanceRef: anchor } = ctx.args;
+    if (!conditionColumnRef || !anchor) return undefined;
 
     const pCols = ctx.resultPool.getAnchoredPColumns({ main: anchor },
       JSON.parse(conditionColumnRef) as AnchoredPColumnSelector,
@@ -150,7 +218,62 @@ export const model = BlockModel.create()
     const values = data?.getDataAsJson<Record<string, string>>()?.['data'];
     if (!values) return undefined;
 
+    // Convert all values to strings for consistency
+    return [...new Set(Object.values(values).map((v) => String(v)))];
+  })
+
+  .output('antigenValues', (ctx) => {
+    const config = ctx.args.controlConfig;
+    if (!config?.enabled || !config.antigenColumnRef) return undefined;
+
+    const anchor = ctx.args.abundanceRef;
+    if (anchor === undefined) return undefined;
+
+    const pCols = ctx.resultPool.getAnchoredPColumns({ main: anchor },
+      JSON.parse(config.antigenColumnRef) as AnchoredPColumnSelector,
+    );
+    const data = pCols?.[0]?.data as TreeNodeAccessor | undefined;
+
+    // @TODO need a convenient method in API
+    const values = data?.getDataAsJson<Record<string, string>>()?.['data'];
+    if (!values) return undefined;
+
     return [...new Set(Object.values(values))];
+  })
+
+  .output('negativeControlConditionValues', (ctx) => {
+    const config = ctx.args.controlConfig;
+    if (!config?.enabled) return undefined;
+
+    const { negativeConditions, antigenColumnRef } = config;
+    if (!negativeConditions?.length || !antigenColumnRef) return undefined;
+
+    const { conditionColumnRef, abundanceRef: anchor } = ctx.args;
+    if (!conditionColumnRef || !anchor) return undefined;
+
+    const getValues = (ref: string) => {
+      const pCols = ctx.resultPool.getAnchoredPColumns({ main: anchor }, JSON.parse(ref) as AnchoredPColumnSelector);
+      return (pCols?.[0]?.data as TreeNodeAccessor | undefined)?.getDataAsJson<{ data: Record<string, string> }>()?.data;
+    };
+
+    const antigenValues = getValues(antigenColumnRef);
+    const conditionValues = getValues(conditionColumnRef);
+
+    if (!antigenValues || !conditionValues) return undefined;
+
+    // Find condition values for samples with negative antigen values
+    const negativeControlConditions = new Set<string>();
+    for (const [sampleId, antigenValue] of Object.entries(antigenValues)) {
+      if (negativeConditions.includes(antigenValue)) {
+        const conditionValue = conditionValues[sampleId];
+        if (conditionValue !== undefined && conditionValue !== null) {
+          // Convert to string immediately
+          negativeControlConditions.add(String(conditionValue));
+        }
+      }
+    }
+
+    return [...negativeControlConditions];
   })
 
   // Get all enrichment statistics
@@ -247,15 +370,54 @@ export const model = BlockModel.create()
 
   .output('isRunning', (ctx) => ctx.outputs?.getIsReadyOrError() === false)
 
+  .outputWithStatus('controlScatterPf', (ctx): PFrameHandle | undefined => {
+    const pCols = ctx.outputs?.resolve({ field: 'controlScatterPf', allowPermanentAbsence: true })?.getPColumns();
+    if (pCols === undefined) {
+      return undefined;
+    }
+
+    return createPFrameForGraphs(ctx, pCols);
+  })
+
+  .output('controlScatterPCols', (ctx) => {
+    const pCols = ctx.outputs?.resolve({ field: 'controlScatterPf', allowPermanentAbsence: true })?.getPColumns();
+    if (pCols === undefined) {
+      return undefined;
+    }
+
+    return pCols.map(
+      (c) =>
+        ({
+          columnId: c.id,
+          spec: c.spec,
+        } satisfies PColumnIdAndSpec),
+    );
+  })
+
+  .output('filteredTooMuch', (ctx) => {
+    const filteredTooMuch = ctx.outputs?.resolve('filteredTooMuch')?.getDataAsJson() as object;
+    if (typeof filteredTooMuch === 'boolean') {
+      return filteredTooMuch;
+    }
+    return undefined;
+  })
+
   .title(() => 'Clonotype enrichment')
 
   .subtitle((ctx) => ctx.args.customBlockLabel || ctx.args.defaultBlockLabel)
 
-  .sections((_ctx) => ([
-    { type: 'link', href: '/', label: 'Main' },
-    { type: 'link', href: '/buble', label: 'Enriched Bubble Plot' },
-    { type: 'link', href: '/line', label: 'Frequency Line Plot' },
-    { type: 'link', href: '/stacked', label: 'Frequency Bar Plot' },
-  ]))
+  .sections((ctx) => {
+    const sections: Array<{ type: 'link'; href: `/${string}`; label: string }> = [
+      { type: 'link', href: '/', label: 'Main' },
+      { type: 'link', href: '/buble', label: 'Enriched Bubble Plot' },
+      { type: 'link', href: '/line', label: 'Frequency Line Plot' },
+      { type: 'link', href: '/stacked', label: 'Frequency Bar Plot' },
+    ];
+
+    if (ctx.args.controlConfig.enabled) {
+      sections.push({ type: 'link', href: '/scatter', label: 'Control Scatter Plot' });
+    }
+    return sections;
+  })
 
   .done(2);

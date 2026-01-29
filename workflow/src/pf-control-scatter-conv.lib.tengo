@@ -1,0 +1,109 @@
+ll := import("@platforma-sdk/workflow-tengo:ll")
+maps := import("@platforma-sdk/workflow-tengo:maps")
+strings := import("@platforma-sdk/workflow-tengo:strings")
+
+getColumns := func(countsSpec, conditionOrder) {
+  lastCondition := conditionOrder[len(conditionOrder) - 1]
+  columns := []
+  
+  // Add remaining fixed-name columns
+  columns = columns + [{
+        column: "Overall Log2FC",
+        id: "overall_log2fc",
+        allowNA: true,
+        spec: {
+          name: "pl7.app/vdj/enrichment",
+          valueType: "Double",
+          domain: {},
+          annotations: {
+            "pl7.app/label": "Overall Log2FC",
+            "pl7.app/table/visibility": "optional",
+            "pl7.app/format": ".2f",
+            "pl7.app/toPlot": "true"
+          }
+        }
+      }, {
+        column: "MaxPositiveEnrichment",
+        id: "maxenrichment",
+        allowNA: false,
+        spec: {
+          name: "pl7.app/vdj/maxEnrichment",
+          valueType: "Double",
+          domain: {},
+          annotations: {
+            "pl7.app/label": "Max Log2FC",
+            "pl7.app/table/visibility": "optional",
+            "pl7.app/format": ".2f",
+            "pl7.app/toPlot": "true"
+          }
+        }
+      },
+      {
+        column: "Binding Specificity",
+        id: "binding_specificity",
+        allowNA: true,
+        spec: {
+          name: "pl7.app/vdj/bindingSpecificity",
+          valueType: "String",
+          domain: {},
+          annotations: {
+            "pl7.app/label": "Binding Specificity",
+            "pl7.app/table/visibility": "default"
+          }
+        }
+      }, {
+        column: "MaxNegControlEnrichment",
+        id: "maxnegcontrolenrichment",
+        allowNA: true,
+        spec: {
+          name: "pl7.app/vdj/maxNegControlEnrichment",
+          valueType: "Double",
+          domain: {},
+          annotations: {
+            "pl7.app/label": "Max control Log2FC",
+            "pl7.app/table/visibility": "optional",
+            "pl7.app/format": ".2f",
+            "pl7.app/toPlot": "true"
+          }
+        }
+      },
+      {
+        column: "Frequency " + lastCondition,
+        id: strings.substituteSpecialCharacters("frequency_" + lastCondition),
+        allowNA: true,
+        spec: {
+          name: "pl7.app/vdj/frequency",
+          valueType: "Double",
+          domain: {},
+          annotations: {
+            "pl7.app/label": "Frequency " + lastCondition,
+            // add isScore only in exports to ease plots
+            // "pl7.app/vdj/isScore": "true",
+            "pl7.app/table/orderPriority": "8000",
+            "pl7.app/table/visibility": "optional",
+            "pl7.app/format": ".2e",
+            "pl7.app/toPlot": "true"
+          }
+        }
+      }]
+
+  return {
+    axes: [
+      {
+        column: "elementId",
+        spec: maps.deepMerge(countsSpec.axesSpec[1], {
+          annotations: {
+            "pl7.app/table/visibility": "default"
+          }
+        })
+      }
+    ],
+    columns: columns,
+    storageFormat: "Parquet",
+    partitionKeyLength: 0
+  }
+}
+
+export ll.toStrict({
+	getColumns: getColumns
+})
