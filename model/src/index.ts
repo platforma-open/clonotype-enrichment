@@ -409,13 +409,13 @@ export const model = BlockModel.create()
   .sections((ctx) => {
     const sections: Array<{ type: 'link'; href: `/${string}`; label: string }> = [
       { type: 'link', href: '/', label: 'Main' },
-      { type: 'link', href: '/buble', label: 'Enriched bubble plot' },
-      { type: 'link', href: '/line', label: 'Frequency line plot' },
-      { type: 'link', href: '/stacked', label: 'Frequency bar plot' },
+      { type: 'link', href: '/bubble', label: 'Enriched Bubble Plot' },
+      { type: 'link', href: '/line', label: 'Frequency Line Plot' },
+      { type: 'link', href: '/stacked', label: 'Frequency Bar Plot' },
     ];
 
     if (ctx.args.controlConfig.enabled) {
-      sections.push({ type: 'link', href: '/scatter', label: 'Control scatter plot' });
+      sections.push({ type: 'link', href: '/scatter', label: 'Control Scatter Plot' });
     }
     return sections;
   })

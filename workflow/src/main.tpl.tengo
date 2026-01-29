@@ -37,7 +37,6 @@ calculateAnnotationValues := func(inputFile, enrichmentColumn) {
 		saveFileContent("overall_75.txt").
 		printErrStreamToStdout().
 		saveStdoutContent().
-		cache().
 		run()
 
 	return {
@@ -222,7 +221,6 @@ wf.body(func(args) {
 		saveFileContent("filtered_too_much.txt").
 		printErrStreamToStdout().
 		saveStdoutContent().
-		cache().
 		run()
 
 	// Convert script outputs to Pframes
