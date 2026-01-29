@@ -284,8 +284,8 @@ wf.body(func(args) {
 
 			annotationStats := calculateAnnotationValues(enrichCsv, "Enrichment " + comparison)
 
-			specOpts := {
-				label: inputType + " Enrichment " + comparison
+			specLabel := {
+				label: "Log2FC " + comparison
 			}
 
 			exportColumnRender := render.create(enrichmentColumnTpl, {
@@ -303,7 +303,7 @@ wf.body(func(args) {
 				conditionOrder: conditionOrder,
 				controlConfig: controlConfig,
 				blockId: blockId,
-				specOpts: specOpts,
+				specLabel: specLabel,
 				customBlockLabel: args.customBlockLabel,
 				defaultBlockLabel: args.defaultBlockLabel
 			})

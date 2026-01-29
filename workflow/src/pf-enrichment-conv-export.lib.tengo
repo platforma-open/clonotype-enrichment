@@ -7,6 +7,7 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percenti
 
   specLabel := "Max Log2FC"
 
+  // this same comparisons defines downstream which column will be used
   if len(opts) == 1 {
     specLabel = opts[0].label
   }
@@ -37,7 +38,7 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percenti
             "pl7.app/comparison": specLabel
           },
           annotations: {
-            "pl7.app/label": "Max Log2FC",
+            "pl7.app/label": specLabel,
             "pl7.app/table/orderPriority": "9000",
             "pl7.app/table/visibility": "default",
             "pl7.app/min": min,
@@ -48,7 +49,9 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percenti
             "pl7.app/format": ".2f"
           }
         }
-      }, {
+      }]
+
+  enrichmentQualityColumn := {
         column: "EnrichmentQuality",
         id: "enrichment_quality",
         allowNA: true,
@@ -72,7 +75,7 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percenti
             "pl7.app/table/orderPriority": "95"
           }
         }
-      }]
+      }
 
   // Overall Log2FC columns will have additional specs if target was selected
   overallColumn := {
@@ -101,7 +104,7 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percenti
         }
       }
 
-  if targetCondition {
+  if targetCondition && len(opts) == 0 {
     overallColumn.spec.domain["pl7.app/vdj/antigenType"] = targetCondition
 
     columns = columns + [{
@@ -132,7 +135,10 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percenti
         }
       }]
   }
-  columns = columns + [overallColumn]
+
+  if len(opts) == 0 {
+    columns = columns + [overallColumn, enrichmentQualityColumn]
+  }
 
   return {
     axes: [
