@@ -585,7 +585,7 @@ def hybrid_enrichment_analysis(
         
         # Calculate thresholds (percentiles) from the current data
         # Handle cases where columns might have nulls by using fill_null(0) for percentile calculation if needed
-        high_threshold = enrichment_results.select(pl.col('MaxPositiveEnrichment').fill_null(0).quantile(0.75)).item()
+        high_threshold = max(1.0, enrichment_results.select(pl.col('MaxPositiveEnrichment').fill_null(0).quantile(0.75)).item())
         stable_threshold = enrichment_results.select(pl.col('Overall Log2FC').fill_null(0).quantile(0.50)).item()
         low_threshold = enrichment_results.select(pl.col('MaxPositiveEnrichment').fill_null(0).quantile(0.25)).item()
         freq_threshold = enrichment_results.select(pl.col('_max_freq').fill_null(0).quantile(0.75)).item()
