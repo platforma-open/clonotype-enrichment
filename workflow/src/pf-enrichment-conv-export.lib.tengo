@@ -39,7 +39,7 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, downsampling,
             "pl7.app/min": min,
             "pl7.app/max": max,
             "pl7.app/isScore": "true",
-            "pl7.app/score/rankValues": "increasing",
+            "pl7.app/score/rankingOrder": "decreasing",
             "pl7.app/score/defaultCutoff": cutoff,
             "pl7.app/format": ".2f"
           }
