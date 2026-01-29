@@ -2,6 +2,7 @@ import type { GraphMakerState } from '@milaboratories/graph-maker';
 import type {
   AnchoredPColumnSelector,
   PColumnIdAndSpec,
+  PDataColumnSpec,
   PFrameHandle,
   PlDataTableStateV2,
   PlRef,
@@ -13,6 +14,9 @@ import {
   createPFrameForGraphs,
   createPlDataTableStateV2,
   createPlDataTableV2,
+  getRelatedColumns,
+  isHiddenFromGraphColumn,
+  isHiddenFromUIColumn,
 } from '@platforma-sdk/model';
 
 export type DownsamplingParameters = {
@@ -227,18 +231,33 @@ export const model = BlockModel.create()
     if (!config?.enabled || !config.antigenColumnRef) return undefined;
 
     const anchor = ctx.args.abundanceRef;
-    if (anchor === undefined) return undefined;
+    const { conditionColumnRef } = ctx.args;
+    if (anchor === undefined || !conditionColumnRef) return undefined;
 
-    const pCols = ctx.resultPool.getAnchoredPColumns({ main: anchor },
-      JSON.parse(config.antigenColumnRef) as AnchoredPColumnSelector,
-    );
-    const data = pCols?.[0]?.data as TreeNodeAccessor | undefined;
+    const getValues = (ref: string) => {
+      const pCols = ctx.resultPool.getAnchoredPColumns({ main: anchor }, JSON.parse(ref) as AnchoredPColumnSelector);
+      return (pCols?.[0]?.data as TreeNodeAccessor | undefined)?.getDataAsJson<{ data: Record<string, string> }>()?.data;
+    };
 
-    // @TODO need a convenient method in API
-    const values = data?.getDataAsJson<Record<string, string>>()?.['data'];
-    if (!values) return undefined;
+    const antigenValuesData = getValues(config.antigenColumnRef);
+    const conditionValuesData = getValues(conditionColumnRef);
 
-    return [...new Set(Object.values(values))];
+    if (!antigenValuesData || !conditionValuesData) return undefined;
+
+    const counts: Record<string, Set<string>> = {};
+    for (const [sampleId, antigenValue] of Object.entries(antigenValuesData)) {
+      if (!counts[antigenValue]) {
+        counts[antigenValue] = new Set();
+      }
+      const conditionValue = conditionValuesData[sampleId];
+      if (conditionValue !== undefined && conditionValue !== null) {
+        counts[antigenValue].add(String(conditionValue));
+      }
+    }
+
+    return Object.entries(counts)
+      .filter(([_, conditions]) => conditions.size >= 2)
+      .map(([antigen, _]) => antigen);
   })
 
   .output('negativeControlConditionValues', (ctx) => {
@@ -341,7 +360,13 @@ export const model = BlockModel.create()
       return undefined;
     }
 
-    return createPFrameForGraphs(ctx, pCols);
+    // we use this chunk instead of createPFrameForGraphs to skip clonotype-enrichment block exports
+    const suitableSpec = (spec: PDataColumnSpec) => {
+      const trace = spec.annotations?.['pl7.app/trace'];
+      const hasEnrichment = typeof trace === 'string' && trace.includes('clonotype-enrichment');
+      return !hasEnrichment && !isHiddenFromUIColumn(spec) && !isHiddenFromGraphColumn(spec);
+    };
+    return ctx.createPFrame(getRelatedColumns(ctx, { columns: pCols, predicate: suitableSpec }));
   })
 
   .output('stackedPCols', (ctx) => {
@@ -365,7 +390,13 @@ export const model = BlockModel.create()
       return undefined;
     }
 
-    return createPFrameForGraphs(ctx, pCols);
+    // we use this chunk instead of createPFrameForGraphs to skip clonotype-enrichment block exports
+    const suitableSpec = (spec: PDataColumnSpec) => {
+      const trace = spec.annotations?.['pl7.app/trace'];
+      const hasEnrichment = typeof trace === 'string' && trace.includes('clonotype-enrichment');
+      return !hasEnrichment && !isHiddenFromUIColumn(spec) && !isHiddenFromGraphColumn(spec);
+    };
+    return ctx.createPFrame(getRelatedColumns(ctx, { columns: pCols, predicate: suitableSpec }));
   })
 
   .output('isRunning', (ctx) => ctx.outputs?.getIsReadyOrError() === false)
@@ -376,7 +407,13 @@ export const model = BlockModel.create()
       return undefined;
     }
 
-    return createPFrameForGraphs(ctx, pCols);
+    // we use this chunk instead of createPFrameForGraphs to skip clonotype-enrichment block exports
+    const suitableSpec = (spec: PDataColumnSpec) => {
+      const trace = spec.annotations?.['pl7.app/trace'];
+      const hasEnrichment = typeof trace === 'string' && trace.includes('clonotype-enrichment');
+      return !hasEnrichment && !isHiddenFromUIColumn(spec) && !isHiddenFromGraphColumn(spec);
+    };
+    return ctx.createPFrame(getRelatedColumns(ctx, { columns: pCols, predicate: suitableSpec }));
   })
 
   .output('controlScatterPCols', (ctx) => {
