@@ -1,9 +1,9 @@
 import { model } from '@platforma-open/milaboratories.clonotype-enrichment.model';
 import { defineApp } from '@platforma-sdk/ui-vue';
 import { watch } from 'vue';
-import MainPage from './pages/MainPage.vue';
 import BubblePage from './pages/BubblePage.vue';
 import LinePage from './pages/LinePage.vue';
+import MainPage from './pages/MainPage.vue';
 import ScatterPage from './pages/ScatterPage.vue';
 import StackedPage from './pages/StackedPage.vue';
 
@@ -14,7 +14,7 @@ export const sdkPlugin = defineApp(model, (app) => {
     },
     routes: {
       '/': () => MainPage,
-      '/buble': () => BubblePage,
+      '/bubble': () => BubblePage,
       '/line': () => LinePage,
       '/stacked': () => StackedPage,
       '/scatter': () => ScatterPage,
