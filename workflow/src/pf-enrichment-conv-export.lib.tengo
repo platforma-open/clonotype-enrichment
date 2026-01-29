@@ -2,7 +2,7 @@ ll := import("@platforma-sdk/workflow-tengo:ll")
 canonical := import("@platforma-sdk/workflow-tengo:canonical")
 
 getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percentile, downsampling, 
-                  conditionOrder, controlConfig, blockId, ...opts) {
+                  conditionOrder, controlConfig, filteringConfig, blockId, ...opts) {
   ll.assert(len(opts) <= 1, "expected at most one options map")
 
   specLabel := "Max Log2FC"
@@ -31,6 +31,7 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percenti
           valueType: "Double",
           domain: {
             "pl7.app/downsampling": canonical.encode(downsampling),
+            "pl7.app/filteringConfig": canonical.encode(filteringConfig),
             "pl7.app/conditionsOrder": canonical.encode(conditionOrder),
             "pl7.app/blockId": blockId,
             "pl7.app/comparison": specLabel
@@ -56,6 +57,7 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percenti
           valueType: "String",
           domain: {
             "pl7.app/downsampling": canonical.encode(downsampling),
+            "pl7.app/filteringConfig": canonical.encode(filteringConfig),
             "pl7.app/conditionsOrder": canonical.encode(conditionOrder),
             "pl7.app/blockId": blockId
           },
@@ -84,6 +86,7 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percenti
             "pl7.app/downsampling": canonical.encode(downsampling),
             "pl7.app/vdj/enrichment/type": "overall",
             "pl7.app/vdj/enrichment/comparison": conditionOrder[len(conditionOrder) - 1] + " vs " + conditionOrder[0],
+            "pl7.app/filteringConfig": canonical.encode(filteringConfig),
             "pl7.app/comparison": "Overall Enrichment"
           },
           annotations: {
@@ -110,6 +113,7 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percenti
           valueType: "String",
           domain: {
             "pl7.app/downsampling": canonical.encode(downsampling),
+            "pl7.app/filteringConfig": canonical.encode(filteringConfig),
             "pl7.app/conditionsOrder": canonical.encode(conditionOrder),
             "pl7.app/vdj/enrichment/targetThreshold": targetThreshold,
             "pl7.app/vdj/enrichment/controlThreshold": controlThreshold,

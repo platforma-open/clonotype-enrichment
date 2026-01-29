@@ -20,6 +20,7 @@ self.body(func(args) {
     topEnrichedColCsv := args.topEnrichedColCsv
     conditionOrder := args.conditionOrder
     controlConfig := args.controlConfig
+    FilteringConfig := args.FilteringConfig
     blockId := args.blockId
     specOpts := args.specOpts
     customBlockLabel := args.customBlockLabel
@@ -37,6 +38,7 @@ self.body(func(args) {
                                                                 downsampling,
                                                                 conditionOrder,
                                                                 controlConfig,
+                                                                FilteringConfig,
                                                                 blockId,
                                                                 specOpts)
     } else {
@@ -49,6 +51,7 @@ self.body(func(args) {
                                                                 downsampling,
                                                                 conditionOrder,
                                                                 controlConfig,
+                                                                FilteringConfig,
                                                                 blockId)
     }
 
