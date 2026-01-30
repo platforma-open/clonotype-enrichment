@@ -369,18 +369,17 @@ def hybrid_enrichment_analysis(
     ).select(['elementId', 'Label'])
 
     # --- Target Track Processing ---
-    # Get total reads for target track frequencies and filtering
+    # Get total reads for target track frequencies and filtering and define target_track_df
     if has_antigen and current_target:
         target_reads = total_reads_df.filter(pl.col('antigen') == current_target)
         target_total_reads_dict = dict(zip(target_reads['condition'], target_reads['total_reads']))
+
+        target_track_df = aggregated_df.filter(pl.col('antigen') == current_target)
     else:
         # Fallback to global totals if no antigen or control disabled
         global_reads = total_reads_df.group_by('condition').agg(pl.col('total_reads').sum())
         target_total_reads_dict = dict(zip(global_reads['condition'], global_reads['total_reads']))
-
-    target_track_df = aggregated_df
-    if has_antigen and current_target:
-        target_track_df = aggregated_df.filter(pl.col('antigen') == current_target)
+        target_track_df = aggregated_df
 
     # Calculate track-specific n_clonotypes for normalization
     target_n_clonotypes = target_track_df.select('elementId').n_unique()

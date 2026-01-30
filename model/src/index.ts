@@ -43,7 +43,7 @@ type AntigenControlConfig = {
   antigenEnabled: boolean;
   controlEnabled: boolean;
   antigenColumnRef?: SUniversalPColumnId; // Metadata column for antigen/control
-  targetCondition?: string; // e.g., ["Target-Antigen"]
+  targetCondition?: string; // e.g., "Target-Antigen"
   negativeConditions: string[]; // e.g., ["BSA", "Plastic"]
   targetThreshold: number; // Default: 2.0 log2 FC
   controlThreshold: number; // Default: 1.0 log2 FC
