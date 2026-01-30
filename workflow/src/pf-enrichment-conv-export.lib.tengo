@@ -1,25 +1,29 @@
 ll := import("@platforma-sdk/workflow-tengo:ll")
 canonical := import("@platforma-sdk/workflow-tengo:canonical")
 
-getColumns := func(abundanceSpec, inputType, min, max, cutoff, downsampling, 
-                  conditionOrder, blockId, ...opts) {
+getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percentile, downsampling, 
+                  conditionOrder, antigenControlConfig, filteringConfig, blockId, ...opts) {
   ll.assert(len(opts) <= 1, "expected at most one options map")
 
-  specLabel := "Maximum " + inputType + " Enrichment"
+  specLabel := "Max Log2FC"
 
+  // this same comparisons defines downstream which column will be used
   if len(opts) == 1 {
     specLabel = opts[0].label
   }
 
-  return {
-    axes: [
-      {
-        column: "elementId",
-        spec: abundanceSpec.axesSpec[1]
-      }
-      ],
-    columns: [
-      {
+  // Extract control info
+  targetCondition := undefined
+  targetThreshold := undefined
+  controlThreshold := undefined
+  if antigenControlConfig != undefined && antigenControlConfig.controlEnabled == true {
+    targetCondition = antigenControlConfig.targetCondition
+    targetThreshold = string(antigenControlConfig.targetThreshold)
+    controlThreshold = string(antigenControlConfig.controlThreshold)
+  }
+
+  // Define columns for exports
+  columns := [{
         column: "Enrichment",
         id: "enrichment",
         allowNA: true,
@@ -28,6 +32,7 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, downsampling,
           valueType: "Double",
           domain: {
             "pl7.app/downsampling": canonical.encode(downsampling),
+            "pl7.app/filteringConfig": canonical.encode(filteringConfig),
             "pl7.app/conditionsOrder": canonical.encode(conditionOrder),
             "pl7.app/blockId": blockId,
             "pl7.app/comparison": specLabel
@@ -44,7 +49,105 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, downsampling,
             "pl7.app/format": ".2f"
           }
         }
-      }],
+      }]
+
+  enrichmentQualityColumn := {
+        column: "EnrichmentQuality",
+        id: "enrichment_quality",
+        allowNA: true,
+        spec: {
+          name: "pl7.app/vdj/enrichmentQuality",
+          valueType: "String",
+          domain: {
+            "pl7.app/downsampling": canonical.encode(downsampling),
+            "pl7.app/filteringConfig": canonical.encode(filteringConfig),
+            "pl7.app/conditionsOrder": canonical.encode(conditionOrder),
+            "pl7.app/blockId": blockId
+          },
+          annotations: {
+            "pl7.app/label": "Enrichment Quality",
+            "pl7.app/isDiscreteFilter": "true",
+            "pl7.app/discreteValues": "[\"Stable Binder\", \"Rescuer\", \"Parasite\", \"Weak Binder\"]",
+            "pl7.app/isScore": "true",
+            "pl7.app/score/rankValues": "decreasing",
+            "pl7.app/score/defaultCutoff": "[\"Stable Binder\", \"Rescuer\"]",
+            "pl7.app/table/visibility": "default",
+            "pl7.app/table/orderPriority": "95"
+          }
+        }
+      }
+
+  // Overall Log2FC columns will have additional specs if target was selected
+  overallColumn := {
+        column: "Overall Log2FC",
+        id: "overall_log2fc",
+        allowNA: true,
+        spec: {
+          name: "pl7.app/vdj/enrichment",
+          valueType: "Double",
+          domain: {
+            "pl7.app/downsampling": canonical.encode(downsampling),
+            "pl7.app/vdj/enrichment/type": "overall",
+            "pl7.app/vdj/enrichment/comparison": conditionOrder[len(conditionOrder) - 1] + " vs " + conditionOrder[0],
+            "pl7.app/filteringConfig": canonical.encode(filteringConfig),
+            "pl7.app/comparison": "Overall Enrichment"
+          },
+          annotations: {
+            "pl7.app/label": "Overall Log2FC",
+            "pl7.app/table/orderPriority": "90",
+            "pl7.app/table/visibility": "default",
+            // "pl7.app/isScore": "true",
+            "pl7.app/score/rankValues": "increasing",
+            "pl7.app/score/defaultCutoff": overall75Percentile,
+            "pl7.app/format": ".2f"
+          }
+        }
+      }
+
+  if targetCondition && len(opts) == 0 {
+    overallColumn.spec.domain["pl7.app/vdj/antigenType"] = targetCondition
+
+    columns = columns + [{
+        column: "Binding Specificity",
+        id: "binding_specificity",
+        allowNA: true,
+        spec: {
+          name: "pl7.app/vdj/bindingSpecificity",
+          valueType: "String",
+          domain: {
+            "pl7.app/downsampling": canonical.encode(downsampling),
+            "pl7.app/filteringConfig": canonical.encode(filteringConfig),
+            "pl7.app/conditionsOrder": canonical.encode(conditionOrder),
+            "pl7.app/vdj/enrichment/targetThreshold": targetThreshold,
+            "pl7.app/vdj/enrichment/controlThreshold": controlThreshold,
+            "pl7.app/blockId": blockId
+          },
+          annotations: {
+            "pl7.app/label": "Binding Specificity",
+            "pl7.app/isDiscreteFilter": "true",
+            "pl7.app/discreteValues": "[\"Antigen-Specific\", \"Non-Specific\", \"Negative-Control\", \"Not-Enriched\"]",
+            "pl7.app/isScore": "true",
+            "pl7.app/score/rankValues": "decreasing",
+            "pl7.app/score/defaultCutoff": "[\"Antigen-Specific\"]",
+            "pl7.app/table/visibility": "default",
+            "pl7.app/table/orderPriority": "100"
+          }
+        }
+      }]
+  }
+
+  if len(opts) == 0 {
+    columns = columns + [overallColumn, enrichmentQualityColumn]
+  }
+
+  return {
+    axes: [
+      {
+        column: "elementId",
+        spec: abundanceSpec.axesSpec[1]
+      }
+      ],
+    columns: columns,
     storageFormat: "Parquet",
     partitionKeyLength: 0
   }

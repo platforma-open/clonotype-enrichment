@@ -3,7 +3,8 @@ import numpy as np
 import argparse
 import os
 
-def process_enrichment(input_file, output_dir='.', enrichment_column='Enrichment'):
+def process_enrichment(input_file, output_dir='.', enrichment_column='Enrichment',
+                       overall_column='Overall Log2FC'):
     """
     Process enrichment data using polars for better performance.
     """
@@ -20,7 +21,8 @@ def process_enrichment(input_file, output_dir='.', enrichment_column='Enrichment
             'enrichment_max.txt': nan_value,
             'enrichment_median.txt': nan_value,
             'enrichment_mean.txt': nan_value,
-            'enrichment_75.txt': nan_value
+            'enrichment_75.txt': nan_value,
+            'overall_75.txt': nan_value
         }
     else:
         # Extract the 'Enrichment' column and calculate statistics
@@ -50,6 +52,13 @@ def process_enrichment(input_file, output_dir='.', enrichment_column='Enrichment
             'enrichment_mean.txt': f"{enrichment_mean:.2f}",
             'enrichment_75.txt': f"{enrichment_75_out:.2f}" 
         }
+
+        # Calculate p75 for Overall Log2FC
+        overall_p75 = df.select(pl.col(overall_column).quantile(0.75))[0, 0]
+        # Use same logic as for Enrichment p75
+        overall_p75_out = overall_p75 if overall_p75 > 1 else 1
+        output_files['overall_75.txt'] = f"{overall_p75_out:.2f}"
+
 
     for filename, content in output_files.items():
         output_path = os.path.join(output_dir, filename)

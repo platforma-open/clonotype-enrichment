@@ -9,38 +9,43 @@ import { useApp } from '../app';
 const app = useApp();
 
 const defaultOptions = computed((): PredefinedGraphOption<'scatterplot'>[] | undefined => {
-  if (!app.model.outputs.stackedPCols)
+  if (!app.model.outputs.controlScatterPCols)
     return undefined;
 
-  const stackedPCols = app.model.outputs.stackedPCols;
-  const getColSpec = (name: string) =>
-    stackedPCols[stackedPCols.findIndex((p) => (p.spec.name === name
-      && p.spec.annotations?.['pl7.app/vdj/isScore'] === undefined
-    ))].spec;
+  const controlScatterPCols = app.model.outputs.controlScatterPCols;
+  const getColSpec = (name: string) => {
+    const idx = controlScatterPCols.findIndex((p) => (p.spec.name === name));
+    return idx !== -1 ? controlScatterPCols[idx].spec : undefined;
+  };
 
-  const frequencyColSpec = getColSpec('pl7.app/vdj/frequency');
+  const maxEnrichmentSpec = getColSpec('pl7.app/vdj/maxEnrichment');
+  const maxNegControlEnrichmentSpec = getColSpec('pl7.app/vdj/maxNegControlEnrichment');
+  const bindingSpecificitySpec = getColSpec('pl7.app/vdj/bindingSpecificity');
+  const frequencySpec = getColSpec('pl7.app/vdj/frequency');
+
+  if (!maxEnrichmentSpec || !maxNegControlEnrichmentSpec || !bindingSpecificitySpec || !frequencySpec)
+    return undefined;
+
   const defaults: PredefinedGraphOption<'scatterplot'>[] = [
     {
-      inputName: 'y',
-      selectedSource: frequencyColSpec,
-    },
-    // pl7.app/vdj/condition
-    {
       inputName: 'x',
-      selectedSource: frequencyColSpec.axesSpec[1],
+      selectedSource: maxNegControlEnrichmentSpec,
     },
-    // pl7.app/vdj/clonotypeKey
+    {
+      inputName: 'y',
+      selectedSource: maxEnrichmentSpec,
+    },
     {
       inputName: 'grouping',
-      selectedSource: frequencyColSpec.axesSpec[0],
-    },
-    {
-      inputName: 'tooltipContent',
-      selectedSource: frequencyColSpec.axesSpec[0],
+      selectedSource: bindingSpecificitySpec,
     },
     {
       inputName: 'size',
-      selectedSource: frequencyColSpec,
+      selectedSource: frequencySpec,
+    },
+    {
+      inputName: 'tooltipContent',
+      selectedSource: frequencySpec.axesSpec[0],
     },
   ];
   return defaults;
@@ -56,9 +61,9 @@ const inputElementAxis = computed(() => {
 
 const dataColumnPredicate = (spec: PColumnSpec) =>
   inputElementAxis.value !== undefined
-  && spec.axesSpec.length === 2
+  && spec.axesSpec.length === 1
   && spec.axesSpec[0].name === inputElementAxis.value
-  && spec.axesSpec[1].name === 'pl7.app/vdj/condition';
+  && spec.annotations?.['pl7.app/toPlot'] === 'true';
 
 const metaColumnPredicate = (spec: PColumnSpec) =>
   inputElementAxis.value !== undefined
@@ -68,10 +73,10 @@ const metaColumnPredicate = (spec: PColumnSpec) =>
 
 <template>
   <GraphMaker
-    v-model="app.model.ui.lineState"
+    v-model="app.model.ui.scatterState"
     chartType="scatterplot"
     :data-state-key="app.model.args.abundanceRef"
-    :p-frame="app.model.outputs.linePf"
+    :p-frame="app.model.outputs.controlScatterPf"
     :default-options="defaultOptions"
     :dataColumnPredicate="dataColumnPredicate"
     :meta-column-predicate="metaColumnPredicate"

@@ -7,42 +7,51 @@ text := import("text")
 
 pfEnrichmentConvExport := import(":pf-enrichment-conv-export")
 
-self.defineOutputs("columnSpec", "columnData")
+self.defineOutputs("columnSpec", "columnData", "bindingSpecificitySpec", "bindingSpecificityData", "overallSpec", "overallData", "enrichmentQualitySpec", "enrichmentQualityData")
 
 self.body(func(args) {
     min := args.min
     max := args.max
     cutoff := args.cutoff
+    overall75Percentile := args.overall75Percentile
     downsampling := args.downsampling
     abundanceSpec := args.abundanceSpec
     inputType := args.inputType
     topEnrichedColCsv := args.topEnrichedColCsv
     conditionOrder := args.conditionOrder
+    antigenControlConfig := args.antigenControlConfig
+    FilteringConfig := args.FilteringConfig
     blockId := args.blockId
-    specOpts := args.specOpts
+    specLabel := args.specLabel
     customBlockLabel := args.customBlockLabel
     defaultBlockLabel := args.defaultBlockLabel
 
     enrichmentImportParamsExport := undefined
-    // In case of additional exports we will modify some spec values using specOpts
-    if specOpts != undefined {
+    // In case of additional exports we will modify some spec values using specLabel
+    if specLabel != undefined {
         enrichmentImportParamsExport = pfEnrichmentConvExport.getColumns(abundanceSpec, 
                                                                 inputType,
                                                                 string(min.getData()),
                                                                 string(max.getData()),
                                                                 string(cutoff.getData()),
+                                                                string(overall75Percentile.getData()),
                                                                 downsampling,
                                                                 conditionOrder,
+                                                                antigenControlConfig,
+                                                                FilteringConfig,
                                                                 blockId,
-                                                                specOpts)
+                                                                specLabel)
     } else {
         enrichmentImportParamsExport = pfEnrichmentConvExport.getColumns(abundanceSpec, 
                                                                 inputType,
                                                                 string(min.getData()),
                                                                 string(max.getData()),
                                                                 string(cutoff.getData()),
+                                                                string(overall75Percentile.getData()),
                                                                 downsampling,
                                                                 conditionOrder,
+                                                                antigenControlConfig,
+                                                                FilteringConfig,
                                                                 blockId)
     }
 
@@ -79,8 +88,36 @@ self.body(func(args) {
             label: label
         })
 
-    return {
-        columnSpec: trace.inject(exportFile["enrichment.spec"]),
-        columnData: exportFile["enrichment.data"]
+    res := undefined
+    if specLabel != undefined {
+        res = {
+            columnSpec: trace.inject(exportFile["enrichment.spec"]),
+            columnData: exportFile["enrichment.data"],
+            overallSpec: "empty",
+            overallData: "empty",
+            enrichmentQualitySpec: "empty",
+            enrichmentQualityData: "empty",
+            bindingSpecificitySpec: "empty",
+            bindingSpecificityData: "empty"
+        }
+    } else {
+        res = {
+            columnSpec: trace.inject(exportFile["enrichment.spec"]),
+            columnData: exportFile["enrichment.data"],
+            overallSpec: trace.inject(exportFile["overall_log2fc.spec"]),
+            overallData: exportFile["overall_log2fc.data"],
+            enrichmentQualitySpec: trace.inject(exportFile["enrichment_quality.spec"]),
+            enrichmentQualityData: exportFile["enrichment_quality.data"]
+        }
+
+        if antigenControlConfig != undefined && antigenControlConfig.controlEnabled == true {
+            res.bindingSpecificitySpec = trace.inject(exportFile["binding_specificity.spec"])
+            res.bindingSpecificityData = exportFile["binding_specificity.data"]
+        } else {
+            res.bindingSpecificitySpec = "empty"
+            res.bindingSpecificityData = "empty"
+        }
     }
+
+    return res
 })

@@ -6,7 +6,7 @@ assets := import("@platforma-sdk/workflow-tengo:assets")
 
 enrichmentColumnTpl := assets.importTemplate(":enrichment-column")
 
-self.defineOutputs("exports", "outStats")
+self.defineOutputs("exports", "outStats", "filteredTooMuch")
 
 self.body(func(args) {
     outStats := {
@@ -21,11 +21,14 @@ self.body(func(args) {
         min: args.min,
         max: args.max,
         cutoff: args.cutoff,
+        overall75Percentile: args.overall75Percentile,
         downsampling: args.downsampling,
         abundanceSpec: args.abundanceSpec,
         inputType: args.inputType,
         topEnrichedColCsv: args.topEnrichedColCsv,
         conditionOrder: args.conditionOrder,
+        antigenControlConfig: args.antigenControlConfig,
+        FilteringConfig: args.FilteringConfig,
         blockId: args.blockId,
         customBlockLabel: args.customBlockLabel,
         defaultBlockLabel: args.defaultBlockLabel
@@ -39,9 +42,32 @@ self.body(func(args) {
         exportColumnRender.output("columnSpec"),
         exportColumnRender.output("columnData")
     )
+    if args.antigenControlConfig.controlEnabled == true {
+        exports.add(
+            "Binding Specificity", 
+            exportColumnRender.output("bindingSpecificitySpec"),
+            exportColumnRender.output("bindingSpecificityData")
+        )
+    }
+    exports.add(
+        "Enrichment - Overall", 
+        exportColumnRender.output("overallSpec"),
+        exportColumnRender.output("overallData")
+    )
+    exports.add(
+        "Enrichment Quality", 
+        exportColumnRender.output("enrichmentQualitySpec"),
+        exportColumnRender.output("enrichmentQualityData")
+    )
+
+    filteredTooMuch := false
+    if string(args.filteredTooMuch.getData()) == "true" {
+        filteredTooMuch = true
+    }
 
     return {
         exports: exports.build(),
-        outStats: outStats
+        outStats: outStats,
+        filteredTooMuch: filteredTooMuch
     }
 })

@@ -2,6 +2,7 @@
 import type { PredefinedGraphOption } from '@milaboratories/graph-maker';
 import { GraphMaker } from '@milaboratories/graph-maker';
 import '@milaboratories/graph-maker/styles';
+import type { PColumnSpec } from '@platforma-sdk/model';
 import { computed } from 'vue';
 import { useApp } from '../app';
 
@@ -50,8 +51,18 @@ const defaultOptions = computed((): PredefinedGraphOption<'bubble'>[] | undefine
   return defaults;
 });
 
-// @TODO: add data-state-key to GraphMaker once it's fixed
-// :data-state-key="app.model.args.abundanceRef"
+const inputElementAxis = computed(() => {
+  const spec = app.model.outputs.datasetSpec;
+  if (spec?.axesSpec !== undefined && spec.axesSpec.length >= 2) {
+    return spec.axesSpec[1].name;
+  }
+  return undefined;
+});
+
+const metaColumnPredicate = (spec: PColumnSpec) =>
+  inputElementAxis.value !== undefined
+  && spec.axesSpec[0]?.name === inputElementAxis.value;
+
 </script>
 
 <template>
@@ -61,5 +72,7 @@ const defaultOptions = computed((): PredefinedGraphOption<'bubble'>[] | undefine
     :data-state-key="app.model.args.abundanceRef"
     :p-frame="app.model.outputs.bubblePf"
     :defaultOptions="defaultOptions"
+    :dataColumnPredicate="(spec: PColumnSpec) => spec.axesSpec.length === 3 && spec.axesSpec[2].name === 'pl7.app/vdj/Baseline-condition'"
+    :meta-column-predicate="metaColumnPredicate"
   />
 </template>

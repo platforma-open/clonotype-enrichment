@@ -2,6 +2,7 @@
 import type { PredefinedGraphOption } from '@milaboratories/graph-maker';
 import { GraphMaker } from '@milaboratories/graph-maker';
 import '@milaboratories/graph-maker/styles';
+import type { PColumnSpec } from '@platforma-sdk/model';
 import { computed } from 'vue';
 import { useApp } from '../app';
 
@@ -37,6 +38,24 @@ const defaultOptions = computed((): PredefinedGraphOption<'discrete'>[] | undefi
   return defaults;
 });
 
+const inputElementAxis = computed(() => {
+  const spec = app.model.outputs.datasetSpec;
+  if (spec?.axesSpec !== undefined && spec.axesSpec.length >= 2) {
+    return spec.axesSpec[1].name;
+  }
+  return undefined;
+});
+
+const dataColumnPredicate = (spec: PColumnSpec) =>
+  inputElementAxis.value !== undefined
+  && spec.axesSpec.length === 2
+  && spec.axesSpec[0].name === inputElementAxis.value
+  && spec.axesSpec[1].name === 'pl7.app/vdj/condition';
+
+const metaColumnPredicate = (spec: PColumnSpec) =>
+  inputElementAxis.value !== undefined
+  && spec.axesSpec[0]?.name === inputElementAxis.value
+  && !spec.annotations?.['pl7.app/trace']?.includes('clonotype-enrichment');
 </script>
 
 <template>
@@ -46,5 +65,7 @@ const defaultOptions = computed((): PredefinedGraphOption<'discrete'>[] | undefi
     :data-state-key="app.model.args.abundanceRef"
     :p-frame="app.model.outputs.stackedPf"
     :default-options="defaultOptions"
+    :dataColumnPredicate="dataColumnPredicate"
+    :meta-column-predicate="metaColumnPredicate"
   />
 </template>

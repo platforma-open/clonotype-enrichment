@@ -72,7 +72,7 @@ getColumns := func(countsSpec) {
           valueType: "Double",
           domain: {},
           annotations: {
-            "pl7.app/label": "Maximum Enrichment"
+            "pl7.app/label": "Max Log2FC"
           }
         }
       }
