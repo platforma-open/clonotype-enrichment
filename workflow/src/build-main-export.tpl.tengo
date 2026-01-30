@@ -27,7 +27,7 @@ self.body(func(args) {
         inputType: args.inputType,
         topEnrichedColCsv: args.topEnrichedColCsv,
         conditionOrder: args.conditionOrder,
-        controlConfig: args.controlConfig,
+        antigenControlConfig: args.antigenControlConfig,
         FilteringConfig: args.FilteringConfig,
         blockId: args.blockId,
         customBlockLabel: args.customBlockLabel,
@@ -42,7 +42,7 @@ self.body(func(args) {
         exportColumnRender.output("columnSpec"),
         exportColumnRender.output("columnData")
     )
-    if args.controlConfig.enabled == true {
+    if args.antigenControlConfig.controlEnabled == true {
         exports.add(
             "Binding Specificity", 
             exportColumnRender.output("bindingSpecificitySpec"),

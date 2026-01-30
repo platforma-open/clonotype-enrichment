@@ -38,21 +38,23 @@ const defaultOptions = computed((): PredefinedGraphOption<'discrete'>[] | undefi
   return defaults;
 });
 
-const isClustered = computed(() => {
+const inputElementAxis = computed(() => {
   const spec = app.model.outputs.datasetSpec;
-  return spec?.axesSpec !== undefined
-    && spec.axesSpec.length >= 2
-    && spec.axesSpec[1].name === 'pl7.app/vdj/clusterId';
+  if (spec?.axesSpec !== undefined && spec.axesSpec.length >= 2) {
+    return spec.axesSpec[1].name;
+  }
+  return undefined;
 });
 
-const primaryAxis = computed(() => isClustered.value ? 'pl7.app/vdj/clusterId' : 'pl7.app/vdj/clonotypeKey');
-
 const dataColumnPredicate = (spec: PColumnSpec) =>
-  spec.axesSpec.length === 2
-  && spec.axesSpec[0].name === primaryAxis.value
+  inputElementAxis.value !== undefined
+  && spec.axesSpec.length === 2
+  && spec.axesSpec[0].name === inputElementAxis.value
   && spec.axesSpec[1].name === 'pl7.app/vdj/condition';
 
-const metaColumnPredicate = (spec: PColumnSpec) => spec.axesSpec[0]?.name === primaryAxis.value
+const metaColumnPredicate = (spec: PColumnSpec) =>
+  inputElementAxis.value !== undefined
+  && spec.axesSpec[0]?.name === inputElementAxis.value
   && !spec.annotations?.['pl7.app/trace']?.includes('clonotype-enrichment');
 </script>
 

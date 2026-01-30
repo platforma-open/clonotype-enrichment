@@ -39,8 +39,9 @@ type FilteringConfig = {
   };
 };
 
-type ControlConfig = {
-  enabled: boolean;
+type AntigenControlConfig = {
+  antigenEnabled: boolean;
+  controlEnabled: boolean;
   antigenColumnRef?: SUniversalPColumnId; // Metadata column for antigen/control
   targetCondition?: string; // e.g., ["Target-Antigen"]
   negativeConditions: string[]; // e.g., ["BSA", "Plastic"]
@@ -67,7 +68,7 @@ export type BlockArgs = {
   FilteringConfig: FilteringConfig;
   clonotypeDefinition: SUniversalPColumnId[];
   additionalEnrichmentExports: string[];
-  controlConfig: ControlConfig;
+  antigenControlConfig: AntigenControlConfig;
   pseudoCount: number; // Default: 100
 };
 
@@ -96,8 +97,9 @@ export const model = BlockModel.create()
       },
     },
     additionalEnrichmentExports: [],
-    controlConfig: {
-      enabled: false,
+    antigenControlConfig: {
+      antigenEnabled: false,
+      controlEnabled: false,
       negativeConditions: [],
       targetThreshold: 2.0,
       controlThreshold: 1.0,
@@ -141,20 +143,26 @@ export const model = BlockModel.create()
   })
 
   .argsValid((ctx) => {
-    const { abundanceRef, conditionColumnRef, conditionOrder, controlConfig } = ctx.args;
+    const { abundanceRef, conditionColumnRef, conditionOrder, antigenControlConfig } = ctx.args;
     const basicValid = abundanceRef !== undefined
       && conditionColumnRef !== undefined
       && conditionOrder.length > 0;
 
     if (!basicValid) return false;
 
-    if (controlConfig.enabled) {
-      const { antigenColumnRef, targetCondition, negativeConditions, controlConditionsOrder } = controlConfig;
-      if (!antigenColumnRef || !targetCondition || !negativeConditions.length || controlConditionsOrder.length < 2) return false;
+    if (antigenControlConfig.antigenEnabled || antigenControlConfig.controlEnabled) {
+      if (!antigenControlConfig.antigenColumnRef) return false;
     }
 
-    // Need to include check for non empty controlConditionsOrder
-    // Need to include check for at least two samples with negative and positive control conditions
+    if (antigenControlConfig.antigenEnabled) {
+      if (!antigenControlConfig.targetCondition) return false;
+    }
+
+    if (antigenControlConfig.controlEnabled) {
+      if (!antigenControlConfig.antigenEnabled
+        || !antigenControlConfig.negativeConditions.length
+        || antigenControlConfig.controlConditionsOrder.length < 2) return false;
+    }
 
     return true;
   })
@@ -223,8 +231,8 @@ export const model = BlockModel.create()
   })
 
   .output('antigenValues', (ctx) => {
-    const config = ctx.args.controlConfig;
-    if (!config?.enabled || !config.antigenColumnRef) return undefined;
+    const config = ctx.args.antigenControlConfig;
+    if (!config?.antigenEnabled || !config.antigenColumnRef) return undefined;
 
     const anchor = ctx.args.abundanceRef;
     const { conditionColumnRef } = ctx.args;
@@ -257,8 +265,8 @@ export const model = BlockModel.create()
   })
 
   .output('negativeControlConditionValues', (ctx) => {
-    const config = ctx.args.controlConfig;
-    if (!config?.enabled) return undefined;
+    const config = ctx.args.antigenControlConfig;
+    if (!config?.controlEnabled) return undefined;
 
     const { negativeConditions, antigenColumnRef } = config;
     if (!negativeConditions?.length || !antigenColumnRef) return undefined;
@@ -429,7 +437,7 @@ export const model = BlockModel.create()
       { type: 'link', href: '/stacked', label: 'Frequency Bar Plot' },
     ];
 
-    if (ctx.args.controlConfig.enabled) {
+    if (ctx.args.antigenControlConfig.controlEnabled) {
       sections.push({ type: 'link', href: '/scatter', label: 'Control Scatter Plot' });
     }
     return sections;

@@ -27,7 +27,7 @@ import {
   usePlDataTableSettingsV2,
 } from '@platforma-sdk/ui-vue';
 import { asyncComputed } from '@vueuse/core';
-import { computed, ref, watchEffect } from 'vue';
+import { computed, ref, watch, watchEffect } from 'vue';
 import { useApp } from '../app';
 
 const app = useApp();
@@ -94,7 +94,7 @@ const tableLoadingText = computed(() => {
   return 'Loading';
 });
 
-// Get list of available values within round column
+// Get list of available values within condition column
 // we will select them in list, being the first one denominator and rest numerators
 const conditionValues = computed(() => mapToOptions(app.model.outputs.conditionValues));
 
@@ -105,7 +105,7 @@ const antigenValues = computed(() => mapToOptions(app.model.outputs.antigenValue
 
 // Get list of available values within antigen column (no selected as target) for negative control selection
 const negativeAntigenValues = computed(() => {
-  const target = app.model.args.controlConfig.targetCondition;
+  const target = app.model.args.antigenControlConfig.targetCondition;
   const filtered = app.model.outputs.antigenValues?.filter((v) => v !== target);
   return mapToOptions(filtered);
 });
@@ -153,7 +153,7 @@ const comparisonsMessage = computed(() => {
 });
 
 const negativeComparisonOptions = computed(() => {
-  const order = [...app.model.args.controlConfig.controlConditionsOrder];
+  const order = [...app.model.args.antigenControlConfig.controlConditionsOrder];
   if (order.length < 2) return [];
 
   const comparisons = [];
@@ -233,7 +233,7 @@ const availableToAdd = computed(() => {
 });
 
 const availableToAddToControl = computed(() => {
-  const current = new Set(app.model.args.controlConfig.controlConditionsOrder);
+  const current = new Set(app.model.args.antigenControlConfig.controlConditionsOrder);
   return negativeControlConditionOptions.value.filter((opt) => !current.has(opt.value));
 });
 
@@ -253,7 +253,7 @@ const resetControlConditionOrder = () => {
       const bIdx = orderMap.get(b) ?? Number.MAX_SAFE_INTEGER;
       return aIdx - bIdx;
     });
-    app.model.args.controlConfig.controlConditionsOrder = sorted;
+    app.model.args.antigenControlConfig.controlConditionsOrder = sorted;
   }
 };
 
@@ -299,13 +299,13 @@ watchEffect(() => {
   }
 });
 
-const controlSyncCol = ref<string | undefined>(app.model.args.controlConfig.antigenColumnRef);
+const controlSyncCol = ref<string | undefined>(app.model.args.antigenControlConfig.antigenColumnRef);
 watchEffect(() => {
-  const col = app.model.args.controlConfig.antigenColumnRef;
+  const col = app.model.args.antigenControlConfig.antigenColumnRef;
   const vals = app.model.outputs.negativeControlConditionValues;
 
   if (vals && vals.length > 0) {
-    const current = app.model.args.controlConfig.controlConditionsOrder;
+    const current = app.model.args.antigenControlConfig.controlConditionsOrder;
     const valSet = new Set(vals);
 
     const hasInvalidItems = current.some((v) => !valSet.has(v));
@@ -318,7 +318,7 @@ watchEffect(() => {
         const bIdx = orderMap.get(b) ?? Number.MAX_SAFE_INTEGER;
         return aIdx - bIdx;
       });
-      app.model.args.controlConfig.controlConditionsOrder = sorted;
+      app.model.args.antigenControlConfig.controlConditionsOrder = sorted;
       controlSyncCol.value = col;
     }
   }
@@ -355,6 +355,13 @@ watchEffect(() => {
       syncAbundanceRef.value = abundanceRefStr;
       syncIsClustered.value = isClustered;
     }
+  }
+});
+
+// Enforce dependency: Enable target selection if negative controls are enabled
+watch(() => app.model.args.antigenControlConfig.controlEnabled, (enabled) => {
+  if (enabled) {
+    app.model.args.antigenControlConfig.antigenEnabled = true;
   }
 });
 
@@ -459,37 +466,66 @@ const isControlOrderOpen = ref(true); // Open by default
       </PlAccordionSection>
     </PlAccordion>
 
-    <PlCheckbox v-model="app.model.args.controlConfig.enabled">
-      Enable target selection & negative controls
-      <PlTooltip class="info">
-        <template #tooltip>
-          <div>
-            Enable negative control analysis to distinguish antigen-specific binders from background binders.
-          </div>
-        </template>
-      </PlTooltip>
-    </PlCheckbox>
+    <PlRow>
+      <div style="display: flex; align-items: center; gap: 4px;">
+        <PlCheckbox
+          v-model="app.model.args.antigenControlConfig.antigenEnabled"
+          :disabled="app.model.args.antigenControlConfig.controlEnabled"
+        >
+          Multiple target dataset
+        </PlCheckbox>
+        <PlTooltip class="info">
+          <template #tooltip>
+            <div>
+              Enable specific target selection for dedicated enrichment analysis.
+            </div>
+          </template>
+        </PlTooltip>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 4px;">
+        <PlCheckbox v-model="app.model.args.antigenControlConfig.controlEnabled">
+          Use negative controls
+        </PlCheckbox>
+        <PlTooltip class="info">
+          <template #tooltip>
+            <div>
+              Enables specificity analysis by comparing your target against control samples.<br/><br/>
+              You can select multiple negative controls (e.g., irrelevant antigens). The analysis calculates enrichment for each one independently and uses the <strong>maximum value</strong> found across all controls as a baseline for background binding. This helps filter out "sticky" or non-specific clonotypes that appear in your control samples.
+            </div>
+          </template>
+        </PlTooltip>
+      </div>
+    </PlRow>
     <PlDropdown
-      v-if="app.model.args.controlConfig.enabled"
-      v-model="app.model.args.controlConfig.antigenColumnRef"
+      v-if="app.model.args.antigenControlConfig.antigenEnabled"
+      v-model="app.model.args.antigenControlConfig.antigenColumnRef"
       :options="app.model.outputs.metadataOptions"
       label="Antigen column" required
     />
-    <PlRow v-if="app.model.args.controlConfig.enabled">
+    <PlDropdown
+      v-if="app.model.args.antigenControlConfig.antigenEnabled
+        && !app.model.args.antigenControlConfig.controlEnabled"
+      v-model="app.model.args.antigenControlConfig.targetCondition"
+      :options="antigenValues"
+      label="Target"
+    />
+    <PlRow v-if="app.model.args.antigenControlConfig.controlEnabled">
       <PlDropdown
-        v-model="app.model.args.controlConfig.targetCondition"
+        v-model="app.model.args.antigenControlConfig.targetCondition"
         :options="antigenValues"
         label="Target"
       />
       <PlDropdownMulti
-        v-model="app.model.args.controlConfig.negativeConditions"
+        v-model="app.model.args.antigenControlConfig.negativeConditions"
+        :style="{minWidth: '148px'}"
         :options="negativeAntigenValues"
         label="Negative control(s)"
       />
     </PlRow>
     <PlAccordion multiple>
       <PlAccordionSection
-        v-if="app.model.args.controlConfig.enabled"
+        v-if="app.model.args.antigenControlConfig.controlEnabled"
         v-model="isControlOrderOpen" label="Negative Condition Order"
       >
         <div style="display: flex; margin-bottom: -15px;">
@@ -511,7 +547,7 @@ const isControlOrderOpen = ref(true); // Open by default
           </PlTooltip>
         </div>
         <PlElementList
-          v-model:items="app.model.args.controlConfig.controlConditionsOrder"
+          v-model:items="app.model.args.antigenControlConfig.controlConditionsOrder"
         >
           <template #item-title="{ item }">
             {{ item }}
@@ -531,9 +567,9 @@ const isControlOrderOpen = ref(true); // Open by default
         </div>
       </PlAccordionSection>
     </PlAccordion>
-    <PlRow v-if="app.model.args.controlConfig.enabled">
+    <PlRow v-if="app.model.args.antigenControlConfig.controlEnabled">
       <PlNumberField
-        v-model="app.model.args.controlConfig.targetThreshold"
+        v-model="app.model.args.antigenControlConfig.targetThreshold"
         label="Target threshold"
         :minValue="0"
         :step="0.1"
@@ -555,7 +591,7 @@ const isControlOrderOpen = ref(true); // Open by default
         </template>
       </PlNumberField>
       <PlNumberField
-        v-model="app.model.args.controlConfig.controlThreshold"
+        v-model="app.model.args.antigenControlConfig.controlThreshold"
         label="Control threshold"
         :minValue="0"
         :step="0.1"
@@ -599,7 +635,7 @@ const isControlOrderOpen = ref(true); // Open by default
       />
     </PlAccordionSection>
 
-    <PlAccordionSection label="Clonotype Filtering Options">
+    <PlAccordionSection label="Clonotype Filtering">
       <PlRadioGroup
         v-model="app.model.args.FilteringConfig.baseFilter"
         :options="filteringOptions"
@@ -659,10 +695,10 @@ const isControlOrderOpen = ref(true); // Open by default
         <PlTooltip class="info">
           <template #tooltip>
             <div>
-              Keep clonotypes present in selected conditions.<br/><br/>
-              <strong>Any selected (OR):</strong> Only keeps clonotypes present in at least one of the selected rounds.<br/>
-              <strong>All selected (AND):</strong> Only keeps clonotypes present in all of the selected rounds.<br/><br/>
-              Useful to focus on clonotypes that reached later selection rounds.
+              Filter clonotypes based on their occurrence across conditions.<br/><br/>
+              <strong>Present in any (OR):</strong> Keeps clonotypes detected in at least one of the selected conditions.<br/>
+              <strong>Present in all (AND):</strong> Only keeps clonotypes detected in every one of the selected conditions.<br/><br/>
+              Useful to focus on persistent clonotypes or those appearing in later selection conditions.
             </div>
           </template>
         </PlTooltip>
@@ -675,8 +711,8 @@ const isControlOrderOpen = ref(true); // Open by default
         />
         <PlDropdown
           v-model="app.model.args.FilteringConfig.presentInRounds.logic"
-          :options="[{ value: 'OR', label: 'Any selected (OR)' },
-                     { value: 'AND', label: 'All selected (AND)' }]"
+          :options="[{ value: 'OR', label: 'Present in any (OR)' },
+                     { value: 'AND', label: 'Present in all (AND)' }]"
           label="Logic"
         />
       </PlRow>

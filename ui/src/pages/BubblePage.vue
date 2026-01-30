@@ -51,16 +51,18 @@ const defaultOptions = computed((): PredefinedGraphOption<'bubble'>[] | undefine
   return defaults;
 });
 
-const metaColumnPredicate = (spec: PColumnSpec) => {
-  const isClustered = app.model.outputs.datasetSpec?.axesSpec !== undefined
-    && app.model.outputs.datasetSpec.axesSpec.length >= 2
-    && app.model.outputs.datasetSpec.axesSpec[1].name === 'pl7.app/vdj/clusterId';
-  if (isClustered) {
-    return spec.axesSpec[0]?.name !== 'pl7.app/vdj/clonotypeKey';
-  } else {
-    return spec.axesSpec[0]?.name === 'pl7.app/vdj/clonotypeKey';
+const inputElementAxis = computed(() => {
+  const spec = app.model.outputs.datasetSpec;
+  if (spec?.axesSpec !== undefined && spec.axesSpec.length >= 2) {
+    return spec.axesSpec[1].name;
   }
-};
+  return undefined;
+});
+
+const metaColumnPredicate = (spec: PColumnSpec) =>
+  inputElementAxis.value !== undefined
+  && spec.axesSpec[0]?.name === inputElementAxis.value;
+
 </script>
 
 <template>

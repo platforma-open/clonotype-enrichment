@@ -2,7 +2,7 @@ ll := import("@platforma-sdk/workflow-tengo:ll")
 canonical := import("@platforma-sdk/workflow-tengo:canonical")
 
 getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percentile, downsampling, 
-                  conditionOrder, controlConfig, filteringConfig, blockId, ...opts) {
+                  conditionOrder, antigenControlConfig, filteringConfig, blockId, ...opts) {
   ll.assert(len(opts) <= 1, "expected at most one options map")
 
   specLabel := "Max Log2FC"
@@ -16,10 +16,10 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percenti
   targetCondition := undefined
   targetThreshold := undefined
   controlThreshold := undefined
-  if controlConfig != undefined && controlConfig.enabled == true {
-    targetCondition = controlConfig.targetCondition
-    targetThreshold = string(controlConfig.targetThreshold)
-    controlThreshold = string(controlConfig.controlThreshold)
+  if antigenControlConfig != undefined && antigenControlConfig.controlEnabled == true {
+    targetCondition = antigenControlConfig.targetCondition
+    targetThreshold = string(antigenControlConfig.targetThreshold)
+    controlThreshold = string(antigenControlConfig.controlThreshold)
   }
 
   // Define columns for exports
@@ -96,7 +96,7 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percenti
             "pl7.app/label": "Overall Log2FC",
             "pl7.app/table/orderPriority": "90",
             "pl7.app/table/visibility": "default",
-            "pl7.app/isScore": "true",
+            // "pl7.app/isScore": "true",
             "pl7.app/score/rankValues": "increasing",
             "pl7.app/score/defaultCutoff": overall75Percentile,
             "pl7.app/format": ".2f"

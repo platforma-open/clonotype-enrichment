@@ -370,7 +370,7 @@ def hybrid_enrichment_analysis(
 
     # --- Target Track Processing ---
     # Get total reads for target track frequencies and filtering
-    if has_antigen and control_enabled and current_target:
+    if has_antigen and current_target:
         target_reads = total_reads_df.filter(pl.col('antigen') == current_target)
         target_total_reads_dict = dict(zip(target_reads['condition'], target_reads['total_reads']))
     else:
@@ -379,7 +379,7 @@ def hybrid_enrichment_analysis(
         target_total_reads_dict = dict(zip(global_reads['condition'], global_reads['total_reads']))
 
     target_track_df = aggregated_df
-    if has_antigen and control_enabled and current_target:
+    if has_antigen and current_target:
         target_track_df = aggregated_df.filter(pl.col('antigen') == current_target)
 
     # Calculate track-specific n_clonotypes for normalization
@@ -747,9 +747,16 @@ def _process_outputs(
         # Create empty outputs if no enrichment columns
         empty_cols = ['elementId', 'Label', 'Comparison', 'Numerator',
                       'Denominator', 'Enrichment', 'Frequency_Numerator',
-                      'Overall Log2FC', 'MaxPositiveEnrichment']
-        empty_df = pl.DataFrame(schema={col: pl.Utf8 if col in [
-                                'elementId', 'Label', 'Comparison', 'Numerator', 'Denominator'] else pl.Float64 for col in empty_cols})
+                      'Overall Log2FC', 'MaxPositiveEnrichment', 
+                      'MaxNegControlEnrichment', 'Binding Specificity', 'EnrichmentQuality']
+        empty_schema = {}
+        for col in empty_cols:
+            if col in ['elementId', 'Label', 'Comparison', 'Numerator', 'Denominator', 'Binding Specificity', 'EnrichmentQuality']:
+                empty_schema[col] = pl.Utf8
+            else:
+                empty_schema[col] = pl.Float64
+        
+        empty_df = pl.DataFrame(schema=empty_schema)
 
         empty_df.write_csv(bubble_csv)
         empty_df.write_csv(top_enriched_csv)

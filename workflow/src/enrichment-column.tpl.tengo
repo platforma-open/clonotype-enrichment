@@ -19,7 +19,7 @@ self.body(func(args) {
     inputType := args.inputType
     topEnrichedColCsv := args.topEnrichedColCsv
     conditionOrder := args.conditionOrder
-    controlConfig := args.controlConfig
+    antigenControlConfig := args.antigenControlConfig
     FilteringConfig := args.FilteringConfig
     blockId := args.blockId
     specLabel := args.specLabel
@@ -37,7 +37,7 @@ self.body(func(args) {
                                                                 string(overall75Percentile.getData()),
                                                                 downsampling,
                                                                 conditionOrder,
-                                                                controlConfig,
+                                                                antigenControlConfig,
                                                                 FilteringConfig,
                                                                 blockId,
                                                                 specLabel)
@@ -50,7 +50,7 @@ self.body(func(args) {
                                                                 string(overall75Percentile.getData()),
                                                                 downsampling,
                                                                 conditionOrder,
-                                                                controlConfig,
+                                                                antigenControlConfig,
                                                                 FilteringConfig,
                                                                 blockId)
     }
@@ -110,7 +110,7 @@ self.body(func(args) {
             enrichmentQualityData: exportFile["enrichment_quality.data"]
         }
 
-        if controlConfig != undefined && controlConfig.enabled == true {
+        if antigenControlConfig != undefined && antigenControlConfig.controlEnabled == true {
             res.bindingSpecificitySpec = trace.inject(exportFile["binding_specificity.spec"])
             res.bindingSpecificityData = exportFile["binding_specificity.data"]
         } else {
