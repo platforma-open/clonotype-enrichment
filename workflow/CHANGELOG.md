@@ -1,5 +1,16 @@
 # @platforma-open/milaboratories.clonotype-enrichment.workflow
 
+## 3.0.0
+
+### Major Changes
+
+- d76b735: Upgrade to include specific antigen selection, negative control usage, improved filters and pseudocount usage
+
+### Patch Changes
+
+- Updated dependencies [d76b735]
+  - @platforma-open/milaboratories.clonotype-enrichment.software@3.0.0
+
 ## 2.22.4
 
 ### Patch Changes
