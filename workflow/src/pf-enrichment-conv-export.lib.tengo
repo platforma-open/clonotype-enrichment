@@ -13,11 +13,11 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percenti
   }
 
   // Extract control info
-  targetCondition := undefined
+  targetAntigen := undefined
   targetThreshold := undefined
   controlThreshold := undefined
   if antigenControlConfig != undefined && antigenControlConfig.controlEnabled == true {
-    targetCondition = antigenControlConfig.targetCondition
+    targetAntigen = antigenControlConfig.targetAntigen
     targetThreshold = string(antigenControlConfig.targetThreshold)
     controlThreshold = string(antigenControlConfig.controlThreshold)
   }
@@ -104,8 +104,8 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percenti
         }
       }
 
-  if targetCondition && len(opts) == 0 {
-    overallColumn.spec.domain["pl7.app/vdj/antigenType"] = targetCondition
+  if targetAntigen && len(opts) == 0 {
+    overallColumn.spec.domain["pl7.app/vdj/antigenType"] = targetAntigen
 
     columns = columns + [{
         column: "Binding Specificity",

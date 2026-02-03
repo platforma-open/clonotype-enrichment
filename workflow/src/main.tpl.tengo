@@ -172,12 +172,12 @@ wf.body(func(args) {
 
 	if antigenControlConfig.antigenEnabled || antigenControlConfig.controlEnabled {
 		calculateEnrichment = calculateEnrichment.
-			arg("--current_target").arg(string(antigenControlConfig.targetCondition))
+			arg("--current_target").arg(string(antigenControlConfig.targetAntigen))
 		
 		if antigenControlConfig.controlEnabled {
 			calculateEnrichment = calculateEnrichment.
 				arg("--control_enabled").
-				arg("--negative_conditions").arg(string(antigenControlConfig.negativeConditions)).
+				arg("--negative_antigens").arg(string(antigenControlConfig.negativeAntigens)).
 				arg("--control_conditions_order").arg(string(antigenControlConfig.controlConditionsOrder)).
 				arg("--target_threshold").arg(string(antigenControlConfig.targetThreshold)).
 				arg("--control_threshold").arg(string(antigenControlConfig.controlThreshold))
