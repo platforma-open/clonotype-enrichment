@@ -42,8 +42,8 @@ type AntigenControlConfig = {
   antigenEnabled: boolean;
   controlEnabled: boolean;
   antigenColumnRef?: SUniversalPColumnId; // Metadata column for antigen/control
-  targetCondition?: string; // e.g., "Target-Antigen"
-  negativeConditions: string[]; // e.g., ["BSA", "Plastic"]
+  targetAntigen?: string; // e.g., "Target-Antigen"
+  negativeAntigens: string[]; // e.g., ["BSA", "Plastic"]
   targetThreshold: number; // Default: 2.0 log2 FC
   controlThreshold: number; // Default: 1.0 log2 FC
   controlConditionsOrder: string[]; // e.g., ["BSA", "Plastic"]
@@ -99,7 +99,7 @@ export const model = BlockModel.create()
     antigenControlConfig: {
       antigenEnabled: false,
       controlEnabled: false,
-      negativeConditions: [],
+      negativeAntigens: [],
       targetThreshold: 2.0,
       controlThreshold: 1.0,
       controlConditionsOrder: [],
@@ -154,12 +154,12 @@ export const model = BlockModel.create()
     }
 
     if (antigenControlConfig.antigenEnabled) {
-      if (!antigenControlConfig.targetCondition) return false;
+      if (!antigenControlConfig.targetAntigen) return false;
     }
 
     if (antigenControlConfig.controlEnabled) {
       if (!antigenControlConfig.antigenEnabled
-        || !antigenControlConfig.negativeConditions.length
+        || !antigenControlConfig.negativeAntigens.length
         || antigenControlConfig.controlConditionsOrder.length < 2) return false;
     }
 

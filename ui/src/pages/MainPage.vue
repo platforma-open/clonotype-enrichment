@@ -150,9 +150,9 @@ const effectiveConditionValues = computed(() => {
   if (!raw?.conditionValues?.length) return [];
   if (!raw.conditionBySample || !raw.antigenBySample) return raw.conditionValues;
   const config = app.model.args.antigenControlConfig;
-  if (!config?.antigenEnabled || !config.targetCondition) return raw.conditionValues;
+  if (!config?.antigenEnabled || !config.targetAntigen) return raw.conditionValues;
   // Restrict to conditions present in samples that have the selected target antigen
-  const target = config.targetCondition;
+  const target = config.targetAntigen;
   const conditionsForTarget = new Set<string>();
   for (const [sampleId, antigenValue] of Object.entries(raw.antigenBySample)) {
     if (antigenValue === target) {
@@ -167,7 +167,6 @@ const effectiveConditionOptions = computed(() => mapToOptions(effectiveCondition
 /** Options for condition order list and present-in-rounds filter (current order). */
 const conditionOrderOptions = computed(() => mapToOptions([...app.model.args.conditionOrder]));
 
-/** Antigen values that have at least 2 conditions (for target selection). */
 /** Antigens that appear in at least 2 conditions (required for target selection). */
 const antigenValuesList = computed(() => {
   const raw = metadataFetched.value;
@@ -186,7 +185,7 @@ const antigenValues = computed(() => mapToOptions(antigenValuesList.value));
 
 /** Antigen options excluding the selected target (for negative control dropdown). */
 const negativeAntigenValues = computed(() => {
-  const target = app.model.args.antigenControlConfig.targetCondition;
+  const target = app.model.args.antigenControlConfig.targetAntigen;
   const filtered = antigenValuesList.value?.filter((v) => v !== target);
   return mapToOptions(filtered);
 });
@@ -196,8 +195,8 @@ const negativeControlConditionValues = computed(() => {
   const raw = metadataFetched.value;
   if (!raw?.conditionBySample || !raw?.antigenBySample) return [];
   const config = app.model.args.antigenControlConfig;
-  if (!config?.controlEnabled || !config.negativeConditions?.length) return [];
-  const negSet = new Set(config.negativeConditions);
+  if (!config?.controlEnabled || !config.negativeAntigens?.length) return [];
+  const negSet = new Set(config.negativeAntigens);
   const conditions = new Set<string>();
   for (const [sampleId, antigenValue] of Object.entries(raw.antigenBySample)) {
     if (negSet.has(antigenValue)) {
@@ -590,18 +589,18 @@ const isControlOrderOpen = ref(true); // Open by default
     <PlDropdown
       v-if="app.model.args.antigenControlConfig.antigenEnabled
         && !app.model.args.antigenControlConfig.controlEnabled"
-      v-model="app.model.args.antigenControlConfig.targetCondition"
+      v-model="app.model.args.antigenControlConfig.targetAntigen"
       :options="antigenValues"
       label="Target"
     />
     <PlRow v-if="app.model.args.antigenControlConfig.controlEnabled">
       <PlDropdown
-        v-model="app.model.args.antigenControlConfig.targetCondition"
+        v-model="app.model.args.antigenControlConfig.targetAntigen"
         :options="antigenValues"
         label="Target"
       />
       <PlDropdownMulti
-        v-model="app.model.args.antigenControlConfig.negativeConditions"
+        v-model="app.model.args.antigenControlConfig.negativeAntigens"
         :style="{minWidth: '148px'}"
         :options="negativeAntigenValues"
         label="Negative control(s)"

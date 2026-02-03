@@ -242,7 +242,7 @@ def hybrid_enrichment_analysis(
     filtered_too_much_txt: Optional[str] = None,
     pseudo_count: float = 0.0,
     control_enabled: bool = False,
-    negative_conditions: Optional[List[str]] = None,
+    negative_antigens: Optional[List[str]] = None,
     control_conditions_order: Optional[List[str]] = None,
     target_threshold: float = 2.0,
     control_threshold: float = 1.0,
@@ -462,9 +462,9 @@ def hybrid_enrichment_analysis(
 
     # --- Negative Control Track Processing ---
     max_neg_enrichment_df = None
-    if has_antigen and control_enabled and negative_conditions:
+    if has_antigen and control_enabled and negative_antigens:
         # Filter for all negative antigens
-        neg_track_df = aggregated_df.filter(pl.col('antigen').is_in(negative_conditions))
+        neg_track_df = aggregated_df.filter(pl.col('antigen').is_in(negative_antigens))
 
         # Use control-specific order if provided, otherwise fallback to main order
         base_order = control_conditions_order if control_conditions_order is not None else condition_order
@@ -997,8 +997,8 @@ if __name__ == "__main__":
                         help="Constant to add to abundance values for enrichment and frequency calculations")
     parser.add_argument("--control_enabled", action="store_true",
                         help="Enable negative control specificity filtering")
-    parser.add_argument("--negative_conditions", type=str, required=False,
-                        help="JSON list of negative antigen conditions")
+    parser.add_argument("--negative_antigens", type=str, required=False,
+                        help="JSON list of negative antigen names")
     parser.add_argument("--control_conditions_order", type=str, required=False,
                         help="JSON list of conditions where negative antigens are present")
     parser.add_argument("--target_threshold", type=float, default=2.0,
@@ -1032,7 +1032,7 @@ if __name__ == "__main__":
         filtered_too_much_txt=args.filtered_too_much,
         pseudo_count=args.pseudo_count,
         control_enabled=args.control_enabled,
-        negative_conditions=json.loads(args.negative_conditions) if args.negative_conditions else None,
+        negative_antigens=json.loads(args.negative_antigens) if args.negative_antigens else None,
         control_conditions_order=json.loads(args.control_conditions_order) if args.control_conditions_order else None,
         target_threshold=args.target_threshold,
         control_threshold=args.control_threshold,
