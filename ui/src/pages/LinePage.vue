@@ -8,9 +8,9 @@ import { useApp } from '../app';
 
 const app = useApp();
 
-const defaultOptions = computed((): PredefinedGraphOption<'scatterplot'>[] | undefined => {
+const defaultOptions = computed((): PredefinedGraphOption<'scatterplot'>[] | null => {
   if (!app.model.outputs.stackedPCols)
-    return undefined;
+    return null;
 
   const stackedPCols = app.model.outputs.stackedPCols;
   const getColSpec = (name: string) =>
@@ -70,7 +70,6 @@ const metaColumnPredicate = (spec: PColumnSpec) =>
   <GraphMaker
     v-model="app.model.ui.lineState"
     chartType="scatterplot"
-    :data-state-key="app.model.args.abundanceRef"
     :p-frame="app.model.outputs.linePf"
     :default-options="defaultOptions"
     :dataColumnPredicate="dataColumnPredicate"

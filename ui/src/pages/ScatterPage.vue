@@ -8,9 +8,9 @@ import { useApp } from '../app';
 
 const app = useApp();
 
-const defaultOptions = computed((): PredefinedGraphOption<'scatterplot'>[] | undefined => {
+const defaultOptions = computed((): PredefinedGraphOption<'scatterplot'>[] | null => {
   if (!app.model.outputs.controlScatterPCols)
-    return undefined;
+    return null;
 
   const controlScatterPCols = app.model.outputs.controlScatterPCols;
   const getColSpec = (name: string) => {
@@ -24,7 +24,7 @@ const defaultOptions = computed((): PredefinedGraphOption<'scatterplot'>[] | und
   const frequencySpec = getColSpec('pl7.app/vdj/frequency');
 
   if (!maxEnrichmentSpec || !maxNegControlEnrichmentSpec || !bindingSpecificitySpec || !frequencySpec)
-    return undefined;
+    return null;
 
   const defaults: PredefinedGraphOption<'scatterplot'>[] = [
     {
@@ -75,7 +75,6 @@ const metaColumnPredicate = (spec: PColumnSpec) =>
   <GraphMaker
     v-model="app.model.ui.scatterState"
     chartType="scatterplot"
-    :data-state-key="app.model.args.abundanceRef"
     :p-frame="app.model.outputs.controlScatterPf"
     :default-options="defaultOptions"
     :dataColumnPredicate="dataColumnPredicate"

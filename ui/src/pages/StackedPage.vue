@@ -8,9 +8,9 @@ import { useApp } from '../app';
 
 const app = useApp();
 
-const defaultOptions = computed((): PredefinedGraphOption<'discrete'>[] | undefined => {
+const defaultOptions = computed((): PredefinedGraphOption<'discrete'>[] | null => {
   if (!app.model.outputs.stackedPCols)
-    return undefined;
+    return null;
 
   const stackedPCols = app.model.outputs.stackedPCols;
   const getColSpec = (name: string) =>
@@ -62,7 +62,6 @@ const metaColumnPredicate = (spec: PColumnSpec) =>
   <GraphMaker
     v-model="app.model.ui.stackedState"
     chartType="discrete"
-    :data-state-key="app.model.args.abundanceRef"
     :p-frame="app.model.outputs.stackedPf"
     :default-options="defaultOptions"
     :dataColumnPredicate="dataColumnPredicate"

@@ -8,9 +8,9 @@ import { useApp } from '../app';
 
 const app = useApp();
 
-const defaultOptions = computed((): PredefinedGraphOption<'bubble'>[] | undefined => {
+const defaultOptions = computed((): PredefinedGraphOption<'bubble'>[] | null => {
   if (!app.model.outputs.bubblePCols)
-    return undefined;
+    return null;
 
   const bubblePCols = app.model.outputs.bubblePCols;
 
@@ -69,7 +69,6 @@ const metaColumnPredicate = (spec: PColumnSpec) =>
   <GraphMaker
     v-model="app.model.ui.bubbleState"
     chartType="bubble"
-    :data-state-key="app.model.args.abundanceRef"
     :p-frame="app.model.outputs.bubblePf"
     :defaultOptions="defaultOptions"
     :dataColumnPredicate="(spec: PColumnSpec) => spec.axesSpec.length === 3 && spec.axesSpec[2].name === 'pl7.app/vdj/Baseline-condition'"
