@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { PlRef } from '@platforma-sdk/model';
-import { getRawPlatformaInstance } from '@platforma-sdk/model';
+import type { PFrameHandle, PlRef } from '@platforma-sdk/model';
+import { getRawPlatformaInstance, getSingleColumnData, PFrameImpl } from '@platforma-sdk/model';
 import type {
   ListOption,
 } from '@platforma-sdk/ui-vue';
@@ -25,6 +25,7 @@ import {
   PlSlideModal,
   PlTooltip,
   usePlDataTableSettingsV2,
+  useWatchFetch,
 } from '@platforma-sdk/ui-vue';
 import { asyncComputed } from '@vueuse/core';
 import { computed, ref, watch, watchEffect } from 'vue';
@@ -94,35 +95,119 @@ const tableLoadingText = computed(() => {
   return 'Loading';
 });
 
-// Get list of available values within condition column
-// we will select them in list, being the first one denominator and rest numerators
-const conditionValues = computed(() => mapToOptions(app.model.outputs.conditionValues));
+type MetadataFetched = {
+  conditionValues: string[];
+  conditionBySample?: Record<string, string>;
+  antigenBySample?: Record<string, string>;
+};
 
+/** Fetch metadata column data once from the pframe and derive all metadata-derived lists. */
+const metadataFetched = useWatchFetch(() => app.model.outputs.metadataColumnsPframe, async (pframeHandle: PFrameHandle | undefined) => {
+  if (!pframeHandle) return undefined;
+  const pFrame = new PFrameImpl(pframeHandle);
+  const list = await pFrame.listColumns();
+  const conditionColId = list?.[0]?.columnId;
+  if (!conditionColId) return undefined;
+
+  // Unique condition values (first column)
+  const conditionUnique = await pFrame.getUniqueValues({ columnId: conditionColId, filters: [], limit: 1000 });
+  const conditionValues = [...(conditionUnique?.values?.data ?? [])].map((v) => String(v));
+
+  const antigenColId = list?.[1]?.columnId;
+  if (!antigenColId) {
+    return { conditionValues } satisfies MetadataFetched;
+  }
+
+  // Full column data for both columns (sample id → value) to derive effective/antigen/control lists
+  const handle = pframeHandle;
+  const [conditionColData, antigenColData] = await Promise.all([
+    getSingleColumnData(handle, conditionColId),
+    getSingleColumnData(handle, antigenColId),
+  ]);
+
+  const buildBySample = (colData: { axesData: Record<string, (string | number | null)[]>; data: (string | number | null)[] }) => {
+    const axisKeys = Object.keys(colData.axesData);
+    if (!axisKeys.length) return {};
+    const sampleKey = axisKeys[0];
+    const out: Record<string, string> = {};
+    for (let i = 0; i < colData.data.length; i++) {
+      const sampleId = colData.axesData[sampleKey]?.[i];
+      const val = colData.data[i];
+      if (sampleId != null && val != null) out[String(sampleId)] = String(val);
+    }
+    return out;
+  };
+
+  const conditionBySample = buildBySample(conditionColData);
+  const antigenBySample = buildBySample(antigenColData);
+
+  return { conditionValues, conditionBySample, antigenBySample } satisfies MetadataFetched;
+});
+
+/** Condition values valid for the main order: all in dataset or only those in samples for the selected target antigen. */
+const effectiveConditionValues = computed(() => {
+  const raw = metadataFetched.value;
+  if (!raw?.conditionValues?.length) return [];
+  if (!raw.conditionBySample || !raw.antigenBySample) return raw.conditionValues;
+  const config = app.model.args.antigenControlConfig;
+  if (!config?.antigenEnabled || !config.targetCondition) return raw.conditionValues;
+  // Restrict to conditions present in samples that have the selected target antigen
+  const target = config.targetCondition;
+  const conditionsForTarget = new Set<string>();
+  for (const [sampleId, antigenValue] of Object.entries(raw.antigenBySample)) {
+    if (antigenValue === target) {
+      const c = raw.conditionBySample[sampleId];
+      if (c) conditionsForTarget.add(c);
+    }
+  }
+  return [...conditionsForTarget];
+});
+const effectiveConditionOptions = computed(() => mapToOptions(effectiveConditionValues.value));
+
+/** Options for condition order list and present-in-rounds filter (current order). */
 const conditionOrderOptions = computed(() => mapToOptions([...app.model.args.conditionOrder]));
 
-// Get list of available values within antigen column for target selection
-const antigenValues = computed(() => mapToOptions(app.model.outputs.antigenValues));
+/** Antigen values that have at least 2 conditions (for target selection). */
+/** Antigens that appear in at least 2 conditions (required for target selection). */
+const antigenValuesList = computed(() => {
+  const raw = metadataFetched.value;
+  if (!raw?.conditionBySample || !raw?.antigenBySample) return [];
+  const counts: Record<string, Set<string>> = {};
+  for (const [sampleId, antigenValue] of Object.entries(raw.antigenBySample)) {
+    if (!counts[antigenValue]) counts[antigenValue] = new Set();
+    const c = raw.conditionBySample![sampleId];
+    if (c) counts[antigenValue].add(c);
+  }
+  return Object.entries(counts)
+    .filter(([, conditions]) => conditions.size >= 2)
+    .map(([antigen]) => antigen);
+});
+const antigenValues = computed(() => mapToOptions(antigenValuesList.value));
 
-// Get list of available values within antigen column (no selected as target) for negative control selection
+/** Antigen options excluding the selected target (for negative control dropdown). */
 const negativeAntigenValues = computed(() => {
   const target = app.model.args.antigenControlConfig.targetCondition;
-  const filtered = app.model.outputs.antigenValues?.filter((v) => v !== target);
+  const filtered = antigenValuesList.value?.filter((v) => v !== target);
   return mapToOptions(filtered);
 });
 
-// Check if there are condition values for negative control samples that are not in the main condition order
-// const hasExtraNegativeControlConditions = computed(() => {
-//   const negValues = app.model.outputs.negativeControlConditionValues;
-//   const order = app.model.args.conditionOrder;
-//   if (!negValues?.length || !order) return false;
-
-//   // Check if any negative control condition is NOT in the main condition order
-//   const orderSet = new Set(order);
-//   return negValues.some((v) => !orderSet.has(v));
-// });
-
-// Get condition values from samples that have negative antigen values
-const negativeControlConditionOptions = computed(() => mapToOptions(app.model.outputs.negativeControlConditionValues));
+/** Condition values in samples that have the selected negative control antigens. */
+const negativeControlConditionValues = computed(() => {
+  const raw = metadataFetched.value;
+  if (!raw?.conditionBySample || !raw?.antigenBySample) return [];
+  const config = app.model.args.antigenControlConfig;
+  if (!config?.controlEnabled || !config.negativeConditions?.length) return [];
+  const negSet = new Set(config.negativeConditions);
+  const conditions = new Set<string>();
+  for (const [sampleId, antigenValue] of Object.entries(raw.antigenBySample)) {
+    if (negSet.has(antigenValue)) {
+      const c = raw.conditionBySample[sampleId];
+      if (c) conditions.add(c);
+    }
+  }
+  return [...conditions];
+});
+const negativeControlConditionOptions = computed(() => mapToOptions(negativeControlConditionValues.value));
 
 // Generate comparison options based on condition order
 // Creates all possible numerator-denominator pairs where numerator comes after denominator
@@ -229,7 +314,7 @@ const filteredTooMuch = asyncComputed(async () => {
 
 const availableToAdd = computed(() => {
   const current = new Set(app.model.args.conditionOrder);
-  return conditionValues.value.filter((opt) => !current.has(opt.value));
+  return effectiveConditionOptions.value.filter((opt) => !current.has(opt.value));
 });
 
 const availableToAddToControl = computed(() => {
@@ -238,14 +323,15 @@ const availableToAddToControl = computed(() => {
 });
 
 const resetConditionOrder = () => {
-  if (app.model.outputs.conditionValues) {
-    app.model.args.conditionOrder = [...app.model.outputs.conditionValues];
+  const vals = effectiveConditionValues.value;
+  if (vals?.length) {
+    app.model.args.conditionOrder = [...vals];
   }
 };
 
 const resetControlConditionOrder = () => {
-  if (app.model.outputs.negativeControlConditionValues) {
-    const vals = app.model.outputs.negativeControlConditionValues;
+  const vals = negativeControlConditionValues.value;
+  if (vals?.length) {
     const mainOrder = app.model.args.conditionOrder;
     const orderMap = new Map(mainOrder.map((v, i) => [v, i]));
     const sorted = [...vals].sort((a, b) => {
@@ -278,23 +364,21 @@ const isClusterId = computed(() => {
 const conditionSyncCol = ref<string | undefined>(app.model.args.conditionColumnRef);
 watchEffect(() => {
   const col = app.model.args.conditionColumnRef;
-  const vals = app.model.outputs.conditionValues;
+  const vals = effectiveConditionValues.value;
 
   if (vals && vals.length > 0) {
     const current = app.model.args.conditionOrder;
     const valSet = new Set(vals);
 
-    // If the current order contains values that are no longer in the selected column,
-    // it's "invalid" (likely due to a dataset change or column value update).
+    // If the current order contains values that are no longer valid (e.g. not in selected dataset,
+    // or not present in samples for the selected target antigen), remove them but preserve order.
     const hasInvalidItems = current.some((v) => !valSet.has(v));
 
-    // Reset to default (all available values) if:
-    // 1. The user switched to a DIFFERENT column in conditionColumnRef.
-    // 2. The order is completely empty (fresh block initialization).
-    // 3. The current order contains values that no longer exist in the selected column.
-    if (col !== conditionSyncCol.value || current.length === 0 || hasInvalidItems) {
+    if (col !== conditionSyncCol.value || current.length === 0) {
       app.model.args.conditionOrder = [...vals];
       conditionSyncCol.value = col;
+    } else if (hasInvalidItems) {
+      app.model.args.conditionOrder = current.filter((v) => valSet.has(v));
     }
   }
 });
@@ -302,7 +386,7 @@ watchEffect(() => {
 const controlSyncCol = ref<string | undefined>(app.model.args.antigenControlConfig.antigenColumnRef);
 watchEffect(() => {
   const col = app.model.args.antigenControlConfig.antigenColumnRef;
-  const vals = app.model.outputs.negativeControlConditionValues;
+  const vals = negativeControlConditionValues.value;
 
   if (vals && vals.length > 0) {
     const current = app.model.args.antigenControlConfig.controlConditionsOrder;

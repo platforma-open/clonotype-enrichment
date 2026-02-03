@@ -6,7 +6,6 @@ import type {
   PlDataTableStateV2,
   PlRef,
   SUniversalPColumnId,
-  TreeNodeAccessor,
 } from '@platforma-sdk/model';
 import {
   BlockModel,
@@ -213,90 +212,31 @@ export const model = BlockModel.create()
     else return undefined;
   })
 
-  .output('conditionValues', (ctx) => {
-    const { conditionColumnRef, abundanceRef: anchor } = ctx.args;
+  /** PFrame with condition column and (when antigen enabled) antigen column for UI to fetch metadata values. */
+  .output('metadataColumnsPframe', (ctx) => {
+    const { conditionColumnRef, abundanceRef: anchor, antigenControlConfig: config } = ctx.args;
     if (!conditionColumnRef || !anchor) return undefined;
 
-    const pCols = ctx.resultPool.getAnchoredPColumns({ main: anchor },
+    // Resolve condition column from anchor + selector
+    const conditionCols = ctx.resultPool.getAnchoredPColumns(
+      { main: anchor },
       JSON.parse(conditionColumnRef) as AnchoredPColumnSelector,
     );
-    const data = pCols?.[0]?.data as TreeNodeAccessor | undefined;
+    const conditionCol = conditionCols?.[0];
+    if (!conditionCol) return undefined;
 
-    // @TODO need a convenient method in API
-    const values = data?.getDataAsJson<Record<string, string>>()?.['data'];
-    if (!values) return undefined;
-
-    // Convert all values to strings for consistency
-    return [...new Set(Object.values(values).map((v) => String(v)))];
-  })
-
-  .output('antigenValues', (ctx) => {
-    const config = ctx.args.antigenControlConfig;
-    if (!config?.antigenEnabled || !config.antigenColumnRef) return undefined;
-
-    const anchor = ctx.args.abundanceRef;
-    const { conditionColumnRef } = ctx.args;
-    if (anchor === undefined || !conditionColumnRef) return undefined;
-
-    const getValues = (ref: string) => {
-      const pCols = ctx.resultPool.getAnchoredPColumns({ main: anchor }, JSON.parse(ref) as AnchoredPColumnSelector);
-      return (pCols?.[0]?.data as TreeNodeAccessor | undefined)?.getDataAsJson<{ data: Record<string, string> }>()?.data;
-    };
-
-    const antigenValuesData = getValues(config.antigenColumnRef);
-    const conditionValuesData = getValues(conditionColumnRef);
-
-    if (!antigenValuesData || !conditionValuesData) return undefined;
-
-    const counts: Record<string, Set<string>> = {};
-    for (const [sampleId, antigenValue] of Object.entries(antigenValuesData)) {
-      if (!counts[antigenValue]) {
-        counts[antigenValue] = new Set();
-      }
-      const conditionValue = conditionValuesData[sampleId];
-      if (conditionValue !== undefined && conditionValue !== null) {
-        counts[antigenValue].add(String(conditionValue));
-      }
+    const columns = [conditionCol];
+    // Add antigen column when target/control selection is enabled
+    if (config?.antigenEnabled && config.antigenColumnRef) {
+      const antigenCols = ctx.resultPool.getAnchoredPColumns(
+        { main: anchor },
+        JSON.parse(config.antigenColumnRef) as AnchoredPColumnSelector,
+      );
+      const antigenCol = antigenCols?.[0];
+      if (antigenCol) columns.push(antigenCol);
     }
 
-    return Object.entries(counts)
-      .filter(([_, conditions]) => conditions.size >= 2)
-      .map(([antigen, _]) => antigen);
-  })
-
-  .output('negativeControlConditionValues', (ctx) => {
-    const config = ctx.args.antigenControlConfig;
-    if (!config?.controlEnabled) return undefined;
-
-    const { negativeConditions, antigenColumnRef } = config;
-    if (!negativeConditions?.length || !antigenColumnRef) return undefined;
-
-    const { conditionColumnRef, abundanceRef: anchor } = ctx.args;
-    if (!conditionColumnRef || !anchor) return undefined;
-
-    const getValues = (ref: string) => {
-      const pCols = ctx.resultPool.getAnchoredPColumns({ main: anchor }, JSON.parse(ref) as AnchoredPColumnSelector);
-      return (pCols?.[0]?.data as TreeNodeAccessor | undefined)?.getDataAsJson<{ data: Record<string, string> }>()?.data;
-    };
-
-    const antigenValues = getValues(antigenColumnRef);
-    const conditionValues = getValues(conditionColumnRef);
-
-    if (!antigenValues || !conditionValues) return undefined;
-
-    // Find condition values for samples with negative antigen values
-    const negativeControlConditions = new Set<string>();
-    for (const [sampleId, antigenValue] of Object.entries(antigenValues)) {
-      if (negativeConditions.includes(antigenValue)) {
-        const conditionValue = conditionValues[sampleId];
-        if (conditionValue !== undefined && conditionValue !== null) {
-          // Convert to string immediately
-          negativeControlConditions.add(String(conditionValue));
-        }
-      }
-    }
-
-    return [...negativeControlConditions];
+    return ctx.createPFrame(columns);
   })
 
   // Get all enrichment statistics
