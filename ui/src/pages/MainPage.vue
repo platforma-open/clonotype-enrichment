@@ -75,6 +75,12 @@ watchEffect(() => {
     label = label ? `${label}, ${conditionLabel}` : conditionLabel;
   }
 
+  // Add target antigen if defined
+  const antigenControlConfig = app.model.args.antigenControlConfig;
+  if (antigenControlConfig.targetAntigen && antigenControlConfig.antigenEnabled) {
+    label = label ? `${label}, ${antigenControlConfig.targetAntigen}` : antigenControlConfig.targetAntigen;
+  }
+
   // Add filtering mode at the end
   if (baseFilter) {
     const filteringLabel = baseFilter === 'none' ? 'No filtering' : (baseFilter === 'shared' ? 'Shared (all conditions)' : 'Multiple conditions');
@@ -164,6 +170,40 @@ const effectiveConditionValues = computed(() => {
 });
 const effectiveConditionOptions = computed(() => mapToOptions(effectiveConditionValues.value));
 
+/** Conditions present in the dataset but excluded from the order because they are not in samples for the selected target antigen. */
+const conditionsExcludedByTarget = computed(() => {
+  const raw = metadataFetched.value;
+  const config = app.model.args.antigenControlConfig;
+  if (!raw?.conditionValues?.length || !config?.antigenEnabled || !config.targetAntigen) return [];
+  const effective = effectiveConditionValues.value;
+  const effectiveSet = new Set(effective);
+  return raw.conditionValues.filter((c) => !effectiveSet.has(c));
+});
+
+/** Stable key for current excluded conditions (persists across page changes; alert re-shows when key changes). */
+const conditionsExcludedAlertKey = computed(() =>
+  [...conditionsExcludedByTarget.value].sort().join(','));
+
+const conditionsExcludedAlertVisible = computed({
+  get: () => {
+    const key = conditionsExcludedAlertKey.value;
+    const dismissedKey = app.model.ui.excludedAlertDismissedKey ?? '';
+    return key !== '' && key !== dismissedKey;
+  },
+  set: (visible) => {
+    if (!visible && conditionsExcludedAlertKey.value) {
+      app.model.ui.excludedAlertDismissedKey = conditionsExcludedAlertKey.value;
+    }
+  },
+});
+
+// Clear dismissed state when exclusions go away (e.g. "Multiple target" unchecked) so the alert can show again if the same target is re-selected
+watch(conditionsExcludedAlertKey, (key) => {
+  if (key === '') {
+    app.model.ui.excludedAlertDismissedKey = undefined;
+  }
+});
+
 /** Options for condition order list and present-in-rounds filter (current order). */
 const conditionOrderOptions = computed(() => mapToOptions([...app.model.args.conditionOrder]));
 
@@ -229,38 +269,38 @@ const comparisonOptions = computed(() => {
   return comparisons;
 });
 
-const comparisonsMessage = computed(() => {
-  if (comparisonOptions.value.length === 0) {
-    return '';
-  }
-  return `Will calculate: ${comparisonOptions.value.map((c) => c.label).join(', ')}`;
-});
+// const comparisonsMessage = computed(() => {
+//   if (comparisonOptions.value.length === 0) {
+//     return '';
+//   }
+//   return `Will calculate: ${comparisonOptions.value.map((c) => c.label).join(', ')}`;
+// });
 
-const negativeComparisonOptions = computed(() => {
-  const order = [...app.model.args.antigenControlConfig.controlConditionsOrder];
-  if (order.length < 2) return [];
+// const negativeComparisonOptions = computed(() => {
+//   const order = [...app.model.args.antigenControlConfig.controlConditionsOrder];
+//   if (order.length < 2) return [];
 
-  const comparisons = [];
-  for (let num_i = 1; num_i < order.length; num_i++) {
-    for (let den_j = 0; den_j < num_i; den_j++) {
-      const numerator = order[num_i];
-      const denominator = order[den_j];
-      const comparisonName = `${numerator} vs ${denominator}`;
-      comparisons.push({
-        value: comparisonName,
-        label: comparisonName,
-      });
-    }
-  }
-  return comparisons;
-});
+//   const comparisons = [];
+//   for (let num_i = 1; num_i < order.length; num_i++) {
+//     for (let den_j = 0; den_j < num_i; den_j++) {
+//       const numerator = order[num_i];
+//       const denominator = order[den_j];
+//       const comparisonName = `${numerator} vs ${denominator}`;
+//       comparisons.push({
+//         value: comparisonName,
+//         label: comparisonName,
+//       });
+//     }
+//   }
+//   return comparisons;
+// });
 
-const negativeComparisonsMessage = computed(() => {
-  if (negativeComparisonOptions.value.length === 0) {
-    return '';
-  }
-  return `Will calculate: ${negativeComparisonOptions.value.map((c) => c.label).join(', ')}`;
-});
+// const negativeComparisonsMessage = computed(() => {
+//   if (negativeComparisonOptions.value.length === 0) {
+//     return '';
+//   }
+//   return `Will calculate: ${negativeComparisonOptions.value.map((c) => c.label).join(', ')}`;
+// });
 
 // Downsampling options
 const downsamplingOptions: ListOption<string | undefined>[] = [
@@ -543,9 +583,14 @@ const isControlOrderOpen = ref(true); // Open by default
             <PlMaskIcon24 name="reverse" />
           </template>
         </PlBtnGhost>
-        <div v-if="comparisonsMessage" style="color: #6b7280; font-size: 13px; margin-top: 8px;">
-          {{ comparisonsMessage }}
-        </div>
+        <PlAlert
+          v-if="conditionsExcludedByTarget.length > 0"
+          v-model="conditionsExcludedAlertVisible"
+          type="warn"
+          closeable
+        >
+          Conditions not present in samples for the selected target antigen were removed: {{ conditionsExcludedByTarget.join(', ') }}.
+        </PlAlert>
       </PlAccordionSection>
     </PlAccordion>
 
@@ -645,9 +690,6 @@ const isControlOrderOpen = ref(true); // Open by default
             <PlMaskIcon24 name="reverse" />
           </template>
         </PlBtnGhost>
-        <div v-if="negativeComparisonsMessage" style="color: #6b7280; font-size: 13px; margin-top: 8px;">
-          {{ negativeComparisonsMessage }}
-        </div>
       </PlAccordionSection>
     </PlAccordion>
     <PlRow v-if="app.model.args.antigenControlConfig.controlEnabled">

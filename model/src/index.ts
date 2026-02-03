@@ -55,6 +55,8 @@ export type UiState = {
   lineState: GraphMakerState;
   stackedState: GraphMakerState;
   scatterState: GraphMakerState;
+  /** When set, the "conditions excluded by target" alert is hidden until the excluded list changes (key = sorted excluded conditions). */
+  excludedAlertDismissedKey?: string;
 };
 
 export type BlockArgs = {
@@ -139,6 +141,7 @@ export const model = BlockModel.create()
       template: 'dots',
       currentTab: null,
     },
+    excludedAlertDismissedKey: undefined,
   })
 
   .argsValid((ctx) => {
