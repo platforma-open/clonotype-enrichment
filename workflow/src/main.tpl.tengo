@@ -173,6 +173,12 @@ wf.body(func(args) {
 	if antigenControlConfig.antigenEnabled || antigenControlConfig.controlEnabled {
 		calculateEnrichment = calculateEnrichment.
 			arg("--current_target").arg(string(antigenControlConfig.targetAntigen))
+
+		if antigenControlConfig.sequencedLibraryEnabled {
+			calculateEnrichment = calculateEnrichment.
+				arg("--sequenced_library_enabled").
+				arg("--sequenced_library_sample_id").arg(string(antigenControlConfig.sequencedLibrarySampleId))
+		}
 		
 		if antigenControlConfig.controlEnabled {
 			calculateEnrichment = calculateEnrichment.

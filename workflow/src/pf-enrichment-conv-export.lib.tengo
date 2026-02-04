@@ -1,8 +1,7 @@
 ll := import("@platforma-sdk/workflow-tengo:ll")
 canonical := import("@platforma-sdk/workflow-tengo:canonical")
 
-getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percentile, downsampling, 
-                  conditionOrder, antigenControlConfig, filteringConfig, blockId, ...opts) {
+getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percentile, downsampling, conditionOrder, antigenControlConfig, filteringConfig, blockId, ...opts) {
   ll.assert(len(opts) <= 1, "expected at most one options map")
 
   specLabel := "Max Log2FC"
@@ -13,13 +12,20 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percenti
   }
 
   // Extract control info
-  targetAntigen := undefined
   targetThreshold := undefined
   controlThreshold := undefined
-  if antigenControlConfig != undefined && antigenControlConfig.controlEnabled == true {
-    targetAntigen = antigenControlConfig.targetAntigen
-    targetThreshold = string(antigenControlConfig.targetThreshold)
-    controlThreshold = string(antigenControlConfig.controlThreshold)
+  baseDomain := {
+    "pl7.app/vdj/enrichment/filteringConfig": canonical.encode(filteringConfig),
+    "pl7.app/vdj/enrichment/conditionsOrder": canonical.encode(conditionOrder),
+    "pl7.app/blockId": blockId
+  }
+  if antigenControlConfig.antigenEnabled {
+    baseDomain["pl7.app/vdj/antigenType"] = antigenControlConfig.targetAntigen
+    if antigenControlConfig.controlEnabled {
+      baseDomain["pl7.app/vdj/enrichment/controlEnabled"] = "true"
+      targetThreshold = string(antigenControlConfig.targetThreshold)
+      controlThreshold = string(antigenControlConfig.controlThreshold)
+    }
   }
 
   // Define columns for exports
@@ -30,13 +36,7 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percenti
         spec: {
           name: "pl7.app/vdj/enrichment",
           valueType: "Double",
-          domain: {
-            "pl7.app/downsampling": canonical.encode(downsampling),
-            "pl7.app/filteringConfig": canonical.encode(filteringConfig),
-            "pl7.app/conditionsOrder": canonical.encode(conditionOrder),
-            "pl7.app/blockId": blockId,
-            "pl7.app/comparison": specLabel
-          },
+          domain: baseDomain,
           annotations: {
             "pl7.app/label": specLabel,
             "pl7.app/table/orderPriority": "9000",
@@ -58,12 +58,7 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percenti
         spec: {
           name: "pl7.app/vdj/enrichmentQuality",
           valueType: "String",
-          domain: {
-            "pl7.app/downsampling": canonical.encode(downsampling),
-            "pl7.app/filteringConfig": canonical.encode(filteringConfig),
-            "pl7.app/conditionsOrder": canonical.encode(conditionOrder),
-            "pl7.app/blockId": blockId
-          },
+          domain: baseDomain,
           annotations: {
             "pl7.app/label": "Enrichment Quality",
             "pl7.app/isDiscreteFilter": "true",
@@ -77,6 +72,12 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percenti
         }
       }
 
+  // Prepare a domain map for overall Log2FC column
+  overallDomain := copy(baseDomain)
+  overallDomain["pl7.app/vdj/enrichment/type"] = "overall"
+  overallDomain["pl7.app/vdj/enrichment/comparison"] = conditionOrder[len(conditionOrder) - 1] + " vs " + conditionOrder[0]
+  overallDomain["pl7.app/comparison"] = "Overall Enrichment"
+
   // Overall Log2FC columns will have additional specs if target was selected
   overallColumn := {
         column: "Overall Log2FC",
@@ -85,13 +86,7 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percenti
         spec: {
           name: "pl7.app/vdj/enrichment",
           valueType: "Double",
-          domain: {
-            "pl7.app/downsampling": canonical.encode(downsampling),
-            "pl7.app/vdj/enrichment/type": "overall",
-            "pl7.app/vdj/enrichment/comparison": conditionOrder[len(conditionOrder) - 1] + " vs " + conditionOrder[0],
-            "pl7.app/filteringConfig": canonical.encode(filteringConfig),
-            "pl7.app/comparison": "Overall Enrichment"
-          },
+          domain: overallDomain,
           annotations: {
             "pl7.app/label": "Overall Log2FC",
             "pl7.app/table/orderPriority": "90",
@@ -104,8 +99,11 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percenti
         }
       }
 
-  if targetAntigen && len(opts) == 0 {
-    overallColumn.spec.domain["pl7.app/vdj/antigenType"] = targetAntigen
+  if antigenControlConfig.controlEnabled && len(opts) == 0 {
+    // Prepare a domain map for binding specificity column
+    bindingDomain := copy(baseDomain)
+    bindingDomain["pl7.app/vdj/enrichment/targetThreshold"] = targetThreshold
+    bindingDomain["pl7.app/vdj/enrichment/controlThreshold"] = controlThreshold
 
     columns = columns + [{
         column: "Binding Specificity",
@@ -114,14 +112,7 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percenti
         spec: {
           name: "pl7.app/vdj/bindingSpecificity",
           valueType: "String",
-          domain: {
-            "pl7.app/downsampling": canonical.encode(downsampling),
-            "pl7.app/filteringConfig": canonical.encode(filteringConfig),
-            "pl7.app/conditionsOrder": canonical.encode(conditionOrder),
-            "pl7.app/vdj/enrichment/targetThreshold": targetThreshold,
-            "pl7.app/vdj/enrichment/controlThreshold": controlThreshold,
-            "pl7.app/blockId": blockId
-          },
+          domain: bindingDomain,
           annotations: {
             "pl7.app/label": "Binding Specificity",
             "pl7.app/isDiscreteFilter": "true",

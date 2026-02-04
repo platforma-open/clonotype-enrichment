@@ -246,7 +246,9 @@ def hybrid_enrichment_analysis(
     control_conditions_order: Optional[List[str]] = None,
     target_threshold: float = 2.0,
     control_threshold: float = 1.0,
-    current_target: Optional[str] = None
+    current_target: Optional[str] = None,
+    sequenced_library_enabled: bool = False,
+    sequenced_library_sample_id: Optional[str] = None,
 ) -> None:
     """
     Optimized hybrid enrichment analysis using polars for better performance and memory efficiency.
@@ -259,11 +261,49 @@ def hybrid_enrichment_analysis(
     - present_in_rounds: List of rounds to filter clonotypes by presence
     - present_in_rounds_logic: Logic for presence filtering ('OR' or 'AND')
     - pseudo_count: Constant to add to abundance values for enrichment and frequency calculation
+    - control_enabled: Enable negative control specificity filtering
+    - negative_antigens: List of negative antigen names
+    - control_conditions_order: List of ordered conditions where negative antigens are present
+    - target_threshold: Log2 fold change threshold for target conditions
+    - control_threshold: Log2 fold change threshold for control conditions
+    - current_target: The current target antigen for this iteration
+    - sequenced_library_enabled: Use the selected sequenced library sample's condition as base condition for enrichment
+    - sequenced_library_sample_id: Sample ID of the sequenced library (used as base condition when enabled)
     """
     # Read data with polars lazy evaluation
     input_df = pl.scan_csv(input_data_csv)
     schema = input_df.collect_schema()
-    
+
+    # Normalize condition order and resolve sequenced library as base condition
+    condition_order = [str(cond) for cond in condition_order]
+    if present_in_rounds:
+        present_in_rounds = [str(cond) for cond in present_in_rounds]
+    library_condition: Optional[str] = None
+    if sequenced_library_enabled and sequenced_library_sample_id:
+        sample_cond = (
+            input_df.filter(pl.col("sampleId") == sequenced_library_sample_id)
+            .select("condition")
+            .unique()
+            .collect()
+        )
+        if sample_cond.height > 0:
+            raw = sample_cond["condition"][0]
+            library_condition = "Library" if raw is None or str(raw).strip() == "" else str(raw)
+            # If the library condition is empty, we need to rename it to "Library" in the data
+            if library_condition == "Library":
+                input_df = input_df.with_columns(
+                    pl.when(pl.col("sampleId") == sequenced_library_sample_id)
+                    .then(pl.lit(library_condition))
+                    .otherwise(pl.col("condition"))
+                    .alias("condition")
+                )
+
+    effective_condition_order: List[str] = (
+        [library_condition] + [c for c in condition_order if c != library_condition]
+        if library_condition is not None
+        else condition_order
+    )
+
     # Check if input data is empty (no clonotypes)
     ## Check if there are any non-null, non-empty elementId value in lazy frame
     element_count = input_df.filter(
@@ -271,8 +311,8 @@ def hybrid_enrichment_analysis(
         (pl.col('elementId') != "")
     ).select(pl.len()).collect().item()
     if element_count == 0:
-        # Create empty outputs and exit
-        create_empty_outputs(condition_order, enrichment_csv, bubble_csv,
+        # Create empty outputs and exit (use effective order so schema matches non-empty case)
+        create_empty_outputs(effective_condition_order, enrichment_csv, bubble_csv,
                                 top_enriched_csv, top_20_csv, highest_enrichment_csv,
                                 filtered_too_much_txt)
         return
@@ -307,11 +347,6 @@ def hybrid_enrichment_analysis(
 
         # Continue with lazy evaluation
         input_df = input_df.lazy()
-
-    # Make sure condition_order is a list of strings
-    condition_order = [str(cond) for cond in condition_order]
-    if present_in_rounds:
-        present_in_rounds = [str(cond) for cond in present_in_rounds]
 
     # Rename and validate columns
     if "abundance" in input_df.collect_schema().names():
@@ -387,7 +422,7 @@ def hybrid_enrichment_analysis(
     # Apply clonotype filtering if requested on the target track
     if filter_clonotypes:
         target_track_df = filter_clonotypes_by_criteria(
-            target_track_df, condition_order, 
+            target_track_df, effective_condition_order,
             filter_single_sample, filter_any_zero, min_abundance,
             min_frequency, target_total_reads_dict,
             present_in_rounds, present_in_rounds_logic,
@@ -416,7 +451,7 @@ def hybrid_enrichment_analysis(
     )
 
     # Ensure all conditions are present in pivot
-    for condition in condition_order:
+    for condition in effective_condition_order:
         if condition not in pivot_df.collect_schema().names():
             pivot_df = pivot_df.with_columns(pl.lit(0).alias(condition))
 
@@ -429,7 +464,7 @@ def hybrid_enrichment_analysis(
 
     # Pre-calculate frequencies for target track
     freq_expressions = []
-    for condition in condition_order:
+    for condition in effective_condition_order:
         total = target_total_reads_dict.get(condition, 1)
         # This ensures frequencies sum to 1: Σ[(abundance + p) / (total + N*p)] = 1
         freq_expressions.append(
@@ -440,9 +475,9 @@ def hybrid_enrichment_analysis(
     pivot_df = pivot_df.with_columns(freq_expressions)
 
     # Calculate Overall Log2FC (last vs first)
-    if len(condition_order) >= 2:
-        first_cond = condition_order[0]
-        last_cond = condition_order[-1]
+    if len(effective_condition_order) >= 2:
+        first_cond = effective_condition_order[0]
+        last_cond = effective_condition_order[-1]
         
         # Formula: log2((last_freq) / (first_freq))
         # Since freq_last = (abundance_last + p) / (total_last + N*p)
@@ -457,7 +492,7 @@ def hybrid_enrichment_analysis(
 
     # Calculate pairwise enrichments
     enrichment_results = _calculate_enrichments_vectorized(
-        pivot_df, condition_order, target_total_reads_dict
+        pivot_df, effective_condition_order, target_total_reads_dict
     )
 
     # --- Negative Control Track Processing ---
@@ -466,8 +501,11 @@ def hybrid_enrichment_analysis(
         # Filter for all negative antigens
         neg_track_df = aggregated_df.filter(pl.col('antigen').is_in(negative_antigens))
 
-        # Use control-specific order if provided, otherwise fallback to main order
-        base_order = control_conditions_order if control_conditions_order is not None else condition_order
+        # Use control-specific order if provided, otherwise fallback to effective (target) order
+        base_order = control_conditions_order if control_conditions_order is not None else effective_condition_order
+        # When sequenced library is enabled, put library condition first as base for controls too
+        if library_condition is not None:
+            base_order = [library_condition] + [c for c in base_order if c != library_condition]
         
         if neg_track_df.height > 0:
             # We need to calculate enrichment independently for each negative 
@@ -575,7 +613,7 @@ def hybrid_enrichment_analysis(
     # Calculate Enrichment Quality
     if enrichment_results.height > 0:
         # Max frequency across all conditions for each clonotype
-        freq_cols = [f'Frequency {c}' for c in condition_order]
+        freq_cols = [f'Frequency {c}' for c in effective_condition_order]
         
         # Generate max frequency column
         enrichment_results = enrichment_results.with_columns(
@@ -619,7 +657,7 @@ def hybrid_enrichment_analysis(
 
     # Process outputs efficiently
     _process_outputs(
-        enrichment_results, condition_order, bubble_csv, top_enriched_csv,
+        enrichment_results, effective_condition_order, bubble_csv, top_enriched_csv,
         top_20_csv, highest_enrichment_csv, top_n_bubble, top_n_enriched, min_enrichment
     )
 
@@ -1007,6 +1045,10 @@ if __name__ == "__main__":
                         help="Log2 fold change threshold for control conditions")
     parser.add_argument("--current_target", type=str, required=False,
                         help="The current target antigen for this iteration")
+    parser.add_argument("--sequenced_library_enabled", action="store_true",
+                        help="Enable usage of the selected sequenced library sample's condition as base condition for enrichment")
+    parser.add_argument("--sequenced_library_sample_id", type=str, required=False,
+                        help="Sample ID of the sequenced library (used as base condition when enabled)")
 
     args = parser.parse_args()
 
@@ -1036,5 +1078,7 @@ if __name__ == "__main__":
         control_conditions_order=json.loads(args.control_conditions_order) if args.control_conditions_order else None,
         target_threshold=args.target_threshold,
         control_threshold=args.control_threshold,
-        current_target=args.current_target
+        current_target=args.current_target,
+        sequenced_library_enabled=args.sequenced_library_enabled,
+        sequenced_library_sample_id=args.sequenced_library_sample_id
     )

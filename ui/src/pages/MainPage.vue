@@ -670,7 +670,7 @@ const isControlOrderOpen = ref(true); // Open by default
       <PlTooltip v-if="app.model.args.antigenControlConfig.antigenEnabled" class="info">
         <template #tooltip>
           <div>
-            Enable it to select the sample used as the sequenced library reference for enrichment (to be used as base condition).
+            Enable it to select the sample used as the sequenced library reference for enrichment (to be used as base condition). Please, make sure it has a unique value in the condition column.
           </div>
         </template>
       </PlTooltip>
