@@ -663,21 +663,21 @@ const isControlOrderOpen = ref(true); // Open by default
     <div style="display: flex; align-items: center; gap: 4px;">
       <PlCheckbox
         v-if="app.model.args.antigenControlConfig.antigenEnabled"
-        v-model="app.model.args.sequencedLibraryEnabled"
+        v-model="app.model.args.antigenControlConfig.sequencedLibraryEnabled"
       >
         Sequenced Library
       </PlCheckbox>
       <PlTooltip v-if="app.model.args.antigenControlConfig.antigenEnabled" class="info">
         <template #tooltip>
           <div>
-            Sample used as the sequenced library reference for enrichment (to be used as base condition). Choose the sample that was sequenced to define the library.Enable specific target selection for dedicated enrichment analysis.
+            Enable it to select the sample used as the sequenced library reference for enrichment (to be used as base condition).
           </div>
         </template>
       </PlTooltip>
     </div>
     <PlDropdown
-      v-if="app.model.args.antigenControlConfig.antigenEnabled && app.model.args.sequencedLibraryEnabled"
-      v-model="app.model.args.sequencedLibrarySampleId"
+      v-if="app.model.args.antigenControlConfig.antigenEnabled && app.model.args.antigenControlConfig.sequencedLibraryEnabled"
+      v-model="app.model.args.antigenControlConfig.sequencedLibrarySampleId"
       :options="sampleOptions"
       label="Sample"
       clearable

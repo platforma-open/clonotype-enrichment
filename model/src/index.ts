@@ -47,6 +47,8 @@ type AntigenControlConfig = {
   targetThreshold: number; // Default: 2.0 log2 FC
   controlThreshold: number; // Default: 1.0 log2 FC
   controlConditionsOrder: string[]; // e.g., ["BSA", "Plastic"]
+  sequencedLibraryEnabled: boolean;
+  sequencedLibrarySampleId?: string;
 };
 
 export type UiState = {
@@ -71,8 +73,6 @@ export type BlockArgs = {
   additionalEnrichmentExports: string[];
   antigenControlConfig: AntigenControlConfig;
   pseudoCount: number; // Default: 100
-  sequencedLibraryEnabled: boolean;
-  sequencedLibrarySampleId?: string;
 };
 
 export const model = BlockModel.create()
@@ -107,10 +107,10 @@ export const model = BlockModel.create()
       targetThreshold: 2.0,
       controlThreshold: 1.0,
       controlConditionsOrder: [],
+      sequencedLibraryEnabled: false,
+      sequencedLibrarySampleId: undefined,
     },
     pseudoCount: 100,
-    sequencedLibraryEnabled: false,
-    sequencedLibrarySampleId: undefined,
   })
 
   .withUiState<UiState>({
