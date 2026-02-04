@@ -71,6 +71,8 @@ export type BlockArgs = {
   additionalEnrichmentExports: string[];
   antigenControlConfig: AntigenControlConfig;
   pseudoCount: number; // Default: 100
+  sequencedLibraryEnabled: boolean;
+  sequencedLibrarySampleId?: string;
 };
 
 export const model = BlockModel.create()
@@ -107,6 +109,8 @@ export const model = BlockModel.create()
       controlConditionsOrder: [],
     },
     pseudoCount: 100,
+    sequencedLibraryEnabled: false,
+    sequencedLibrarySampleId: undefined,
   })
 
   .withUiState<UiState>({
@@ -240,6 +244,19 @@ export const model = BlockModel.create()
     }
 
     return ctx.createPFrame(columns);
+  })
+
+  /** Sample id → label map for the condition column's sample axis (for Sequenced Library dropdown). */
+  .output('sampleLabels', (ctx) => {
+    const { conditionColumnRef, abundanceRef: anchor } = ctx.args;
+    if (!conditionColumnRef || !anchor) return undefined;
+    const conditionCols = ctx.resultPool.getAnchoredPColumns(
+      { main: anchor },
+      JSON.parse(conditionColumnRef) as AnchoredPColumnSelector,
+    );
+    const conditionCol = conditionCols?.[0];
+    if (!conditionCol) return undefined;
+    return ctx.resultPool.findLabels(conditionCol.spec.axesSpec[0]);
   })
 
   // Get all enrichment statistics

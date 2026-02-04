@@ -119,18 +119,6 @@ const metadataFetched = useWatchFetch(() => app.model.outputs.metadataColumnsPfr
   const conditionUnique = await pFrame.getUniqueValues({ columnId: conditionColId, filters: [], limit: 1000 });
   const conditionValues = [...(conditionUnique?.values?.data ?? [])].map((v) => String(v));
 
-  const antigenColId = list?.[1]?.columnId;
-  if (!antigenColId) {
-    return { conditionValues } satisfies MetadataFetched;
-  }
-
-  // Full column data for both columns (sample id → value) to derive effective/antigen/control lists
-  const handle = pframeHandle;
-  const [conditionColData, antigenColData] = await Promise.all([
-    getSingleColumnData(handle, conditionColId),
-    getSingleColumnData(handle, antigenColId),
-  ]);
-
   const buildBySample = (colData: { axesData: Record<string, (string | number | null)[]>; data: (string | number | null)[] }) => {
     const axisKeys = Object.keys(colData.axesData);
     if (!axisKeys.length) return {};
@@ -144,7 +132,17 @@ const metadataFetched = useWatchFetch(() => app.model.outputs.metadataColumnsPfr
     return out;
   };
 
+  // Always fetch condition column full data (sample id → value) for conditionBySample (used for sample options and effective conditions)
+  const conditionColData = await getSingleColumnData(pframeHandle, conditionColId);
   const conditionBySample = buildBySample(conditionColData);
+
+  const antigenColId = list?.[1]?.columnId;
+  if (!antigenColId) {
+    return { conditionValues, conditionBySample } satisfies MetadataFetched;
+  }
+
+  // Full column data for antigen column to derive effective/antigen/control lists
+  const antigenColData = await getSingleColumnData(pframeHandle, antigenColId);
   const antigenBySample = buildBySample(antigenColData);
 
   return { conditionValues, conditionBySample, antigenBySample } satisfies MetadataFetched;
@@ -206,6 +204,17 @@ watch(conditionsExcludedAlertKey, (key) => {
 
 /** Options for condition order list and present-in-rounds filter (current order). */
 const conditionOrderOptions = computed(() => mapToOptions([...app.model.args.conditionOrder]));
+
+/** Sample options (id as value, label from model or id fallback) for sequenced library selection. */
+const sampleOptions = computed(() => {
+  const bySample = metadataFetched.value?.conditionBySample;
+  if (!bySample) return [];
+  const labels = app.model.outputs.sampleLabels as Record<string | number, string> | undefined;
+  return Object.keys(bySample).sort().map((id) => ({
+    value: id,
+    label: labels?.[id] ?? id,
+  }));
+});
 
 /** Antigens that appear in at least 2 conditions (required for target selection). */
 const antigenValuesList = computed(() => {
@@ -651,6 +660,28 @@ const isControlOrderOpen = ref(true); // Open by default
         label="Negative control(s)"
       />
     </PlRow>
+    <div style="display: flex; align-items: center; gap: 4px;">
+      <PlCheckbox
+        v-if="app.model.args.antigenControlConfig.antigenEnabled"
+        v-model="app.model.args.sequencedLibraryEnabled"
+      >
+        Sequenced Library
+      </PlCheckbox>
+      <PlTooltip v-if="app.model.args.antigenControlConfig.antigenEnabled" class="info">
+        <template #tooltip>
+          <div>
+            Sample used as the sequenced library reference for enrichment (to be used as base condition). Choose the sample that was sequenced to define the library.Enable specific target selection for dedicated enrichment analysis.
+          </div>
+        </template>
+      </PlTooltip>
+    </div>
+    <PlDropdown
+      v-if="app.model.args.antigenControlConfig.antigenEnabled && app.model.args.sequencedLibraryEnabled"
+      v-model="app.model.args.sequencedLibrarySampleId"
+      :options="sampleOptions"
+      label="Sample"
+      clearable
+    />
     <PlAccordion multiple>
       <PlAccordionSection
         v-if="app.model.args.antigenControlConfig.controlEnabled"
