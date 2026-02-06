@@ -638,6 +638,32 @@ const isControlOrderOpen = ref(true); // Open by default
       </PlAccordionSection>
     </PlAccordion>
 
+    <PlNumberField
+      v-model="app.model.args.antigenControlConfig.targetThreshold"
+      label="Enrichment threshold"
+      :minValue="0.5"
+      :step="0.1"
+      placeholder="2.0"
+    >
+      <template #tooltip>
+        <p><strong>Enrichment threshold (E<sub>thres</sub>)</strong></p>
+        <p>Log2 Fold Change (Log2FC) used to define enriched clonotypes. A clonotype is considered enriched when its Log2FC between conditions is ≥ this value.</p>
+        <p>This value is used to define <strong>Enrichment quality</strong> categories in combination to data-derived percentiles (q):</p>
+        <p>
+          - High threshold: Max Log2FC greater than maximum between enrichment q75 and E<sub>thres</sub><br/>
+          - Stable threshold: Overall Log2FC greater than maximum between enrichment q50 and E<sub>thres</sub><br/>
+          - Low threshold: Max Log2FC greater than enrichment q25<br/>
+          - Frequency threshold: Frequency greater than frequency q75<br/>
+        </p>
+        <ul>
+          <li><strong>Stable Binder</strong> — high threshold &amp; stable threshold.</li>
+          <li><strong>Rescuer</strong> — high threshold &amp; NOT stable threshold.</li>
+          <li><strong>Parasite</strong> — low threshold &amp; frequency threshold.</li>
+          <li><strong>Weak Binder</strong> — All other clonotypes.</li>
+        </ul>
+      </template>
+    </PlNumberField>
+
     <PlRow>
       <div style="display: flex; align-items: center; gap: 4px;">
         <PlCheckbox
@@ -763,34 +789,29 @@ const isControlOrderOpen = ref(true); // Open by default
         && hasMultiSampleNegativeControl"
     >
       <PlNumberField
-        v-model="app.model.args.antigenControlConfig.targetThreshold"
-        label="Target threshold"
-        :minValue="0"
-        :step="0.1"
-        placeholder="2.0"
-      >
-        <template #tooltip>
-          <div>
-            Log2 Fold Change (Log2FC) thresholds used to define <strong>Binding Specificity</strong> categories.<br/>
-            Being Target<sub>Max</sub> and Control<sub>Max</sub> the maximum Log2FC values for the target and control conditions respectively:
-            <br/><br/>
-            - <strong>Antigen-Specific:</strong> Target<sub>Max</sub> ≥ Target Threshold and Control<sub>Max</sub> &lt; Control Threshold.
-            <br/>
-            - <strong>Non-Specific:</strong> Both Target<sub>Max</sub> and Control<sub>Max</sub> ≥ thresholds (indicates "sticky" binders).
-            <br/>
-            - <strong>Negative-Control:</strong> Target<sub>Max</sub> &lt; Target Threshold and Control<sub>Max</sub> ≥ Control Threshold.
-            <br/>
-            - <strong>Not-Enriched:</strong> Both below thresholds.
-          </div>
-        </template>
-      </PlNumberField>
-      <PlNumberField
         v-model="app.model.args.antigenControlConfig.controlThreshold"
         label="Control threshold"
         :minValue="0"
         :step="0.1"
         placeholder="1.0"
-      />
+      >
+        <template #tooltip>
+          <div>
+            Log2 Fold Change (Log2FC) thresholds used to define <strong>Enriched negative control clonotypes</strong>.<br/>
+            A clonotype is considered enriched if its Log2FC value between conditions is equal or greater than the threshold. This threshold in combination with <strong>Enrichment threshold</strong> is used to define <strong>Binding Specificity</strong> categories:
+            <br/><br/>
+            Being Target<sub>Max</sub> and Control<sub>Max</sub> the maximum Log2FC values for the target and control conditions respectively:
+            <br/><br/>
+            - <strong>Antigen-Specific:</strong> Target<sub>Max</sub> ≥ Enrichment Threshold and Control<sub>Max</sub> &lt; Control Threshold.
+            <br/>
+            - <strong>Non-Specific:</strong> Target<sub>Max</sub> ≥ Enrichment Threshold and Control<sub>Max</sub> ≥ Control Threshold (indicates "sticky" binders).
+            <br/>
+            - <strong>Negative-Control:</strong> Target<sub>Max</sub> &lt; Enrichment Threshold and Control<sub>Max</sub> ≥ Control Threshold.
+            <br/>
+            - <strong>Not-Enriched:</strong> Both below thresholds.
+          </div>
+        </template>
+      </PlNumberField>
     </PlRow>
 
     <PlAccordionSection label="Downsampling">
