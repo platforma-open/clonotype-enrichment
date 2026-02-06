@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.ui
 
+## 3.0.1
+
+### Patch Changes
+
+- effba88: update dependencies
+
 ## 3.0.0
 
 ### Major Changes

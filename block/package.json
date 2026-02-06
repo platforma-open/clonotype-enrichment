@@ -1,6 +1,6 @@
 {
   "name": "@platforma-open/milaboratories.clonotype-enrichment",
-  "version": "2.2.33",
+  "version": "2.2.34",
   "scripts": {
     "build": "shx rm -rf block-pack/* && block-tools pack",
     "do-pack": "shx rm -f *.tgz && pnpm pack && shx mv *.tgz package.tgz",
