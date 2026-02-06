@@ -156,6 +156,7 @@ wf.body(func(args) {
 		addFile("inputFile.csv", downsamplingFile).
 		arg("--input_data").arg("inputFile.csv").
 		arg("--conditions").arg(string(conditionOrder)).
+		arg("--enrichment_threshold").arg(string(args.enrichmentThreshold)).
 		arg("--enrichment").arg("enrichment_results.csv").
 		arg("--bubble").arg("bubble_data.csv").
 		arg("--top_enriched").arg("top_enriched.csv").
@@ -185,7 +186,6 @@ wf.body(func(args) {
 				arg("--control_enabled").
 				arg("--negative_antigens").arg(string(antigenControlConfig.negativeAntigens)).
 				arg("--control_conditions_order").arg(string(antigenControlConfig.controlConditionsOrder)).
-				arg("--target_threshold").arg(string(antigenControlConfig.targetThreshold)).
 				arg("--control_threshold").arg(string(antigenControlConfig.controlThreshold))
 		}
 	}
@@ -312,6 +312,7 @@ wf.body(func(args) {
 				FilteringConfig: FilteringConfig,
 				conditionOrder: conditionOrder,
 				antigenControlConfig: antigenControlConfig,
+				enrichmentThreshold: args.enrichmentThreshold,
 				blockId: blockId,
 				specLabel: specLabel,
 				customBlockLabel: args.customBlockLabel,
@@ -343,6 +344,7 @@ wf.body(func(args) {
 		FilteringConfig: FilteringConfig,
 		conditionOrder: conditionOrder,
 		antigenControlConfig: antigenControlConfig,
+		enrichmentThreshold: args.enrichmentThreshold,
 		blockId: blockId,
 		customBlockLabel: args.customBlockLabel,
 		defaultBlockLabel: args.defaultBlockLabel,

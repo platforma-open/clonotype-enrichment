@@ -639,7 +639,7 @@ const isControlOrderOpen = ref(true); // Open by default
     </PlAccordion>
 
     <PlNumberField
-      v-model="app.model.args.antigenControlConfig.targetThreshold"
+      v-model="app.model.args.enrichmentThreshold"
       label="Enrichment threshold"
       :minValue="0.5"
       :step="0.1"

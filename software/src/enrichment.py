@@ -244,7 +244,7 @@ def hybrid_enrichment_analysis(
     control_enabled: bool = False,
     negative_antigens: Optional[List[str]] = None,
     control_conditions_order: Optional[List[str]] = None,
-    target_threshold: float = 2.0,
+    enrichment_threshold: float = 2.0,
     control_threshold: float = 1.0,
     current_target: Optional[str] = None,
     sequenced_library_enabled: bool = False,
@@ -264,7 +264,7 @@ def hybrid_enrichment_analysis(
     - control_enabled: Enable negative control specificity filtering
     - negative_antigens: List of negative antigen names
     - control_conditions_order: List of ordered conditions where negative antigens are present
-    - target_threshold: Log2 fold change threshold for target conditions
+    - enrichment_threshold: Log2 fold change threshold for target conditions
     - control_threshold: Log2 fold change threshold for control conditions
     - current_target: The current target antigen for this iteration
     - sequenced_library_enabled: Use the selected sequenced library sample's condition as base condition for enrichment
@@ -600,11 +600,11 @@ def hybrid_enrichment_analysis(
         control_expr = pl.col('MaxNegControlEnrichment')
         
         enrichment_results = enrichment_results.with_columns(
-            pl.when((target_expr >= target_threshold) & (control_expr < control_threshold))
+            pl.when((target_expr >= enrichment_threshold) & (control_expr < control_threshold))
             .then(pl.lit("Antigen-Specific"))
-            .when((target_expr >= target_threshold) & (control_expr >= control_threshold))
+            .when((target_expr >= enrichment_threshold) & (control_expr >= control_threshold))
             .then(pl.lit("Non-Specific"))
-            .when((target_expr < target_threshold) & (control_expr >= control_threshold))
+            .when((target_expr < enrichment_threshold) & (control_expr >= control_threshold))
             .then(pl.lit("Negative-Control"))
             .otherwise(pl.lit("Not-Enriched"))
             .alias('Binding Specificity')
@@ -622,8 +622,8 @@ def hybrid_enrichment_analysis(
         
         # Calculate thresholds (percentiles) from the current data
         # Handle cases where columns might have nulls by using fill_null(0) for percentile calculation if needed
-        high_threshold = max(1.0, enrichment_results.select(pl.col('MaxPositiveEnrichment').fill_null(0).quantile(0.75)).item())
-        stable_threshold = enrichment_results.select(pl.col('Overall Log2FC').fill_null(0).quantile(0.50)).item()
+        high_threshold = max(enrichment_threshold, enrichment_results.select(pl.col('MaxPositiveEnrichment').fill_null(0).quantile(0.75)).item())
+        stable_threshold = max(enrichment_threshold, enrichment_results.select(pl.col('Overall Log2FC').fill_null(0).quantile(0.50)).item())
         low_threshold = enrichment_results.select(pl.col('MaxPositiveEnrichment').fill_null(0).quantile(0.25)).item()
         freq_threshold = enrichment_results.select(pl.col('_max_freq').fill_null(0).quantile(0.75)).item()
         
@@ -637,6 +637,13 @@ def hybrid_enrichment_analysis(
             .otherwise(pl.lit("Weak Binder"))
             .alias('EnrichmentQuality')
         )
+        if control_enabled:
+            enrichment_results = enrichment_results.with_columns(
+                pl.when(pl.col('Binding Specificity').is_in(['Negative-Control', 'Not-Enriched']))
+                .then(pl.lit(None).cast(pl.Utf8))
+                .otherwise(pl.col('EnrichmentQuality'))
+                .alias('EnrichmentQuality')
+            )
     else:
         # For empty dataframe, add the column with correct type
         enrichment_results = enrichment_results.with_columns(
@@ -1039,7 +1046,7 @@ if __name__ == "__main__":
                         help="JSON list of negative antigen names")
     parser.add_argument("--control_conditions_order", type=str, required=False,
                         help="JSON list of conditions where negative antigens are present")
-    parser.add_argument("--target_threshold", type=float, default=2.0,
+    parser.add_argument("--enrichment_threshold", type=float, default=2.0,
                         help="Log2 fold change threshold for target conditions")
     parser.add_argument("--control_threshold", type=float, default=1.0,
                         help="Log2 fold change threshold for control conditions")
@@ -1076,7 +1083,7 @@ if __name__ == "__main__":
         control_enabled=args.control_enabled,
         negative_antigens=json.loads(args.negative_antigens) if args.negative_antigens else None,
         control_conditions_order=json.loads(args.control_conditions_order) if args.control_conditions_order else None,
-        target_threshold=args.target_threshold,
+        enrichment_threshold=args.enrichment_threshold,
         control_threshold=args.control_threshold,
         current_target=args.current_target,
         sequenced_library_enabled=args.sequenced_library_enabled,

@@ -45,7 +45,6 @@ type AntigenControlConfig = {
   antigenColumnRef?: SUniversalPColumnId; // Metadata column for antigen/control
   targetAntigen?: string; // e.g., "Target-Antigen"
   negativeAntigens: string[]; // e.g., ["BSA", "Plastic"]
-  targetThreshold: number; // Default: 2.0 log2 FC
   controlThreshold: number; // Default: 1.0 log2 FC
   controlMaskThreshold: number; // Default: 1.0
   controlConditionsOrder: string[]; // e.g., ["BSA", "Plastic"]
@@ -74,6 +73,7 @@ export type BlockArgs = {
   clonotypeDefinition: SUniversalPColumnId[];
   additionalEnrichmentExports: string[];
   antigenControlConfig: AntigenControlConfig;
+  enrichmentThreshold: number; // Default: 2.0 log2 FC
   pseudoCount: number; // Default: 100
 };
 
@@ -106,13 +106,13 @@ export const model = BlockModel.create()
       antigenEnabled: false,
       controlEnabled: false,
       negativeAntigens: [],
-      targetThreshold: 2.0,
       controlThreshold: 1.0,
       controlMaskThreshold: 1.0,
       controlConditionsOrder: [],
       sequencedLibraryEnabled: false,
       sequencedLibrarySampleId: undefined,
     },
+    enrichmentThreshold: 2.0,
     pseudoCount: 100,
   })
 
@@ -155,7 +155,8 @@ export const model = BlockModel.create()
     const { abundanceRef, conditionColumnRef, conditionOrder, antigenControlConfig } = ctx.args;
     const basicValid = abundanceRef !== undefined
       && conditionColumnRef !== undefined
-      && conditionOrder.length > 0;
+      && conditionOrder.length > 0
+      && ctx.args.enrichmentThreshold > 0.5;
 
     if (!basicValid) return false;
 

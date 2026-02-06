@@ -1,7 +1,7 @@
 ll := import("@platforma-sdk/workflow-tengo:ll")
 canonical := import("@platforma-sdk/workflow-tengo:canonical")
 
-getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percentile, downsampling, conditionOrder, antigenControlConfig, filteringConfig, blockId, ...opts) {
+getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percentile, downsampling, conditionOrder, enrichmentThreshold, antigenControlConfig, filteringConfig, blockId, ...opts) {
   ll.assert(len(opts) <= 1, "expected at most one options map")
 
   specLabel := "Max Log2FC"
@@ -12,18 +12,18 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percenti
   }
 
   // Extract control info
-  targetThreshold := undefined
+  enrichmentThresholdStr := string(enrichmentThreshold)
   controlThreshold := undefined
   baseDomain := {
     "pl7.app/vdj/enrichment/filteringConfig": canonical.encode(filteringConfig),
     "pl7.app/vdj/enrichment/conditionsOrder": canonical.encode(conditionOrder),
+    "pl7.app/vdj/enrichment/enrichmentThreshold": enrichmentThresholdStr,
     "pl7.app/blockId": blockId
   }
   if antigenControlConfig.antigenEnabled {
     baseDomain["pl7.app/vdj/antigenType"] = antigenControlConfig.targetAntigen
     if antigenControlConfig.controlEnabled {
       baseDomain["pl7.app/vdj/enrichment/controlEnabled"] = "true"
-      targetThreshold = string(antigenControlConfig.targetThreshold)
       controlThreshold = string(antigenControlConfig.controlThreshold)
     }
   }
@@ -102,7 +102,6 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percenti
   if antigenControlConfig.controlEnabled && len(opts) == 0 {
     // Prepare a domain map for binding specificity column
     bindingDomain := copy(baseDomain)
-    bindingDomain["pl7.app/vdj/enrichment/targetThreshold"] = targetThreshold
     bindingDomain["pl7.app/vdj/enrichment/controlThreshold"] = controlThreshold
 
     columns = columns + [{
