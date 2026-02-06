@@ -12,6 +12,7 @@ import {
   createPFrameForGraphs,
   createPlDataTableStateV2,
   createPlDataTableV2,
+  readAnnotation,
 } from '@platforma-sdk/model';
 
 export type DownsamplingParameters = {
@@ -46,6 +47,7 @@ type AntigenControlConfig = {
   negativeAntigens: string[]; // e.g., ["BSA", "Plastic"]
   targetThreshold: number; // Default: 2.0 log2 FC
   controlThreshold: number; // Default: 1.0 log2 FC
+  controlMaskThreshold: number; // Default: 1.0
   controlConditionsOrder: string[]; // e.g., ["BSA", "Plastic"]
   sequencedLibraryEnabled: boolean;
   sequencedLibrarySampleId?: string;
@@ -106,6 +108,7 @@ export const model = BlockModel.create()
       negativeAntigens: [],
       targetThreshold: 2.0,
       controlThreshold: 1.0,
+      controlMaskThreshold: 1.0,
       controlConditionsOrder: [],
       sequencedLibraryEnabled: false,
       sequencedLibrarySampleId: undefined,
@@ -246,17 +249,63 @@ export const model = BlockModel.create()
     return ctx.createPFrame(columns);
   })
 
-  /** Sample id → label map for the condition column's sample axis (for Sequenced Library dropdown). */
+  // Sample id → label map for all datasets from sample Samples & Data block
   .output('sampleLabels', (ctx) => {
-    const { conditionColumnRef, abundanceRef: anchor } = ctx.args;
-    if (!conditionColumnRef || !anchor) return undefined;
-    const conditionCols = ctx.resultPool.getAnchoredPColumns(
-      { main: anchor },
-      JSON.parse(conditionColumnRef) as AnchoredPColumnSelector,
+    const { abundanceRef: anchor } = ctx.args;
+    if (!anchor) return undefined;
+    const spec = ctx.resultPool.getPColumnSpecByRef(anchor);
+    if (!spec || !spec.axesSpec[0]) return undefined;
+    return ctx.resultPool.findLabels(spec.axesSpec[0]);
+  })
+
+  // Get only the sample IDs from the selected abundance column
+  .output('sampleIds', (ctx) => {
+    const { abundanceRef: anchor } = ctx.args;
+    if (!anchor) return undefined;
+    const spec = ctx.resultPool.getPColumnSpecByRef(anchor);
+    if (!spec) return undefined;
+
+    // Get input dataset trace in array format
+    const traceJson = readAnnotation(spec, 'pl7.app/trace');
+    if (traceJson === undefined) return undefined;
+    let trace: Array<{ type?: string; id?: string }>;
+    try {
+      trace = JSON.parse(traceJson) as Array<{ type?: string; id?: string }>;
+    } catch {
+      return undefined;
+    }
+    if (!Array.isArray(trace)) return undefined;
+
+    // Get the dataset ID from the trace
+    const datasetStep = trace.find(
+      (s) => s.type === 'milaboratories.samples-and-data/dataset' && s.id,
     );
-    const conditionCol = conditionCols?.[0];
-    if (!conditionCol) return undefined;
-    return ctx.resultPool.findLabels(conditionCol.spec.axesSpec[0]);
+    // Get blockID
+    const samplesAndDataStep = trace.find(
+      (s) => s.type === 'milaboratories.samples-and-data' && s.id,
+    );
+    const datasetId = datasetStep?.id;
+    const samplesAndDataBlockId = samplesAndDataStep?.id;
+    if (!datasetId || !samplesAndDataBlockId) return undefined;
+
+    // Get dataset Pcolumn from reconstructed ref
+    const datasetRef: PlRef = {
+      __isRef: true,
+      blockId: samplesAndDataBlockId,
+      name: `pf.dataset.${datasetId}`,
+    };
+    const datasetSpec = ctx.resultPool.getPColumnSpecByRef(datasetRef);
+    if (!datasetSpec) return undefined;
+
+    // Get sampel IDs
+    const axisKeysJson = readAnnotation(datasetSpec, 'pl7.app/axisKeys/0')
+      ?? (datasetSpec.axesSpec?.[0] && readAnnotation(datasetSpec.axesSpec[0], 'pl7.app/axisKeys/0'));
+    if (axisKeysJson === undefined) return undefined;
+    try {
+      return JSON.parse(axisKeysJson) as string[];
+    } catch {
+      return undefined;
+    }
   })
 
   // Get all enrichment statistics

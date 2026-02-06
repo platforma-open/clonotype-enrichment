@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { PFrameHandle, PlRef } from '@platforma-sdk/model';
+import type { PlRef } from '@platforma-sdk/model';
 import { getRawPlatformaInstance, getSingleColumnData, PFrameImpl } from '@platforma-sdk/model';
 import type {
   ListOption,
@@ -107,46 +107,62 @@ type MetadataFetched = {
   antigenBySample?: Record<string, string>;
 };
 
-/** Fetch metadata column data once from the pframe and derive all metadata-derived lists. */
-const metadataFetched = useWatchFetch(() => app.model.outputs.metadataColumnsPframe, async (pframeHandle: PFrameHandle | undefined) => {
-  if (!pframeHandle) return undefined;
-  const pFrame = new PFrameImpl(pframeHandle);
-  const list = await pFrame.listColumns();
-  const conditionColId = list?.[0]?.columnId;
-  if (!conditionColId) return undefined;
+/** Fetch metadata column data once from the pframe and derive all metadata-derived lists. Filter by sampleIds when available so only samples in the abundance input are used. */
+const metadataFetched = useWatchFetch(
+  () => ({
+    pframe: app.model.outputs.metadataColumnsPframe,
+    sampleIds: app.model.outputs.sampleIds as string[] | undefined,
+  }),
+  async ({ pframe: pframeHandle, sampleIds }) => {
+    if (!pframeHandle) return undefined;
+    const pFrame = new PFrameImpl(pframeHandle);
+    const list = await pFrame.listColumns();
+    const conditionColId = list?.[0]?.columnId;
+    if (!conditionColId) return undefined;
 
-  // Unique condition values (first column)
-  const conditionUnique = await pFrame.getUniqueValues({ columnId: conditionColId, filters: [], limit: 1000 });
-  const conditionValues = [...(conditionUnique?.values?.data ?? [])].map((v) => String(v));
+    const buildBySample = (colData: { axesData: Record<string, (string | number | null)[]>; data: (string | number | null)[] }) => {
+      const axisKeys = Object.keys(colData.axesData);
+      if (!axisKeys.length) return {};
+      const sampleKey = axisKeys[0];
+      const out: Record<string, string> = {};
+      for (let i = 0; i < colData.data.length; i++) {
+        const sampleId = colData.axesData[sampleKey]?.[i];
+        const val = colData.data[i];
+        if (sampleId != null && val != null) out[String(sampleId)] = String(val);
+      }
+      return out;
+    };
 
-  const buildBySample = (colData: { axesData: Record<string, (string | number | null)[]>; data: (string | number | null)[] }) => {
-    const axisKeys = Object.keys(colData.axesData);
-    if (!axisKeys.length) return {};
-    const sampleKey = axisKeys[0];
-    const out: Record<string, string> = {};
-    for (let i = 0; i < colData.data.length; i++) {
-      const sampleId = colData.axesData[sampleKey]?.[i];
-      const val = colData.data[i];
-      if (sampleId != null && val != null) out[String(sampleId)] = String(val);
+    // Always fetch condition column full data (sample id → value) for conditionBySample
+    const conditionColData = await getSingleColumnData(pframeHandle, conditionColId);
+    let conditionBySample = buildBySample(conditionColData);
+
+    const antigenColId = list?.[1]?.columnId;
+    let antigenBySample: Record<string, string> | undefined;
+    if (antigenColId) {
+      const antigenColData = await getSingleColumnData(pframeHandle, antigenColId);
+      antigenBySample = buildBySample(antigenColData);
     }
-    return out;
-  };
 
-  // Always fetch condition column full data (sample id → value) for conditionBySample (used for sample options and effective conditions)
-  const conditionColData = await getSingleColumnData(pframeHandle, conditionColId);
-  const conditionBySample = buildBySample(conditionColData);
+    // Restrict to samples present in the abundance input (sampleIds from trace)
+    if (sampleIds?.length) {
+      const sampleIdSet = new Set(sampleIds);
+      conditionBySample = Object.fromEntries(
+        Object.entries(conditionBySample).filter(([id]) => sampleIdSet.has(id)),
+      );
+      if (antigenBySample) {
+        antigenBySample = Object.fromEntries(
+          Object.entries(antigenBySample).filter(([id]) => sampleIdSet.has(id)),
+        );
+      }
+    }
 
-  const antigenColId = list?.[1]?.columnId;
-  if (!antigenColId) {
-    return { conditionValues, conditionBySample } satisfies MetadataFetched;
-  }
+    // Unique condition values from the (possibly filtered) condition map
+    const conditionValues = [...new Set(Object.values(conditionBySample))].filter(Boolean).sort();
 
-  // Full column data for antigen column to derive effective/antigen/control lists
-  const antigenColData = await getSingleColumnData(pframeHandle, antigenColId);
-  const antigenBySample = buildBySample(antigenColData);
-
-  return { conditionValues, conditionBySample, antigenBySample } satisfies MetadataFetched;
-});
+    return { conditionValues, conditionBySample, antigenBySample } satisfies MetadataFetched;
+  },
+);
 
 /** Condition values valid for the main order: all in dataset or only those in samples for the selected target antigen. */
 const effectiveConditionValues = computed(() => {
@@ -168,7 +184,7 @@ const effectiveConditionValues = computed(() => {
 });
 const effectiveConditionOptions = computed(() => mapToOptions(effectiveConditionValues.value));
 
-/** Conditions present in the dataset but excluded from the order because they are not in samples for the selected target antigen. */
+/** Conditions present in the experiment but excluded from the order because they are not in samples for the selected target antigen. */
 const conditionsExcludedByTarget = computed(() => {
   const raw = metadataFetched.value;
   const config = app.model.args.antigenControlConfig;
@@ -216,17 +232,22 @@ const sampleOptions = computed(() => {
   }));
 });
 
-/** Antigens that appear in at least 2 conditions (required for target selection). */
-const antigenValuesList = computed(() => {
+/** Antigens map to their conditions. */
+const antigenConditionsMap = computed(() => {
   const raw = metadataFetched.value;
-  if (!raw?.conditionBySample || !raw?.antigenBySample) return [];
+  if (!raw?.conditionBySample || !raw?.antigenBySample) return {};
   const counts: Record<string, Set<string>> = {};
   for (const [sampleId, antigenValue] of Object.entries(raw.antigenBySample)) {
     if (!counts[antigenValue]) counts[antigenValue] = new Set();
-    const c = raw.conditionBySample![sampleId];
+    const c = raw.conditionBySample[sampleId];
     if (c) counts[antigenValue].add(c);
   }
-  return Object.entries(counts)
+  return counts;
+});
+
+/** Antigens that appear in at least 2 conditions (required for target selection). */
+const antigenValuesList = computed(() => {
+  return Object.entries(antigenConditionsMap.value)
     .filter(([, conditions]) => conditions.size >= 2)
     .map(([antigen]) => antigen);
 });
@@ -235,8 +256,22 @@ const antigenValues = computed(() => mapToOptions(antigenValuesList.value));
 /** Antigen options excluding the selected target (for negative control dropdown). */
 const negativeAntigenValues = computed(() => {
   const target = app.model.args.antigenControlConfig.targetAntigen;
-  const filtered = antigenValuesList.value?.filter((v) => v !== target);
+  // Use all antigens (>= 1 condition), not just those with >= 2 conditions
+  const allAntigens = Object.keys(antigenConditionsMap.value);
+  const filtered = allAntigens.filter((v) => v !== target);
   return mapToOptions(filtered);
+});
+
+const hasSingleSampleNegativeControl = computed(() => {
+  const selected = app.model.args.antigenControlConfig.negativeAntigens;
+  const map = antigenConditionsMap.value;
+  return selected.some((antigen) => (map[antigen]?.size ?? 0) === 1);
+});
+
+const hasMultiSampleNegativeControl = computed(() => {
+  const selected = app.model.args.antigenControlConfig.negativeAntigens;
+  const map = antigenConditionsMap.value;
+  return selected.some((antigen) => (map[antigen]?.size ?? 0) > 1);
 });
 
 /** Condition values in samples that have the selected negative control antigens. */
@@ -418,8 +453,8 @@ watchEffect(() => {
     const current = app.model.args.conditionOrder;
     const valSet = new Set(vals);
 
-    // If the current order contains values that are no longer valid (e.g. not in selected dataset,
-    // or not present in samples for the selected target antigen), remove them but preserve order.
+    // If the current order contains values that are no longer valid (e.g. not present in samples
+    // for the selected target antigen), remove them but preserve order.
     const hasInvalidItems = current.some((v) => !valSet.has(v));
 
     if (col !== conditionSyncCol.value || current.length === 0) {
@@ -684,7 +719,7 @@ const isControlOrderOpen = ref(true); // Open by default
     />
     <PlAccordion multiple>
       <PlAccordionSection
-        v-if="app.model.args.antigenControlConfig.controlEnabled"
+        v-if="app.model.args.antigenControlConfig.controlEnabled && hasMultiSampleNegativeControl"
         v-model="isControlOrderOpen" label="Negative Condition Order"
       >
         <div style="display: flex; margin-bottom: -15px;">
@@ -723,7 +758,10 @@ const isControlOrderOpen = ref(true); // Open by default
         </PlBtnGhost>
       </PlAccordionSection>
     </PlAccordion>
-    <PlRow v-if="app.model.args.antigenControlConfig.controlEnabled">
+    <PlRow
+      v-if="app.model.args.antigenControlConfig.controlEnabled
+        && hasMultiSampleNegativeControl"
+    >
       <PlNumberField
         v-model="app.model.args.antigenControlConfig.targetThreshold"
         label="Target threshold"
@@ -884,6 +922,22 @@ const isControlOrderOpen = ref(true); // Open by default
       >
         <template #tooltip>
           (Default: 100) Represents detection threshold for display campaigns. For <em>in vivo</em> studies, consider lower values (10-50).
+        </template>
+      </PlNumberField>
+      <PlNumberField
+        v-if="hasSingleSampleNegativeControl"
+        v-model="app.model.args.antigenControlConfig.controlMaskThreshold"
+        label="Single control threshold"
+        :minValue="0"
+        :step="0.1"
+        placeholder="1.0"
+      >
+        <template #tooltip>
+          <div>
+            Threshold used to identify and exclude clonotypes present in single-sample controls.<br/><br/>
+            <strong>Value &lt; 1:</strong> Treated as a <strong>frequency</strong> threshold (0.0 to 1.0).<br/>
+            <strong>Value ≥ 1:</strong> Treated as an <strong>abundance</strong> threshold (read/UMI counts).
+          </div>
         </template>
       </PlNumberField>
       <PlDropdownMulti
