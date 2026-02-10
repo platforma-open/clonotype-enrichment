@@ -442,7 +442,7 @@ def hybrid_enrichment_analysis(
         target_reads = total_reads_df.filter(pl.col('antigen') == current_target)
         target_total_reads_dict = dict(zip(target_reads['condition'], target_reads['total_reads']))
         # When sequenced library is enabled, include the library sample
-        if sequenced_library_sample_id is not None:
+        if sequenced_library_enabled and sequenced_library_sample_id is not None:
             library_sample_reads = aggregated_df.filter(
                 pl.col('sampleId') == sequenced_library_sample_id
             ).select(pl.col('abundance').sum()).to_series().item()
@@ -543,11 +543,12 @@ def hybrid_enrichment_analysis(
     neg_control_columns: List[str] = []
     max_neg_enrichment_df = None
     if has_antigen and control_enabled and negative_antigens:
+        neg_track_filter = pl.col('antigen').is_in(negative_antigens)
+        if sequenced_library_enabled and sequenced_library_sample_id is not None:
+            neg_track_filter = neg_track_filter | (pl.col('sampleId') == sequenced_library_sample_id)
+            
         # Filter for all negative antigens; when sequenced library is enabled, include library sample too
-        neg_track_df = aggregated_df.filter(
-            pl.col('antigen').is_in(negative_antigens) 
-            | ((sequenced_library_sample_id is not None) & (pl.col('sampleId') == sequenced_library_sample_id))
-        )
+        neg_track_df = aggregated_df.filter(neg_track_filter)
 
         # Use control-specific order if provided, otherwise fallback to effective (target) order
         base_order = control_conditions_order if control_conditions_order is not None else effective_condition_order
@@ -566,11 +567,12 @@ def hybrid_enrichment_analysis(
             neg_enrichments_present: List[pl.DataFrame] = []  # single-condition: elementId + PresentInNegControl
 
             for neg_antigen in unique_neg_antigens:
+                antigen_filter = pl.col('antigen') == neg_antigen
+                if sequenced_library_enabled and sequenced_library_sample_id is not None:
+                    antigen_filter = antigen_filter | (pl.col('sampleId') == sequenced_library_sample_id)
+                
                 # Include library sample in each negative antigen's track when sequenced library is enabled
-                antigen_df = neg_track_df.filter(
-                    (pl.col('antigen') == neg_antigen) | 
-                    (sequenced_library_enabled & (sequenced_library_sample_id is not None) & (pl.col('sampleId') == sequenced_library_sample_id))
-                )
+                antigen_df = neg_track_df.filter(antigen_filter)
 
                 # Pivot for this specific negative antigen
                 antigen_pivot = (
