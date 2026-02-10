@@ -60,6 +60,7 @@ export type UiState = {
   lineState: GraphMakerState;
   stackedState: GraphMakerState;
   scatterState: GraphMakerState;
+  boxState: GraphMakerState;
   /** When set, the "conditions excluded by target" alert is hidden until the excluded list changes (key = sorted excluded conditions). */
   excludedAlertDismissedKey?: string;
 };
@@ -150,6 +151,11 @@ export const model = BlockModel.create()
     scatterState: {
       title: 'Binding specificity',
       template: 'dots',
+      currentTab: null,
+    },
+    boxState: {
+      title: 'Control Box Plot',
+      template: 'box',
       currentTab: null,
     },
     excludedAlertDismissedKey: undefined,
@@ -451,8 +457,17 @@ export const model = BlockModel.create()
       { type: 'link', href: '/stacked', label: 'Frequency Bar Plot' },
     ];
 
-    if (ctx.args.antigenControlConfig.controlEnabled) {
+    if (ctx.args.antigenControlConfig.hasMultiConditionNegativeControl
+      && !(ctx.args.antigenControlConfig.sequencedLibraryEnabled === false
+        && ctx.args.antigenControlConfig.controlConditionsOrder.length === 1)
+    ) {
       sections.push({ type: 'link', href: '/scatter', label: 'Control Scatter Plot' });
+    }
+    if (ctx.args.antigenControlConfig.hasSingleConditionNegativeControl
+      || (ctx.args.antigenControlConfig.sequencedLibraryEnabled === false
+        && ctx.args.antigenControlConfig.controlConditionsOrder.length === 1)
+    ) {
+      sections.push({ type: 'link', href: '/box', label: 'Control Box Plot' });
     }
     return sections;
   })

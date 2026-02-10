@@ -2,7 +2,7 @@ ll := import("@platforma-sdk/workflow-tengo:ll")
 maps := import("@platforma-sdk/workflow-tengo:maps")
 strings := import("@platforma-sdk/workflow-tengo:strings")
 
-getColumns := func(countsSpec, conditionOrder, hasSingleConditionNegativeControl, hasMultiConditionNegativeControl) {
+getColumns := func(countsSpec, conditionOrder, addPresentInNegControl, addMaxNegControlEnrichment) {
   lastCondition := conditionOrder[len(conditionOrder) - 1]
   columns := []
   
@@ -39,7 +39,7 @@ getColumns := func(countsSpec, conditionOrder, hasSingleConditionNegativeControl
         }
       }]
 
-  if hasSingleConditionNegativeControl || hasMultiConditionNegativeControl {
+  if addPresentInNegControl || addMaxNegControlEnrichment {
     columns = columns + [{
         column: "Binding Specificity",
         id: "binding_specificity",
@@ -56,8 +56,8 @@ getColumns := func(countsSpec, conditionOrder, hasSingleConditionNegativeControl
         }
       }]
   }
-  
-  if hasMultiConditionNegativeControl {
+
+  if addMaxNegControlEnrichment {
     columns = columns + [{
         column: "MaxNegControlEnrichment",
         id: "maxnegcontrolenrichment",
@@ -76,7 +76,7 @@ getColumns := func(countsSpec, conditionOrder, hasSingleConditionNegativeControl
       }]
   }
 
-  if hasSingleConditionNegativeControl {
+  if addPresentInNegControl {
     columns = columns + [{
         column: "PresentInNegControl",
         id: "presentinnegcontrol",

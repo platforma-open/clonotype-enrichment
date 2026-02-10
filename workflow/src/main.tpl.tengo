@@ -236,25 +236,31 @@ wf.body(func(args) {
 
 	// Convert script outputs to Pframes
 	enrichCsv := calculateEnrichment.getFile("enrichment_results.csv")
-	enrichmentImportParams := pfEnrichmentConv.getColumns(abundanceSpec, conditionOrder, antigenControlConfig.controlEnabled, antigenControlConfig.hasSingleConditionNegativeControl, antigenControlConfig.hasMultiConditionNegativeControl)
+
+    // Determine if we should add MaxNegControlEnrichment column
+    // It should be added only if there are multiple control conditions (either >1 conditions or >0 conditions + sequenced library)
+    addMaxNegControlEnrichment := antigenControlConfig.hasMultiConditionNegativeControl && !(len(antigenControlConfig.controlConditionsOrder) == 1 && antigenControlConfig.sequencedLibraryEnabled == false)
+	addPresentInNegControl := antigenControlConfig.hasSingleConditionNegativeControl || (antigenControlConfig.sequencedLibraryEnabled == false && len(antigenControlConfig.controlConditionsOrder) == 1)
+
+	enrichmentImportParams := pfEnrichmentConv.getColumns(abundanceSpec, conditionOrder, antigenControlConfig.controlEnabled, addPresentInNegControl, addMaxNegControlEnrichment, antigenControlConfig.sequencedLibraryEnabled)
 	enrichmentPf := xsv.importFile(enrichCsv, "csv", enrichmentImportParams,
 									{ cpu: 1, mem: "32GiB" })
 	controlScatterPf := undefined
 	if antigenControlConfig.controlEnabled {
-		controlScatterImportParams := pfControlScatterConv.getColumns(abundanceSpec, conditionOrder, antigenControlConfig.hasSingleConditionNegativeControl, antigenControlConfig.hasMultiConditionNegativeControl)
+		controlScatterImportParams := pfControlScatterConv.getColumns(abundanceSpec, conditionOrder, addPresentInNegControl, addMaxNegControlEnrichment)
 		controlScatterPf = xsv.importFile(enrichCsv, "csv", controlScatterImportParams,
 			{ cpu: 1, mem: "32GiB" })
 	}
 
-	bubbleImportParams := pfBubbleConv.getColumns(abundanceSpec, antigenControlConfig.hasSingleConditionNegativeControl, antigenControlConfig.hasMultiConditionNegativeControl)
+	bubbleImportParams := pfBubbleConv.getColumns(abundanceSpec, addPresentInNegControl, addMaxNegControlEnrichment)
 	bubblePf := xsv.importFile(calculateEnrichment.getFile("bubble_data.csv"), "csv", bubbleImportParams,
 							{ cpu: 1, mem: "32GiB" })
 
-	lineImportParams := pfStackedConv.getColumns(abundanceSpec, antigenControlConfig.hasSingleConditionNegativeControl, antigenControlConfig.hasMultiConditionNegativeControl)
+	lineImportParams := pfStackedConv.getColumns(abundanceSpec, addPresentInNegControl, addMaxNegControlEnrichment)
 	linePf := xsv.importFile(calculateEnrichment.getFile("top_10.csv"), "csv", lineImportParams,
 							{ cpu: 1, mem: "32GiB" })
 
-	stackedImportParams := pfStackedConv.getColumns(abundanceSpec, antigenControlConfig.hasSingleConditionNegativeControl, antigenControlConfig.hasMultiConditionNegativeControl)
+	stackedImportParams := pfStackedConv.getColumns(abundanceSpec, addPresentInNegControl, addMaxNegControlEnrichment)
 	stackedPf := xsv.importFile(calculateEnrichment.getFile("top_enriched.csv"), "csv", stackedImportParams,
 								{ cpu: 1, mem: "32GiB" })
 
@@ -263,7 +269,7 @@ wf.body(func(args) {
 	// Export frequency
 	frequencyImportParams := pfFrequencyConv.getColumns(abundanceSpec, conditionOrder,
 														inputType, downsampling,
-														blockId, antigenControlConfig.hasSingleConditionNegativeControl, antigenControlConfig.hasMultiConditionNegativeControl)
+														blockId, addPresentInNegControl, addMaxNegControlEnrichment)
 	frequencyPf := xsv.importFile(enrichCsv, "csv", frequencyImportParams,
 								{ cpu: 1, mem: "32GiB" })
 

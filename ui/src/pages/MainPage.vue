@@ -954,7 +954,7 @@ const isControlOrderOpen = ref(true); // Open by default
         </template>
       </PlNumberField>
       <PlNumberField
-        v-if="hasSingleSampleNegativeControl"
+        v-if="hasSingleSampleNegativeControl || (app.model.args.antigenControlConfig.sequencedLibraryEnabled === false && app.model.args.antigenControlConfig.controlConditionsOrder.length === 1)"
         v-model="app.model.args.antigenControlConfig.controlMaskThreshold"
         label="Single control threshold"
         :minValue="0"

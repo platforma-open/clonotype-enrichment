@@ -279,7 +279,8 @@ def hybrid_enrichment_analysis(
     - sequenced_library_sample_id: Sample ID of the sequenced library (used as base condition when enabled)
     """
     # Read data with polars lazy evaluation
-    input_df = pl.scan_csv(input_data_csv)
+    # Force condition to be string to avoid type errors during comparison
+    input_df = pl.scan_csv(input_data_csv, schema_overrides={"condition": pl.Utf8})
     schema = input_df.collect_schema()
 
     # Normalize condition order and resolve sequenced library as base condition
@@ -296,7 +297,18 @@ def hybrid_enrichment_analysis(
         )
         if sample_cond.height > 0:
             raw = sample_cond["condition"][0]
-            library_condition = "Library" if raw is None or str(raw).strip() == "" else str(raw)
+            # library_condition = "Library sample" if raw is None or str(raw).strip() == "" else str(raw)
+            # To make exports easier we will always rename for now
+            library_condition = "Library"
+            
+            # If there are rows where condition is already "Library", rename them to "Library_" to avoid collision
+            input_df = input_df.with_columns(
+                pl.when(pl.col("condition") == "Library")
+                .then(pl.lit("Library_"))
+                .otherwise(pl.col("condition"))
+                .alias("condition")
+            )
+            
             # Rename to "Library" if empty, or if another sample has the same condition (to disambiguate)
             need_rename = library_condition == "Library"
             if not need_rename:
