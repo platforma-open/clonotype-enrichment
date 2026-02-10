@@ -46,7 +46,8 @@ type AntigenControlConfig = {
   targetAntigen?: string; // e.g., "Target-Antigen"
   negativeAntigens: string[]; // e.g., ["BSA", "Plastic"]
   controlThreshold: number; // Default: 1.0 log2 FC
-  controlMaskThreshold: number; // Default: 10.0
+  singleControlFoldChangeThreshold: number; // Default: 10.0
+  singleControlFrequencyThreshold: number; // Default: 0.01
   controlConditionsOrder: string[]; // e.g., ["BSA", "Plastic"]
   sequencedLibraryEnabled: boolean;
   sequencedLibrarySampleId?: string;
@@ -110,7 +111,8 @@ export const model = BlockModel.create()
       controlEnabled: false,
       negativeAntigens: [],
       controlThreshold: 1.0,
-      controlMaskThreshold: 2.0,
+      singleControlFoldChangeThreshold: 10.0,
+      singleControlFrequencyThreshold: 0.01,
       controlConditionsOrder: [],
       sequencedLibraryEnabled: false,
       sequencedLibrarySampleId: undefined,
@@ -181,7 +183,9 @@ export const model = BlockModel.create()
     if (antigenControlConfig.controlEnabled) {
       if (!antigenControlConfig.antigenEnabled
         || !antigenControlConfig.negativeAntigens.length
-        || antigenControlConfig.controlConditionsOrder.length < 1) return false;
+        || antigenControlConfig.controlConditionsOrder.length < 1
+        || antigenControlConfig.singleControlFoldChangeThreshold === undefined
+        || antigenControlConfig.singleControlFrequencyThreshold === undefined) return false;
     }
 
     return true;

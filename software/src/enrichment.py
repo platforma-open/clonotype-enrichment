@@ -252,7 +252,8 @@ def hybrid_enrichment_analysis(
     control_conditions_order: Optional[List[str]] = None,
     enrichment_threshold: float = 2.0,
     control_threshold: float = 1.0,
-    control_mask_threshold: float = 1.0,
+    single_control_fc_threshold: float = 10.0,
+    single_control_frequency_threshold: float = 0.01,
     current_target: Optional[str] = None,
     sequenced_library_enabled: bool = False,
     sequenced_library_sample_id: Optional[str] = None,
@@ -273,7 +274,6 @@ def hybrid_enrichment_analysis(
     - control_conditions_order: List of ordered conditions where negative antigens are present
     - enrichment_threshold: Log2 fold change threshold for target conditions
     - control_threshold: Log2 fold change threshold for control conditions
-    - control_mask_threshold: When a negative control has only one condition, filter clonotypes by abundance (>=1) or frequency (<1)
     - current_target: The current target antigen for this iteration
     - sequenced_library_enabled: Use the selected sequenced library sample's condition as base condition for enrichment
     - sequenced_library_sample_id: Sample ID of the sequenced library (used as base condition when enabled)
@@ -299,18 +299,18 @@ def hybrid_enrichment_analysis(
             raw = sample_cond["condition"][0]
             # library_condition = "Library sample" if raw is None or str(raw).strip() == "" else str(raw)
             # To make exports easier we will always rename for now
-            library_condition = "Library"
+            library_condition = "0 - Library"
             
             # If there are rows where condition is already "Library", rename them to "Library_" to avoid collision
             input_df = input_df.with_columns(
-                pl.when(pl.col("condition") == "Library")
+                pl.when(pl.col("condition") == "0 - Library")
                 .then(pl.lit("Library_"))
                 .otherwise(pl.col("condition"))
                 .alias("condition")
             )
             
             # Rename to "Library" if empty, or if another sample has the same condition (to disambiguate)
-            need_rename = library_condition == "Library"
+            need_rename = library_condition == "0 - Library"
             if not need_rename:
                 other_with_same_condition = (
                     input_df.filter(
@@ -322,11 +322,11 @@ def hybrid_enrichment_analysis(
                 )
                 if other_with_same_condition.height > 0:
                     need_rename = True
-                    library_condition = "Library"
+                    library_condition = "0 - Library"
             if need_rename:
                 input_df = input_df.with_columns(
                     pl.when(pl.col("sampleId") == sequenced_library_sample_id)
-                    .then(pl.lit("Library"))
+                    .then(pl.lit("0 - Library"))
                     .otherwise(pl.col("condition"))
                     .alias("condition")
                 )
@@ -625,19 +625,62 @@ def hybrid_enrichment_analysis(
                     antigen_max = antigen_enrichment.select(['elementId', 'MaxPositiveEnrichment'])
                     neg_enrichments_max.append(antigen_max)
                 elif len(available_conditions) == 1:
-                    # Single condition: apply mask only, then mark selected clonotypes as present (no enrichments)
+                    # Single condition: calculate FC against target last condition
                     cond = available_conditions[0]
-                    if control_mask_threshold >= 1.0 or control_mask_threshold == 0.0:  # 0.0 means no threshold, all clonotypes present in control are considered
-                        antigen_pivot = antigen_pivot.filter(pl.col(cond) >= control_mask_threshold)
-                    else:
-                        total = neg_total_reads_dict.get(cond, 1)
-                        freq_expr = (pl.col(cond) + pseudo_count) / (total + (neg_n_clonotypes * pseudo_count))
-                        antigen_pivot = antigen_pivot.with_columns(
-                            freq_expr.alias('_freq_mask')
-                        ).filter(pl.col('_freq_mask') >= control_mask_threshold).drop('_freq_mask')
-                    present_df = antigen_pivot.select(pl.col('elementId')).with_columns(
-                        pl.lit(True).alias('PresentInNegControl')
+                    
+                    # Calculate frequency in control
+                    total = neg_total_reads_dict.get(cond, 1)
+                    freq_expr = (pl.col(cond) + pseudo_count) / (total + (neg_n_clonotypes * pseudo_count))
+                    
+                    antigen_pivot = antigen_pivot.with_columns(
+                        freq_expr.alias('_freq_control')
                     )
+                    
+                    # Get target frequency from enrichment_results
+                    if enrichment_results.height == 0:
+                        # If no target results, we can't calculate FC.
+                        # Fallback: flag if frequency in control is high
+                        present_df = antigen_pivot.filter(
+                            pl.col('_freq_control') >= single_control_frequency_threshold
+                        ).select(pl.col('elementId')).with_columns(
+                            pl.lit(True).alias('PresentInNegControl')
+                        )
+
+                    else:
+                        target_last_cond = effective_condition_order[-1]
+                        target_freq_col = f'Frequency {target_last_cond}'
+                        
+                        # Join to get target frequency
+                        # We use left join on antigen_pivot to keep all control clonotypes
+                        antigen_pivot = antigen_pivot.join(
+                            enrichment_results.select(['elementId', target_freq_col]),
+                            on='elementId',
+                            how='left'
+                        )
+                        
+                        # Calculate Fold Change: Target / Control
+                        # Handle nulls (not in target) as 0 frequency
+                        antigen_pivot = antigen_pivot.with_columns(
+                            pl.col(target_freq_col).fill_null(0.0).alias('_freq_target')
+                        )
+                        
+                        # FC = Target / Control
+                        antigen_pivot = antigen_pivot.with_columns(
+                            (pl.col('_freq_target') / pl.col('_freq_control')).alias('_fc_target_control')
+                        )
+                        
+                        # Filter logic:
+                        # We keep (don't flag as PresentInNegControl) if:
+                        # 1. FC >= threshold (Specific enrichment in target)
+                        # 2. AND Frequency in control < threshold (Low abundance in control)
+                        present_df = antigen_pivot.filter(
+                            (pl.col('_fc_target_control') < single_control_fc_threshold) |
+                            (pl.col('_freq_control') >= single_control_frequency_threshold)
+                        ).select(pl.col('elementId')).with_columns(
+                            pl.lit(True).alias('PresentInNegControl')
+                        )
+                        
+                        
                     neg_enrichments_present.append(present_df)                    
 
             # Combine per-antigen results into one table; track which columns we produced
@@ -1193,8 +1236,10 @@ if __name__ == "__main__":
                         help="Log2 fold change threshold for target conditions")
     parser.add_argument("--control_threshold", type=float, default=1.0,
                         help="Log2 fold change threshold for control conditions")
-    parser.add_argument("--control_mask_threshold", type=float, default=1.0,
-                        help="When a negative control has only one condition: filter by abundance if >=1, by frequency if <1")
+    parser.add_argument("--single_control_fc_threshold", type=float, default=10.0,
+                        help="Fold change threshold for single condition negative control filtering")
+    parser.add_argument("--single_control_frequency_threshold", type=float, default=0.01,
+                        help="Frequency threshold for single condition negative control filtering")
     parser.add_argument("--current_target", type=str, required=False,
                         help="The current target antigen for this iteration")
     parser.add_argument("--sequenced_library_enabled", action="store_true",
@@ -1230,7 +1275,8 @@ if __name__ == "__main__":
         control_conditions_order=json.loads(args.control_conditions_order) if args.control_conditions_order else None,
         enrichment_threshold=args.enrichment_threshold,
         control_threshold=args.control_threshold,
-        control_mask_threshold=args.control_mask_threshold,
+        single_control_fc_threshold=args.single_control_fc_threshold,
+        single_control_frequency_threshold=args.single_control_frequency_threshold,
         current_target=args.current_target,
         sequenced_library_enabled=args.sequenced_library_enabled,
         sequenced_library_sample_id=args.sequenced_library_sample_id

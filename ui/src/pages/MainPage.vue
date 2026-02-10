@@ -953,22 +953,41 @@ const isControlOrderOpen = ref(true); // Open by default
           (Default: 100) Represents detection threshold for display campaigns. For <em>in vivo</em> studies, consider lower values (10-50).
         </template>
       </PlNumberField>
-      <PlNumberField
+      <PlRow
         v-if="hasSingleSampleNegativeControl || (app.model.args.antigenControlConfig.sequencedLibraryEnabled === false && app.model.args.antigenControlConfig.controlConditionsOrder.length === 1)"
-        v-model="app.model.args.antigenControlConfig.controlMaskThreshold"
-        label="Single control threshold"
-        :minValue="0"
-        :step="0.1"
-        placeholder="2.0"
       >
-        <template #tooltip>
-          <div>
-            Threshold used to identify clonotypes present in single-sample controls (Default: 2.0). When a negative control has only one sample, presence defined by this threshold is used in <strong>Binding Specificity</strong> classification (e.g. to label clonotypes as Non-Specific or Negative-Control when present in the control).<br/><br/>
-            <strong>Value &lt; 1:</strong> Treated as a minimal <strong>frequency</strong> threshold (0.0 to 1.0).<br/>
-            <strong>Value ≥ 1:</strong> Treated as a minimal <strong>abundance</strong> threshold (read/UMI counts).
-          </div>
-        </template>
-      </PlNumberField>
+        <PlNumberField
+          v-model="app.model.args.antigenControlConfig.singleControlFoldChangeThreshold"
+          label="Control FC"
+          :minValue="1.0"
+          :step="0.1"
+          placeholder="10.0"
+        >
+          <template #tooltip>
+            <div>
+              <strong>Fold Change Threshold</strong> (Default: 10.0 for single condition control)<br/>
+              Clonotypes present in the control are flagged (filtered) only if their enrichment in the target (Target Last Condition Frequency / Control Frequency) is <strong>less than</strong> this value.<br/><br/>
+              Higher values are stricter (require more enrichment in target relative to control to be kept).
+            </div>
+          </template>
+        </PlNumberField>
+        <PlNumberField
+          v-model="app.model.args.antigenControlConfig.singleControlFrequencyThreshold"
+          label="Control Frequency"
+          :minValue="0"
+          :maxValue="1"
+          :step="0.01"
+          placeholder="0.01"
+        >
+          <template #tooltip>
+            <div>
+              <strong>Frequency Threshold</strong> (Default: 0.01 for single condition control)<br/>
+              Clonotypes are only considered "present" in the control (and thus candidates for filtering) if their frequency in the control sample is <strong>greater than or equal to</strong> this value.<br/><br/>
+              This prevents filtering based on low-abundance noise in the control.
+            </div>
+          </template>
+        </PlNumberField>
+      </PlRow>
       <PlDropdownMulti
         v-if="!isClusterId"
         v-model="app.model.args.clonotypeDefinition"

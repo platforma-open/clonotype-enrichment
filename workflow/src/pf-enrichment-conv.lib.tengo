@@ -5,7 +5,7 @@ strings := import("@platforma-sdk/workflow-tengo:strings")
 getColumns := func(countsSpec, conditionOrder, controlEnabled, addPresentInNegControl, hasMultiConditionNegativeControl, sequencedLibraryEnabled) {
   columns := []
   if sequencedLibraryEnabled {
-    conditionOrder = ["Library"] + conditionOrder
+    conditionOrder = ["0 - Library"] + conditionOrder
   }
   for idx, condition in conditionOrder {
     // Set last round's frequency always visible
