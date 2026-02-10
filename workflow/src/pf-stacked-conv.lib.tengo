@@ -1,6 +1,73 @@
 ll := import("@platforma-sdk/workflow-tengo:ll")
 
-getColumns := func(abundanceSpec) {
+getColumns := func(abundanceSpec, hasSingleConditionNegativeControl, hasMultiConditionNegativeControl) {
+  columns := [
+      {
+        column: "Frequency",
+        id: "frequency",
+        allowNA: false,
+        spec: {
+          name: "pl7.app/vdj/frequency",
+          valueType: "Double",
+          domain: {},
+          annotations: {
+            "pl7.app/label": "Frequency"
+          }
+        }
+      }
+      ]
+
+  if hasSingleConditionNegativeControl || hasMultiConditionNegativeControl {
+    columns = columns + [{
+        column: "Binding Specificity",
+        id: "binding_specificity",
+        allowNA: true,
+        spec: {
+          name: "pl7.app/vdj/bindingSpecificity",
+          valueType: "String",
+          domain: {},
+          annotations: {
+            "pl7.app/label": "Binding Specificity",
+            "pl7.app/table/visibility": "default"
+          }
+        }
+      }]
+  }
+
+  if hasMultiConditionNegativeControl {
+    columns = columns + [{
+      column: "MaxNegControlEnrichment",
+      id: "maxnegcontrolenrichment",
+      allowNA: true,
+      spec: {
+        name: "pl7.app/vdj/maxNegControlEnrichment",
+        valueType: "Double",
+        domain: {},
+        annotations: {
+          "pl7.app/label": "Max control Log2FC",
+          "pl7.app/table/visibility": "optional"
+        }
+      }
+    }]
+  }
+
+  if hasSingleConditionNegativeControl {
+    columns = columns + [{
+      column: "PresentInNegControl",
+      id: "presentinnegcontrol",
+      allowNA: true,
+      spec: {
+        name: "pl7.app/vdj/presentInNegControl",
+        valueType: "String",
+        domain: {},
+        annotations: {
+          "pl7.app/label": "Present in control",
+          "pl7.app/table/visibility": "optional"
+        }
+      }
+    }]
+  }
+
   return {
     axes: [
       {
@@ -21,21 +88,7 @@ getColumns := func(abundanceSpec) {
         }
       }
       ],
-    columns: [
-      {
-        column: "Frequency",
-        id: "frequency",
-        allowNA: false,
-        spec: {
-          name: "pl7.app/vdj/frequency",
-          valueType: "Double",
-          domain: {},
-          annotations: {
-            "pl7.app/label": "Frequency"
-          }
-        }
-      }
-      ],
+    columns: columns,
     storageFormat: "Parquet",
     partitionKeyLength: 0
   }

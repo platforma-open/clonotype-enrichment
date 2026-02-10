@@ -532,6 +532,14 @@ watch(() => app.model.args.antigenControlConfig.controlEnabled, (enabled) => {
   }
 });
 
+// Sync control flags to model
+watchEffect(() => {
+  if (app.model.args.antigenControlConfig) {
+    app.model.args.antigenControlConfig.hasSingleConditionNegativeControl = hasSingleSampleNegativeControl.value;
+    app.model.args.antigenControlConfig.hasMultiConditionNegativeControl = hasMultiSampleNegativeControl.value;
+  }
+});
+
 // Filtering options
 const filteringOptions = [
   { value: 'none', label: 'No filtering' },
@@ -731,7 +739,7 @@ const isControlOrderOpen = ref(true); // Open by default
       <PlTooltip v-if="app.model.args.antigenControlConfig.antigenEnabled" class="info">
         <template #tooltip>
           <div>
-            Enable it to select the sample used as the sequenced library reference for enrichment (to be used as base condition). Please, make sure it has a unique value in the condition column.
+            Enable it to select the sample used as the sequenced naive library reference for enrichment (to be used as base condition). Please, make sure it has a unique value in the condition column.
           </div>
         </template>
       </PlTooltip>
@@ -951,13 +959,13 @@ const isControlOrderOpen = ref(true); // Open by default
         label="Single control threshold"
         :minValue="0"
         :step="0.1"
-        placeholder="1.0"
+        placeholder="2.0"
       >
         <template #tooltip>
           <div>
-            Threshold used to identify and exclude clonotypes present in single-sample controls.<br/><br/>
-            <strong>Value &lt; 1:</strong> Treated as a <strong>frequency</strong> threshold (0.0 to 1.0).<br/>
-            <strong>Value ≥ 1:</strong> Treated as an <strong>abundance</strong> threshold (read/UMI counts).
+            Threshold used to identify clonotypes present in single-sample controls (Default: 2.0). When a negative control has only one sample, presence defined by this threshold is used in <strong>Binding Specificity</strong> classification (e.g. to label clonotypes as Non-Specific or Negative-Control when present in the control).<br/><br/>
+            <strong>Value &lt; 1:</strong> Treated as a minimal <strong>frequency</strong> threshold (0.0 to 1.0).<br/>
+            <strong>Value ≥ 1:</strong> Treated as a minimal <strong>abundance</strong> threshold (read/UMI counts).
           </div>
         </template>
       </PlNumberField>

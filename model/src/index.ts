@@ -46,10 +46,12 @@ type AntigenControlConfig = {
   targetAntigen?: string; // e.g., "Target-Antigen"
   negativeAntigens: string[]; // e.g., ["BSA", "Plastic"]
   controlThreshold: number; // Default: 1.0 log2 FC
-  controlMaskThreshold: number; // Default: 1.0
+  controlMaskThreshold: number; // Default: 10.0
   controlConditionsOrder: string[]; // e.g., ["BSA", "Plastic"]
   sequencedLibraryEnabled: boolean;
   sequencedLibrarySampleId?: string;
+  hasSingleConditionNegativeControl: boolean;
+  hasMultiConditionNegativeControl: boolean;
 };
 
 export type UiState = {
@@ -107,10 +109,12 @@ export const model = BlockModel.create()
       controlEnabled: false,
       negativeAntigens: [],
       controlThreshold: 1.0,
-      controlMaskThreshold: 1.0,
+      controlMaskThreshold: 2.0,
       controlConditionsOrder: [],
       sequencedLibraryEnabled: false,
       sequencedLibrarySampleId: undefined,
+      hasSingleConditionNegativeControl: false,
+      hasMultiConditionNegativeControl: false,
     },
     enrichmentThreshold: 2.0,
     pseudoCount: 100,
@@ -171,7 +175,7 @@ export const model = BlockModel.create()
     if (antigenControlConfig.controlEnabled) {
       if (!antigenControlConfig.antigenEnabled
         || !antigenControlConfig.negativeAntigens.length
-        || antigenControlConfig.controlConditionsOrder.length < 2) return false;
+        || antigenControlConfig.controlConditionsOrder.length < 1) return false;
     }
 
     return true;

@@ -2,7 +2,7 @@ ll := import("@platforma-sdk/workflow-tengo:ll")
 maps := import("@platforma-sdk/workflow-tengo:maps")
 strings := import("@platforma-sdk/workflow-tengo:strings")
 
-getColumns := func(countsSpec, conditionOrder, controlEnabled) {
+getColumns := func(countsSpec, conditionOrder, controlEnabled, hasSingleConditionNegativeControl, hasMultiConditionNegativeControl) {
   columns := []
   for idx, condition in conditionOrder {
     // Set last round's frequency always visible
@@ -117,7 +117,10 @@ getColumns := func(countsSpec, conditionOrder, controlEnabled) {
             "pl7.app/table/visibility": "default"
           }
         }
-      }, {
+      }]
+
+    if hasMultiConditionNegativeControl {
+      columns = columns + [{
         column: "MaxNegControlEnrichment",
         id: "maxnegcontrolenrichment",
         allowNA: true,
@@ -132,6 +135,24 @@ getColumns := func(countsSpec, conditionOrder, controlEnabled) {
           }
         }
       }]
+    }
+
+    if hasSingleConditionNegativeControl {
+      columns = columns + [{
+        column: "PresentInNegControl",
+        id: "presentinnegcontrol",
+        allowNA: true,
+        spec: {
+          name: "pl7.app/vdj/presentInNegControl",
+          valueType: "String",
+          domain: {},
+          annotations: {
+            "pl7.app/label": "Present in control",
+            "pl7.app/table/visibility": "optional"
+          }
+        }
+      }]
+    }
   }
     
   return {

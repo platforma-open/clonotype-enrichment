@@ -19,17 +19,20 @@ const defaultOptions = computed((): PredefinedGraphOption<'scatterplot'>[] | nul
   };
 
   const maxEnrichmentSpec = getColSpec('pl7.app/vdj/maxEnrichment');
-  const maxNegControlEnrichmentSpec = getColSpec('pl7.app/vdj/maxNegControlEnrichment');
+  let negSignalSpec = getColSpec('pl7.app/vdj/maxNegControlEnrichment');
+  if (negSignalSpec === undefined) {
+    negSignalSpec = getColSpec('pl7.app/vdj/presentInNegControl');
+  }
   const bindingSpecificitySpec = getColSpec('pl7.app/vdj/bindingSpecificity');
   const frequencySpec = getColSpec('pl7.app/vdj/frequency');
 
-  if (!maxEnrichmentSpec || !maxNegControlEnrichmentSpec || !bindingSpecificitySpec || !frequencySpec)
+  if (!maxEnrichmentSpec || !negSignalSpec || !bindingSpecificitySpec || !frequencySpec)
     return null;
 
   const defaults: PredefinedGraphOption<'scatterplot'>[] = [
     {
       inputName: 'x',
-      selectedSource: maxNegControlEnrichmentSpec,
+      selectedSource: negSignalSpec,
     },
     {
       inputName: 'y',

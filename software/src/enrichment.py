@@ -152,7 +152,7 @@ def create_empty_outputs(
     enrichment_csv: str,
     bubble_csv: str,
     top_enriched_csv: str,
-    top_20_csv: Optional[str] = None,
+    top_10_csv: Optional[str] = None,
     highest_enrichment_csv: Optional[str] = None,
     filtered_too_much_txt: Optional[str] = None
 ) -> None:
@@ -178,6 +178,7 @@ def create_empty_outputs(
     enrichment_schema['MaxPositiveEnrichment'] = pl.Float64
     enrichment_schema['Overall Log2FC'] = pl.Float64
     enrichment_schema['MaxNegControlEnrichment'] = pl.Float64
+    enrichment_schema['PresentInNegControl'] = pl.Boolean
     enrichment_schema['Binding Specificity'] = pl.Utf8
     enrichment_schema['EnrichmentQuality'] = pl.Utf8
     
@@ -188,19 +189,23 @@ def create_empty_outputs(
     empty_bubble = pl.DataFrame(schema={
         'elementId': pl.Utf8, 'Label': pl.Utf8, 'Numerator': pl.Utf8,
         'Denominator': pl.Utf8, 'Enrichment': pl.Float64,
-        'Frequency_Numerator': pl.Float64, 'MaxPositiveEnrichment': pl.Float64
+        'Frequency_Numerator': pl.Float64, 'MaxPositiveEnrichment': pl.Float64,
+        'Binding Specificity': pl.Utf8, 'MaxNegControlEnrichment': pl.Float64, 'PresentInNegControl': pl.Boolean,
+        'EnrichmentQuality': pl.Utf8
     })
     empty_bubble.write_csv(bubble_csv)
     
     # Create empty top enriched data with proper schema
     empty_top_enriched = pl.DataFrame(schema={
-        'elementId': pl.Utf8, 'Label': pl.Utf8, 'Condition': pl.Utf8, 'Frequency': pl.Float64
+        'elementId': pl.Utf8, 'Label': pl.Utf8, 'Condition': pl.Utf8, 'Frequency': pl.Float64,
+        'Binding Specificity': pl.Utf8, 'MaxNegControlEnrichment': pl.Float64, 'PresentInNegControl': pl.Boolean,
+        'EnrichmentQuality': pl.Utf8
     })
     empty_top_enriched.write_csv(top_enriched_csv)
     
     # Create empty top 20 data if requested
-    if top_20_csv:
-        empty_top_enriched.write_csv(top_20_csv)
+    if top_10_csv:
+        empty_top_enriched.write_csv(top_10_csv)
     
     # Create empty highest enrichment data with proper schema
     if highest_enrichment_csv:
@@ -210,7 +215,8 @@ def create_empty_outputs(
             'Frequency_Numerator': pl.Float64, 
             'Overall Log2FC': pl.Float64,
             'MaxPositiveEnrichment': pl.Float64,
-            'Binding Specificity': pl.Utf8
+            'Binding Specificity': pl.Utf8, 'MaxNegControlEnrichment': pl.Float64, 'PresentInNegControl': pl.Boolean,
+            'EnrichmentQuality': pl.Utf8
         })
         empty_highest.write_csv(highest_enrichment_csv)
 
@@ -226,7 +232,7 @@ def hybrid_enrichment_analysis(
     enrichment_csv: str,
     bubble_csv: str,
     top_enriched_csv: str,
-    top_20_csv: Optional[str] = None,
+    top_10_csv: Optional[str] = None,
     highest_enrichment_csv: Optional[str] = None,
     top_n_bubble: int = 10,
     top_n_enriched: int = 10,
@@ -246,6 +252,7 @@ def hybrid_enrichment_analysis(
     control_conditions_order: Optional[List[str]] = None,
     enrichment_threshold: float = 2.0,
     control_threshold: float = 1.0,
+    control_mask_threshold: float = 1.0,
     current_target: Optional[str] = None,
     sequenced_library_enabled: bool = False,
     sequenced_library_sample_id: Optional[str] = None,
@@ -266,6 +273,7 @@ def hybrid_enrichment_analysis(
     - control_conditions_order: List of ordered conditions where negative antigens are present
     - enrichment_threshold: Log2 fold change threshold for target conditions
     - control_threshold: Log2 fold change threshold for control conditions
+    - control_mask_threshold: When a negative control has only one condition, filter clonotypes by abundance (>=1) or frequency (<1)
     - current_target: The current target antigen for this iteration
     - sequenced_library_enabled: Use the selected sequenced library sample's condition as base condition for enrichment
     - sequenced_library_sample_id: Sample ID of the sequenced library (used as base condition when enabled)
@@ -289,11 +297,24 @@ def hybrid_enrichment_analysis(
         if sample_cond.height > 0:
             raw = sample_cond["condition"][0]
             library_condition = "Library" if raw is None or str(raw).strip() == "" else str(raw)
-            # If the library condition is empty, we need to rename it to "Library" in the data
-            if library_condition == "Library":
+            # Rename to "Library" if empty, or if another sample has the same condition (to disambiguate)
+            need_rename = library_condition == "Library"
+            if not need_rename:
+                other_with_same_condition = (
+                    input_df.filter(
+                        (pl.col("condition") == raw) & (pl.col("sampleId") != sequenced_library_sample_id)
+                    )
+                    .select("sampleId")
+                    .unique()
+                    .collect()
+                )
+                if other_with_same_condition.height > 0:
+                    need_rename = True
+                    library_condition = "Library"
+            if need_rename:
                 input_df = input_df.with_columns(
                     pl.when(pl.col("sampleId") == sequenced_library_sample_id)
-                    .then(pl.lit(library_condition))
+                    .then(pl.lit("Library"))
                     .otherwise(pl.col("condition"))
                     .alias("condition")
                 )
@@ -313,7 +334,7 @@ def hybrid_enrichment_analysis(
     if element_count == 0:
         # Create empty outputs and exit (use effective order so schema matches non-empty case)
         create_empty_outputs(effective_condition_order, enrichment_csv, bubble_csv,
-                                top_enriched_csv, top_20_csv, highest_enrichment_csv,
+                                top_enriched_csv, top_10_csv, highest_enrichment_csv,
                                 filtered_too_much_txt)
         return
 
@@ -408,8 +429,17 @@ def hybrid_enrichment_analysis(
     if has_antigen and current_target:
         target_reads = total_reads_df.filter(pl.col('antigen') == current_target)
         target_total_reads_dict = dict(zip(target_reads['condition'], target_reads['total_reads']))
-
-        target_track_df = aggregated_df.filter(pl.col('antigen') == current_target)
+        # When sequenced library is enabled, include the library sample
+        if sequenced_library_sample_id is not None:
+            library_sample_reads = aggregated_df.filter(
+                pl.col('sampleId') == sequenced_library_sample_id
+            ).select(pl.col('abundance').sum()).to_series().item()
+            target_total_reads_dict[library_condition] = library_sample_reads
+            target_track_df = aggregated_df.filter(
+                (pl.col('antigen') == current_target) | (pl.col('sampleId') == sequenced_library_sample_id)
+            )
+        else:
+            target_track_df = aggregated_df.filter(pl.col('antigen') == current_target)
     else:
         # Fallback to global totals if no antigen or control disabled
         global_reads = total_reads_df.group_by('condition').agg(pl.col('total_reads').sum())
@@ -451,15 +481,17 @@ def hybrid_enrichment_analysis(
     )
 
     # Ensure all conditions are present in pivot
+    pivot_df_schema = pivot_df.collect_schema().names()
     for condition in effective_condition_order:
-        if condition not in pivot_df.collect_schema().names():
+        if condition not in pivot_df_schema:
             pivot_df = pivot_df.with_columns(pl.lit(0).alias(condition))
+    pivot_df_schema = pivot_df.collect_schema().names()
 
     # Convert elementId to index by setting it aside
     pivot_df = pivot_df.sort('elementId')
 
     # Sort columns alphabetically but keep elementId
-    condition_cols = sorted([col for col in pivot_df.collect_schema().names() if col != 'elementId'])
+    condition_cols = sorted([col for col in pivot_df_schema if col != 'elementId'])
     pivot_df = pivot_df.select(['elementId'] + condition_cols)
 
     # Pre-calculate frequencies for target track
@@ -492,14 +524,18 @@ def hybrid_enrichment_analysis(
 
     # Calculate pairwise enrichments
     enrichment_results = _calculate_enrichments_vectorized(
-        pivot_df, effective_condition_order, target_total_reads_dict
+        pivot_df, effective_condition_order
     )
 
     # --- Negative Control Track Processing ---
+    neg_control_columns: List[str] = []
     max_neg_enrichment_df = None
     if has_antigen and control_enabled and negative_antigens:
-        # Filter for all negative antigens
-        neg_track_df = aggregated_df.filter(pl.col('antigen').is_in(negative_antigens))
+        # Filter for all negative antigens; when sequenced library is enabled, include library sample too
+        neg_track_df = aggregated_df.filter(
+            pl.col('antigen').is_in(negative_antigens) 
+            | ((sequenced_library_sample_id is not None) & (pl.col('sampleId') == sequenced_library_sample_id))
+        )
 
         # Use control-specific order if provided, otherwise fallback to effective (target) order
         base_order = control_conditions_order if control_conditions_order is not None else effective_condition_order
@@ -510,12 +546,20 @@ def hybrid_enrichment_analysis(
         if neg_track_df.height > 0:
             # We need to calculate enrichment independently for each negative 
             # antigen (only the ones which where provided and are present in the data)
-            unique_neg_antigens = neg_track_df.select('antigen').unique().to_series().to_list()
-            
-            neg_enrichments = []
+            unique_neg_antigens = (
+                neg_track_df.filter(pl.col('antigen').is_in(negative_antigens))
+                .select('antigen').unique().to_series().to_list()
+            )
+            neg_enrichments_max: List[pl.DataFrame] = []   # multi-condition: elementId + MaxPositiveEnrichment
+            neg_enrichments_present: List[pl.DataFrame] = []  # single-condition: elementId + PresentInNegControl
+
             for neg_antigen in unique_neg_antigens:
-                antigen_df = neg_track_df.filter(pl.col('antigen') == neg_antigen)
-                
+                # Include library sample in each negative antigen's track when sequenced library is enabled
+                antigen_df = neg_track_df.filter(
+                    (pl.col('antigen') == neg_antigen) | 
+                    (sequenced_library_enabled & (sequenced_library_sample_id is not None) & (pl.col('sampleId') == sequenced_library_sample_id))
+                )
+
                 # Pivot for this specific negative antigen
                 antigen_pivot = (
                     antigen_df
@@ -524,54 +568,111 @@ def hybrid_enrichment_analysis(
                     .pivot(values='abundance', index='elementId', on='condition', aggregate_function='sum')
                     .fill_null(0)
                 )
-                
+
                 # Only use conditions that are actually present for this antigen
                 # to avoid spurious enrichments from missing/synthetic conditions
-                available_conditions = [c for c in base_order if c in antigen_pivot.collect_schema().names()]
-                
+                pivot_names = antigen_pivot.collect_schema().names()
+                available_conditions = [c for c in base_order if c in pivot_names]
+                # If the antigen has one experimental condition not in base_order, use it as a fallback
+                experimental_pivot = [c for c in pivot_names if c not in ('elementId', library_condition)]
+                if len(experimental_pivot) == 1 and experimental_pivot[0] not in available_conditions:
+                    available_conditions = ([library_condition] if library_condition in pivot_names else []) + experimental_pivot
+
                 antigen_pivot = antigen_pivot.sort('elementId')
                 # Keep elementId in the selection
                 antigen_pivot = antigen_pivot.select(['elementId'] + available_conditions)
-                
-                # Get total reads for this negative antigen
-                neg_reads = total_reads_df.filter(pl.col('antigen') == neg_antigen)
+
+                # Get total reads for this negative antigen; include library condition counts when library is enabled
+                neg_reads = total_reads_df.filter(
+                    (pl.col('antigen') == neg_antigen) | 
+                    ((library_condition is not None) & (pl.col('condition') == library_condition))
+                )
                 neg_total_reads_dict = dict(zip(neg_reads['condition'], neg_reads['total_reads']))
                 
                 # Calculate track-specific n_clonotypes for this negative antigen
                 neg_n_clonotypes = antigen_df.select('elementId').n_unique()
-                
-                # Calculate frequencies
-                neg_freq_exprs = []
-                for condition in available_conditions:
-                    total = neg_total_reads_dict.get(condition, 1)
-                    neg_freq_exprs.append(
-                        ((pl.col(condition) + pseudo_count) / (total + (neg_n_clonotypes * pseudo_count))).alias(f'freq_{condition}')
-                    )
-                antigen_pivot = antigen_pivot.with_columns(neg_freq_exprs)
-                
-                # Calculate pairwise enrichments
-                antigen_enrichment = _calculate_enrichments_vectorized(
-                    antigen_pivot, available_conditions, neg_total_reads_dict
-                )
-                
-                # SAFETY: If no pairwise comparisons were possible, create a 0-filled max column
-                if 'MaxPositiveEnrichment' not in antigen_enrichment.collect_schema().names():
-                    antigen_enrichment = antigen_enrichment.with_columns(
-                        pl.lit(0.0).alias('MaxPositiveEnrichment')
-                    )
 
-                # We only care about the MaxPositiveEnrichment for negative controls
-                antigen_max = antigen_enrichment.select(['elementId', 'MaxPositiveEnrichment'])
-                neg_enrichments.append(antigen_max)
-            
-            if neg_enrichments:
-                # Combine all negative antigen max enrichments and take the max across antigens
-                combined_neg = pl.concat(neg_enrichments)
+                if len(available_conditions) > 1:
+                    # Multiple conditions: compute frequencies and enrichments
+                    neg_freq_exprs = []
+                    for condition in available_conditions:
+                        total = neg_total_reads_dict.get(condition, 1)
+                        neg_freq_exprs.append(
+                            ((pl.col(condition) + pseudo_count) / (total + (neg_n_clonotypes * pseudo_count))).alias(f'freq_{condition}')
+                        )
+                    antigen_pivot = antigen_pivot.with_columns(neg_freq_exprs)
+                    antigen_enrichment = _calculate_enrichments_vectorized(
+                        antigen_pivot, available_conditions
+                    )
+                    # If no pairwise comparisons were possible, create a 0-filled max column
+                    if 'MaxPositiveEnrichment' not in antigen_enrichment.collect_schema().names():
+                        antigen_enrichment = antigen_enrichment.with_columns(
+                            pl.lit(0.0).alias('MaxPositiveEnrichment')
+                        )
+                    # Store new columns
+                    antigen_max = antigen_enrichment.select(['elementId', 'MaxPositiveEnrichment'])
+                    neg_enrichments_max.append(antigen_max)
+                elif len(available_conditions) == 1:
+                    # Single condition: apply mask only, then mark selected clonotypes as present (no enrichments)
+                    cond = available_conditions[0]
+                    if control_mask_threshold >= 1.0 or control_mask_threshold == 0.0:  # 0.0 means no threshold, all clonotypes present in control are considered
+                        antigen_pivot = antigen_pivot.filter(pl.col(cond) >= control_mask_threshold)
+                    else:
+                        total = neg_total_reads_dict.get(cond, 1)
+                        freq_expr = (pl.col(cond) + pseudo_count) / (total + (neg_n_clonotypes * pseudo_count))
+                        antigen_pivot = antigen_pivot.with_columns(
+                            freq_expr.alias('_freq_mask')
+                        ).filter(pl.col('_freq_mask') >= control_mask_threshold).drop('_freq_mask')
+                    present_df = antigen_pivot.select(pl.col('elementId')).with_columns(
+                        pl.lit(True).alias('PresentInNegControl')
+                    )
+                    neg_enrichments_present.append(present_df)                    
+
+            # Combine per-antigen results into one table; track which columns we produced
+            if neg_enrichments_max:
                 max_neg_enrichment_df = (
-                    combined_neg
+                    pl.concat(neg_enrichments_max)
                     .group_by('elementId')
                     .agg(pl.col('MaxPositiveEnrichment').max().alias('MaxNegControlEnrichment'))
                 )
+                neg_control_columns.append('MaxNegControlEnrichment')
+            if neg_enrichments_present:
+                present_df = (
+                    pl.concat(neg_enrichments_present)
+                    .group_by('elementId')
+                    .agg(pl.col('PresentInNegControl').any().alias('PresentInNegControl'))
+                )
+                if max_neg_enrichment_df is not None:
+                    max_neg_enrichment_df = max_neg_enrichment_df.join(present_df, on='elementId', how='outer')
+                    
+                    # Coalesce elementId columns if they split during outer join
+                    if 'elementId_right' in max_neg_enrichment_df.columns:
+                        max_neg_enrichment_df = max_neg_enrichment_df.with_columns(
+                            pl.coalesce([pl.col('elementId'), pl.col('elementId_right')]).alias('elementId')
+                        ).drop('elementId_right')
+                else:
+                    max_neg_enrichment_df = present_df
+                neg_control_columns.append('PresentInNegControl')
+
+    # Join negative control columns if calculated (right after control processing)
+    if max_neg_enrichment_df is not None:
+        enrichment_results = enrichment_results.join(
+            max_neg_enrichment_df, on='elementId', how='left'
+        )
+        if 'MaxNegControlEnrichment' in neg_control_columns:
+            enrichment_results = enrichment_results.with_columns(
+                pl.col('MaxNegControlEnrichment').fill_null(0)
+            )
+        if 'PresentInNegControl' in neg_control_columns:
+            enrichment_results = enrichment_results.with_columns(
+                pl.col('PresentInNegControl').fill_null(False)
+            )
+    elif control_enabled:
+        # If control enabled but no neg data found, add default columns for backward compatibility
+        enrichment_results = enrichment_results.with_columns(
+            pl.lit(0.0).alias('MaxNegControlEnrichment'),
+            pl.lit(False).alias('PresentInNegControl'),
+        )
 
     # Join with Overall Log2FC if it was calculated
     if 'Overall Log2FC' in pivot_df.collect_schema().names():
@@ -581,30 +682,28 @@ def hybrid_enrichment_analysis(
             how='left'
         )
 
-    # Join with MaxNegControlEnrichment if calculated
-    if max_neg_enrichment_df is not None:
-        enrichment_results = enrichment_results.join(
-            max_neg_enrichment_df, on='elementId', how='left'
-        ).with_columns(
-            pl.col('MaxNegControlEnrichment').fill_null(0)
-        )
-    elif control_enabled:
-        # If control enabled but no data found, add column with 0
-        enrichment_results = enrichment_results.with_columns(
-            pl.lit(0.0).alias('MaxNegControlEnrichment')
-        )
-
     # Calculate Binding Specificity if control is enabled
     if control_enabled:
         target_expr = pl.col('MaxPositiveEnrichment')
-        control_expr = pl.col('MaxNegControlEnrichment')
-        
+        # Antigen-specific when target enriched and not enriched/present in negative control
+        not_in_control_expr = pl.lit(True)
+        if 'MaxNegControlEnrichment' in neg_control_columns:
+            not_in_control_expr = not_in_control_expr & (pl.col('MaxNegControlEnrichment') < control_threshold)
+        if 'PresentInNegControl' in neg_control_columns:
+            not_in_control_expr = not_in_control_expr & (~pl.col('PresentInNegControl'))
+        # Present/enriched in control
+        in_control_expr = pl.lit(False)
+        if 'MaxNegControlEnrichment' in neg_control_columns:
+            in_control_expr = in_control_expr | (pl.col('MaxNegControlEnrichment') >= control_threshold)
+        if 'PresentInNegControl' in neg_control_columns:
+            in_control_expr = in_control_expr | pl.col('PresentInNegControl')
+
         enrichment_results = enrichment_results.with_columns(
-            pl.when((target_expr >= enrichment_threshold) & (control_expr < control_threshold))
+            pl.when((target_expr >= enrichment_threshold) & not_in_control_expr)
             .then(pl.lit("Antigen-Specific"))
-            .when((target_expr >= enrichment_threshold) & (control_expr >= control_threshold))
+            .when((target_expr >= enrichment_threshold) & in_control_expr)
             .then(pl.lit("Non-Specific"))
-            .when((target_expr < enrichment_threshold) & (control_expr >= control_threshold))
+            .when((target_expr < enrichment_threshold) & in_control_expr)
             .then(pl.lit("Negative-Control"))
             .otherwise(pl.lit("Not-Enriched"))
             .alias('Binding Specificity')
@@ -640,7 +739,7 @@ def hybrid_enrichment_analysis(
         if control_enabled:
             enrichment_results = enrichment_results.with_columns(
                 pl.when(pl.col('Binding Specificity').is_in(['Negative-Control', 'Not-Enriched']))
-                .then(pl.lit(None).cast(pl.Utf8))
+                .then(pl.lit("Non Binder").cast(pl.Utf8))
                 .otherwise(pl.col('EnrichmentQuality'))
                 .alias('EnrichmentQuality')
             )
@@ -659,20 +758,22 @@ def hybrid_enrichment_analysis(
     other_cols = [col for col in enrichment_results.collect_schema().names() if col not in cols_to_front]
     enrichment_results = enrichment_results.select(cols_to_front + other_cols)
 
+    # Sort table by elementId
+    enrichment_results = enrichment_results.sort('elementId')
+
     # Save main enrichment results
     enrichment_results.write_csv(enrichment_csv)
 
     # Process outputs efficiently
     _process_outputs(
         enrichment_results, effective_condition_order, bubble_csv, top_enriched_csv,
-        top_20_csv, highest_enrichment_csv, top_n_bubble, top_n_enriched, min_enrichment
+        top_10_csv, highest_enrichment_csv, top_n_bubble, top_n_enriched, min_enrichment
     )
 
 
 def _calculate_enrichments_vectorized(
     pivot_df: pl.DataFrame,
-    condition_order: List[str],
-    total_reads_dict: Dict[str, int]
+    condition_order: List[str]
 ) -> pl.DataFrame:
     """
     Calculate enrichments using vectorized operations for better performance.
@@ -739,7 +840,7 @@ def _process_outputs(
     condition_order: List[str],
     bubble_csv: str,
     top_enriched_csv: str,
-    top_20_csv: Optional[str],
+    top_10_csv: Optional[str],
     highest_enrichment_csv: Optional[str],
     top_n_bubble: int,
     top_n_enriched: int,
@@ -771,43 +872,52 @@ def _process_outputs(
 
         # Process bubble data
         bubble_data = _create_bubble_data(
-            enrichment_results, condition_order, top_n_bubble, min_enrichment
+            enrichment_results, top_n_bubble, min_enrichment
         )
         bubble_data.write_csv(bubble_csv)
 
         # Process top enriched data
         top_enriched_data = _create_top_enriched_data(
-            enrichment_results, condition_order, bubble_data, top_n_enriched
+            enrichment_results, condition_order, min_enrichment, top_n_enriched
         )
         top_enriched_data.write_csv(top_enriched_csv)
 
         # Process top 20 data if requested
-        if top_20_csv:
-            top_20_data = _create_top_enriched_data(
-                enrichment_results, condition_order, bubble_data, 20
+        if top_10_csv:
+            top_10_data = _create_top_enriched_data(
+                enrichment_results, condition_order, min_enrichment, 10
             )
-            top_20_data.write_csv(top_20_csv)
+            top_10_data.write_csv(top_10_csv)
     else:
         # Create empty outputs if no enrichment columns
-        empty_cols = ['elementId', 'Label', 'Comparison', 'Numerator',
-                      'Denominator', 'Enrichment', 'Frequency_Numerator',
-                      'Overall Log2FC', 'MaxPositiveEnrichment', 
-                      'MaxNegControlEnrichment', 'Binding Specificity', 'EnrichmentQuality']
-        empty_schema = {}
-        for col in empty_cols:
-            if col in ['elementId', 'Label', 'Comparison', 'Numerator', 'Denominator', 'Binding Specificity', 'EnrichmentQuality']:
-                empty_schema[col] = pl.Utf8
-            else:
-                empty_schema[col] = pl.Float64
         
-        empty_df = pl.DataFrame(schema=empty_schema)
+        # Bubble needs specific columns
+        bubble_cols = [
+            'elementId', 'Label', 'Numerator', 'Denominator', 'Enrichment', 
+            'Frequency_Numerator', 'MaxPositiveEnrichment', 
+            'Binding Specificity', 'MaxNegControlEnrichment', 'PresentInNegControl', 'EnrichmentQuality'
+        ]
+        pl.DataFrame(schema=bubble_cols).write_csv(bubble_csv)
 
-        empty_df.write_csv(bubble_csv)
-        empty_df.write_csv(top_enriched_csv)
-        if top_20_csv:
-            empty_df.write_csv(top_20_csv)
+        # Top enriched needs specific columns
+        top_enriched_cols = [
+            'elementId', 'Label', 'Condition', 'Frequency',
+            'Binding Specificity', 'MaxNegControlEnrichment', 'PresentInNegControl',
+            'EnrichmentQuality'
+        ]
+        pl.DataFrame(schema=top_enriched_cols).write_csv(top_enriched_csv)
+        
+        if top_10_csv:
+            pl.DataFrame(schema=top_enriched_cols).write_csv(top_10_csv)
+            
         if highest_enrichment_csv:
-            empty_df.write_csv(highest_enrichment_csv)
+            highest_cols = [
+                'elementId', 'Label', 'Comparison', 'Numerator',
+                'Denominator', 'Enrichment', 'Frequency_Numerator',
+                'Overall Log2FC', 'MaxPositiveEnrichment', 
+                'MaxNegControlEnrichment', 'PresentInNegControl', 'Binding Specificity', 'EnrichmentQuality'
+            ]
+            pl.DataFrame(schema=highest_cols).write_csv(highest_enrichment_csv)
 
 
 def _create_detailed_enrichment_table(
@@ -820,7 +930,7 @@ def _create_detailed_enrichment_table(
     """
     # Identify additional columns to preserve
     extra_cols = []
-    for col in ['Overall Log2FC', 'Binding Specificity', 'EnrichmentQuality']:
+    for col in ['Overall Log2FC', 'Binding Specificity', 'EnrichmentQuality', 'MaxNegControlEnrichment', 'PresentInNegControl']:
         if col in enrichment_results.columns:
             extra_cols.append(col)
 
@@ -880,7 +990,6 @@ def _create_detailed_enrichment_table(
 
 def _create_bubble_data(
     enrichment_results: pl.DataFrame,
-    condition_order: List[str],
     top_n_bubble: int,
     min_enrichment: float
 ) -> pl.DataFrame:
@@ -905,8 +1014,6 @@ def _create_bubble_data(
     # Get top clonotypes
     top_clonotypes = (
         filtered_data
-        .group_by('elementId')
-        .agg(pl.col(max_col).max())
         .sort([max_col, 'elementId'], descending=[True, False])
         .head(top_n_bubble)
         .select('elementId')
@@ -919,12 +1026,22 @@ def _create_bubble_data(
     # Create bubble data efficiently
     enrichment_cols = [
         col for col in bubble_data.collect_schema().names() if col.startswith('Enrichment ')]
+    
+    # Identify extra columns to include
+    extra_cols = []
+    for col in ['Binding Specificity', 'MaxNegControlEnrichment', 'PresentInNegControl', 'EnrichmentQuality']:
+        if col in bubble_data.columns:
+            extra_cols.append(col)
+            
     bubble_rows = []
 
     for row in bubble_data.iter_rows(named=True):
         element_id = row['elementId']
         label = row['Label']
         max_val = row[max_col]
+        
+        # Prepare extra data
+        extra_data = {col: row[col] for col in extra_cols}
 
         for col in enrichment_cols:
             enrich_val = row[col]
@@ -934,7 +1051,7 @@ def _create_bubble_data(
                 numerator, denominator = comparison.split(' vs ')
                 freq_val = row.get(f'Frequency {numerator}', None)
 
-                bubble_rows.append({
+                row_data = {
                     'elementId': element_id,
                     'Label': label,
                     'Numerator': numerator,
@@ -942,52 +1059,66 @@ def _create_bubble_data(
                     'Enrichment': enrich_val,
                     'Frequency_Numerator': freq_val,
                     max_col: max_val
-                })
+                }
+                row_data.update(extra_data)
+                bubble_rows.append(row_data)
 
     if bubble_rows:
         return pl.DataFrame(bubble_rows)
     else:
-        return pl.DataFrame(schema={
+        schema = {
             'elementId': pl.Utf8, 'Label': pl.Utf8, 'Numerator': pl.Utf8,
             'Denominator': pl.Utf8, 'Enrichment': pl.Float64,
-            'Frequency_Numerator': pl.Float64, 'MaxPositiveEnrichment': pl.Float64
-        })
+            'Frequency_Numerator': pl.Float64, 'MaxPositiveEnrichment': pl.Float64,
+            'Binding Specificity': pl.Utf8, 'MaxNegControlEnrichment': pl.Float64, 'PresentInNegControl': pl.Boolean,
+            'EnrichmentQuality': pl.Utf8
+        }
+        return pl.DataFrame(schema=schema)
 
 
 def _create_top_enriched_data(
     enrichment_results: pl.DataFrame,
     condition_order: List[str],
-    bubble_data: pl.DataFrame,
+    min_enrichment: float,
     top_n: int
 ) -> pl.DataFrame:
     """
     Create top enriched frequency data efficiently.
     """
-    if bubble_data.height == 0:
+    max_col = 'MaxPositiveEnrichment'
+
+    # Filter by min_enrichment first
+    filtered_results = enrichment_results.filter(
+        pl.col(max_col) >= min_enrichment
+    )
+
+    if filtered_results.height == 0:
         return pl.DataFrame(schema={
             'elementId': pl.Utf8, 'Label': pl.Utf8, 'Condition': pl.Utf8, 'Frequency': pl.Float64
         })
 
     # Get top element IDs
-    max_col = 'MaxPositiveEnrichment'
-
     top_ids = (
-        bubble_data
-        .group_by('elementId')
-        .agg(pl.col(max_col).max())
+        filtered_results
         .sort([max_col, 'elementId'], descending=[True, False])
         .head(top_n)
         .select('elementId')
     )
+
+    # Identify additional columns to preserve
+    extra_cols = []
+    for col in ['Binding Specificity', 'EnrichmentQuality', 'MaxNegControlEnrichment', 'PresentInNegControl']:
+        if col in enrichment_results.columns:
+            extra_cols.append(col)
 
     # Create frequency data
     freq_cols = [f'Frequency {cond}' for cond in condition_order]
     freq_data = (
         enrichment_results
         .join(top_ids, on='elementId', how='inner')
-        .select(['elementId', 'Label'] + freq_cols)
+        .select(['elementId', 'Label'] + extra_cols + freq_cols)
         .melt(
-            id_vars=['elementId', 'Label'],
+            id_vars=['elementId', 'Label'] + extra_cols,
             value_vars=freq_cols,
             variable_name='ConditionFull',
             value_name='Frequency'
@@ -996,7 +1127,7 @@ def _create_top_enriched_data(
             pl.col('ConditionFull').str.replace(
                 'Frequency ', '').alias('Condition')
         )
-        .select(['elementId', 'Label', 'Condition', 'Frequency'])
+        .select(['elementId', 'Label', 'Condition', 'Frequency'] + extra_cols)
     )
 
     return freq_data
@@ -1013,7 +1144,7 @@ if __name__ == "__main__":
     parser.add_argument("--enrichment", required=True)
     parser.add_argument("--bubble", required=True)
     parser.add_argument("--top_enriched", required=True)
-    parser.add_argument("--top_20", required=False)
+    parser.add_argument("--top_10", required=False)
     parser.add_argument("--highest_enrichment_clonotype", required=False,
                         help="Optional CSV output for rows with the highest enrichment per elementId-Label combination.")
     parser.add_argument("--top_n_bubble", type=int, default=10)
@@ -1050,6 +1181,8 @@ if __name__ == "__main__":
                         help="Log2 fold change threshold for target conditions")
     parser.add_argument("--control_threshold", type=float, default=1.0,
                         help="Log2 fold change threshold for control conditions")
+    parser.add_argument("--control_mask_threshold", type=float, default=1.0,
+                        help="When a negative control has only one condition: filter by abundance if >=1, by frequency if <1")
     parser.add_argument("--current_target", type=str, required=False,
                         help="The current target antigen for this iteration")
     parser.add_argument("--sequenced_library_enabled", action="store_true",
@@ -1065,7 +1198,7 @@ if __name__ == "__main__":
         enrichment_csv=args.enrichment,
         bubble_csv=args.bubble,
         top_enriched_csv=args.top_enriched,
-        top_20_csv=args.top_20,
+        top_10_csv=args.top_10,
         highest_enrichment_csv=args.highest_enrichment_clonotype,
         top_n_bubble=args.top_n_bubble,
         top_n_enriched=args.top_n_enriched,
@@ -1085,6 +1218,7 @@ if __name__ == "__main__":
         control_conditions_order=json.loads(args.control_conditions_order) if args.control_conditions_order else None,
         enrichment_threshold=args.enrichment_threshold,
         control_threshold=args.control_threshold,
+        control_mask_threshold=args.control_mask_threshold,
         current_target=args.current_target,
         sequenced_library_enabled=args.sequenced_library_enabled,
         sequenced_library_sample_id=args.sequenced_library_sample_id

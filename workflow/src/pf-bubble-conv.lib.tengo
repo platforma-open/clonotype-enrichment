@@ -1,40 +1,7 @@
 ll := import("@platforma-sdk/workflow-tengo:ll")
 
-getColumns := func(countsSpec) {
-  return {
-    axes: [
-      {
-        column: "elementId",
-        spec: countsSpec.axesSpec[1]
-      },
-      {
-        column: "Numerator",
-        id: "Condition",
-        allowNA: false,
-        spec: {
-          name: "pl7.app/vdj/condition",
-          type: "String",
-          domain: {},
-          annotations: {
-            "pl7.app/label": "Condition"
-          }
-        }
-      },
-      {
-        column: "Denominator",
-        id: "BaselineCondition",
-        allowNA: false,
-        spec: {
-          name: "pl7.app/vdj/Baseline-condition",
-          type: "String",
-          domain: {},
-          annotations: {
-            "pl7.app/label": "Baseline Condition"
-          }
-        }
-      }
-      ],
-    columns: [
+getColumns := func(countsSpec, hasSingleConditionNegativeControl, hasMultiConditionNegativeControl) {
+  columns := [
       {
         column: "Frequency_Numerator",
         id: "NumeratorFrequency",
@@ -76,7 +43,93 @@ getColumns := func(countsSpec) {
           }
         }
       }
+      ]
+
+  if hasSingleConditionNegativeControl || hasMultiConditionNegativeControl {
+    columns = columns + [{
+        column: "Binding Specificity",
+        id: "binding_specificity",
+        allowNA: true,
+        spec: {
+          name: "pl7.app/vdj/bindingSpecificity",
+          valueType: "String",
+          domain: {},
+          annotations: {
+            "pl7.app/label": "Binding Specificity",
+            "pl7.app/table/visibility": "default"
+          }
+        }
+      }]
+  }
+
+  if hasMultiConditionNegativeControl {
+    columns = columns + [{
+      column: "MaxNegControlEnrichment",
+      id: "maxnegcontrolenrichment",
+      allowNA: true,
+      spec: {
+        name: "pl7.app/vdj/maxNegControlEnrichment",
+        valueType: "Double",
+        domain: {},
+        annotations: {
+          "pl7.app/label": "Max control Log2FC",
+          "pl7.app/table/visibility": "optional"
+        }
+      }
+    }]
+  }
+
+    if hasSingleConditionNegativeControl {
+    columns = columns + [{
+      column: "PresentInNegControl",
+      id: "presentinnegcontrol",
+      allowNA: true,
+      spec: {
+        name: "pl7.app/vdj/presentInNegControl",
+        valueType: "String",
+        domain: {},
+        annotations: {
+          "pl7.app/label": "Present in control",
+          "pl7.app/table/visibility": "optional"
+        }
+      }
+    }]
+  }
+
+  return {
+    axes: [
+      {
+        column: "elementId",
+        spec: countsSpec.axesSpec[1]
+      },
+      {
+        column: "Numerator",
+        id: "Condition",
+        allowNA: false,
+        spec: {
+          name: "pl7.app/vdj/condition",
+          type: "String",
+          domain: {},
+          annotations: {
+            "pl7.app/label": "Condition"
+          }
+        }
+      },
+      {
+        column: "Denominator",
+        id: "BaselineCondition",
+        allowNA: false,
+        spec: {
+          name: "pl7.app/vdj/Baseline-condition",
+          type: "String",
+          domain: {},
+          annotations: {
+            "pl7.app/label": "Baseline Condition"
+          }
+        }
+      }
       ],
+    columns: columns,
     storageFormat: "Parquet",
     partitionKeyLength: 0
   }
