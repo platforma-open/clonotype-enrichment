@@ -8,17 +8,17 @@ packages:
 
 catalog:
   # SDK packages - EXACT VERSIONS (no ^ or ~)
-  '@milaboratories/ts-builder': 1.2.4
-  '@milaboratories/ts-configs': 1.2.0
-  '@platforma-sdk/workflow-tengo': 5.8.1
-  '@platforma-sdk/model': 1.53.11
-  '@platforma-sdk/ui-vue': 1.53.11
-  '@platforma-sdk/tengo-builder': 2.4.14
-  '@platforma-sdk/package-builder': 3.11.0
-  '@platforma-sdk/block-tools': 2.6.44
+  '@milaboratories/ts-builder': 1.2.7
+  '@milaboratories/ts-configs': 1.2.1
+  '@platforma-sdk/workflow-tengo': 5.8.2
+  '@platforma-sdk/model': 1.53.15
+  '@platforma-sdk/ui-vue': 1.54.0
+  '@platforma-sdk/tengo-builder': 2.4.17
+  '@platforma-sdk/package-builder': 3.11.3
+  '@platforma-sdk/block-tools': 2.6.47
   '@platforma-sdk/eslint-config': 1.2.0
-  '@platforma-sdk/test': 1.53.12
-  '@milaboratories/helpers': 1.13.0
+  '@platforma-sdk/test': 1.53.15
+  '@milaboratories/helpers': 1.13.2
 
   # Block-specific dependencies
   "@milaboratories/graph-maker": 1.1.223
