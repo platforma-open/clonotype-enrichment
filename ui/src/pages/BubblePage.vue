@@ -61,7 +61,8 @@ const inputElementAxis = computed(() => {
 
 const metaColumnPredicate = (spec: PColumnSpec) =>
   inputElementAxis.value !== undefined
-  && spec.axesSpec[0]?.name === inputElementAxis.value;
+  && spec.axesSpec[0]?.name === inputElementAxis.value
+  && !spec.annotations?.['pl7.app/trace']?.includes('clonotype-enrichment');
 
 </script>
 
