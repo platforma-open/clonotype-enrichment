@@ -29,6 +29,8 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percenti
   }
 
   // Define columns for exports
+  maxDomain := copy(baseDomain)
+  maxDomain["pl7.app/vdj/enrichment/type"] = "max"
   columns := [{
         column: "Enrichment",
         id: "enrichment",
@@ -36,7 +38,7 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percenti
         spec: {
           name: "pl7.app/vdj/enrichment",
           valueType: "Double",
-          domain: baseDomain,
+          domain: maxDomain,
           annotations: {
             "pl7.app/label": specLabel,
             "pl7.app/table/orderPriority": "9000",
