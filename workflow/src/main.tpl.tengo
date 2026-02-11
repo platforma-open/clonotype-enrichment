@@ -187,7 +187,7 @@ wf.body(func(args) {
 				arg("--negative_antigens").arg(string(antigenControlConfig.negativeAntigens)).
 				arg("--control_conditions_order").arg(string(antigenControlConfig.controlConditionsOrder)).
 				arg("--control_threshold").arg(string(antigenControlConfig.controlThreshold)).
-				arg("--single_control_fc_threshold").arg(string(antigenControlConfig.singleControlFoldChangeThreshold)).
+				// arg("--single_control_fc_threshold").arg(string(antigenControlConfig.singleControlFoldChangeThreshold)).
 				arg("--single_control_frequency_threshold").arg(string(antigenControlConfig.singleControlFrequencyThreshold))
 		}
 	}

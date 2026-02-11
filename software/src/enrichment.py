@@ -252,7 +252,7 @@ def hybrid_enrichment_analysis(
     control_conditions_order: Optional[List[str]] = None,
     enrichment_threshold: float = 2.0,
     control_threshold: float = 1.0,
-    single_control_fc_threshold: float = 10.0,
+    single_control_fc_threshold: float = None,
     single_control_frequency_threshold: float = 0.01,
     current_target: Optional[str] = None,
     sequenced_library_enabled: bool = False,
@@ -639,48 +639,48 @@ def hybrid_enrichment_analysis(
                     )
                     
                     # Get target frequency from enrichment_results
-                    if enrichment_results.height == 0:
-                        # If no target results, we can't calculate FC.
-                        # Fallback: flag if frequency in control is high
-                        present_df = antigen_pivot.filter(
-                            pl.col('_freq_control') >= single_control_frequency_threshold
-                        ).select(pl.col('elementId')).with_columns(
-                            pl.lit(True).alias('PresentInNegControl')
-                        )
+                    # if enrichment_results.height == 0:
+                    # If no target results, we can't calculate FC. (comment specific for enrichment FC usecase)
+                    present_df = antigen_pivot.filter(
+                        pl.col('_freq_control') >= single_control_frequency_threshold
+                    ).select(pl.col('elementId')).with_columns(
+                        pl.lit(True).alias('PresentInNegControl')
+                    )
 
-                    else:
-                        target_last_cond = effective_condition_order[-1]
-                        target_freq_col = f'Frequency {target_last_cond}'
+                    # Leave enrichment FC calculation in case we want to re-enable it in the future
+                    # else:
+                    #     target_last_cond = effective_condition_order[-1]
+                    #     target_freq_col = f'Frequency {target_last_cond}'
                         
-                        # Join to get target frequency
-                        # We use left join on antigen_pivot to keep all control clonotypes
-                        antigen_pivot = antigen_pivot.join(
-                            enrichment_results.select(['elementId', target_freq_col]),
-                            on='elementId',
-                            how='left'
-                        )
+                    #     # Join to get target frequency
+                    #     # We use left join on antigen_pivot to keep all control clonotypes
+                    #     antigen_pivot = antigen_pivot.join(
+                    #         enrichment_results.select(['elementId', target_freq_col]),
+                    #         on='elementId',
+                    #         how='left'
+                    #     )
                         
-                        # Calculate Fold Change: Target / Control
-                        # Handle nulls (not in target) as 0 frequency
-                        antigen_pivot = antigen_pivot.with_columns(
-                            pl.col(target_freq_col).fill_null(0.0).alias('_freq_target')
-                        )
+                    #     # Calculate Fold Change: Target / Control
+                    #     # Handle nulls (not in target) as 0 frequency
+                    #     antigen_pivot = antigen_pivot.with_columns(
+                    #         pl.col(target_freq_col).fill_null(0.0).alias('_freq_target')
+                    #     )
                         
-                        # FC = Target / Control
-                        antigen_pivot = antigen_pivot.with_columns(
-                            (pl.col('_freq_target') / pl.col('_freq_control')).alias('_fc_target_control')
-                        )
+                    #     # FC = Target / Control
+                    #     antigen_pivot = antigen_pivot.with_columns(
+                    #         (pl.col('_freq_target') / pl.col('_freq_control')).alias('_fc_target_control')
+                    #     )
                         
-                        # Filter logic:
-                        # We keep (don't flag as PresentInNegControl) if:
-                        # 1. FC >= threshold (Specific enrichment in target)
-                        # 2. AND Frequency in control < threshold (Low abundance in control)
-                        present_df = antigen_pivot.filter(
-                            (pl.col('_fc_target_control') < single_control_fc_threshold) |
-                            (pl.col('_freq_control') >= single_control_frequency_threshold)
-                        ).select(pl.col('elementId')).with_columns(
-                            pl.lit(True).alias('PresentInNegControl')
-                        )
+                    #     # Filter logic:
+                    #     # We keep (don't flag as PresentInNegControl) if:
+                    #     # 1. FC >= threshold (Specific enrichment in target)
+                    #     # 2. AND Frequency in control < threshold (Low abundance in control)
+                    #     present_df = antigen_pivot.filter(
+                    #         (pl.col('_fc_target_control') < single_control_fc_threshold) |
+                    #         (pl.col('_freq_control') >= single_control_frequency_threshold)
+                    #     ).select(pl.col('elementId')).with_columns(
+                    #         pl.lit(True).alias('PresentInNegControl')
+                    #     )
                         
                         
                     neg_enrichments_present.append(present_df)                    
@@ -1238,7 +1238,7 @@ if __name__ == "__main__":
                         help="Log2 fold change threshold for target conditions")
     parser.add_argument("--control_threshold", type=float, default=1.0,
                         help="Log2 fold change threshold for control conditions")
-    parser.add_argument("--single_control_fc_threshold", type=float, default=10.0,
+    parser.add_argument("--single_control_fc_threshold", type=float, default=None,
                         help="Fold change threshold for single condition negative control filtering")
     parser.add_argument("--single_control_frequency_threshold", type=float, default=0.01,
                         help="Frequency threshold for single condition negative control filtering")
