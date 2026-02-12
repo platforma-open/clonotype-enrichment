@@ -199,7 +199,7 @@ def create_empty_outputs(
     empty_top_enriched = pl.DataFrame(schema={
         'elementId': pl.Utf8, 'Label': pl.Utf8, 'Condition': pl.Utf8, 'Frequency': pl.Float64,
         'Binding Specificity': pl.Utf8, 'MaxNegControlEnrichment': pl.Float64, 'PresentInNegControl': pl.Boolean,
-        'EnrichmentQuality': pl.Utf8
+        'EnrichmentQuality': pl.Utf8, 'MaxPositiveEnrichment': pl.Float64
     })
     empty_top_enriched.write_csv(top_enriched_csv)
     
@@ -960,7 +960,7 @@ def _process_outputs(
         top_enriched_cols = [
             'elementId', 'Label', 'Condition', 'Frequency',
             'Binding Specificity', 'MaxNegControlEnrichment', 'PresentInNegControl',
-            'EnrichmentQuality'
+            'EnrichmentQuality', 'MaxPositiveEnrichment'
         ]
         pl.DataFrame(schema=top_enriched_cols).write_csv(top_enriched_csv)
         
@@ -1167,6 +1167,7 @@ def _create_top_enriched_data(
     for col in ['Binding Specificity', 'EnrichmentQuality', 'MaxNegControlEnrichment', 'PresentInNegControl']:
         if col in enrichment_results.columns:
             extra_cols.append(col)
+    extra_cols.append(max_col)
 
     # Create frequency data
     freq_cols = [f'Frequency {cond}' for cond in condition_order]

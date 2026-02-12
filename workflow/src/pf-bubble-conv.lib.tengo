@@ -42,7 +42,27 @@ getColumns := func(countsSpec, addPresentInNegControl, addMaxNegControlEnrichmen
             "pl7.app/label": "Max Log2FC"
           }
         }
+      }, {
+        column: "EnrichmentQuality",
+        id: "enrichment_quality",
+        allowNA: true,
+        spec: {
+          name: "pl7.app/vdj/enrichmentQuality",
+          valueType: "String",
+          domain: {},
+          annotations: {
+            "pl7.app/label": "Enrichment Quality",
+            "pl7.app/isDiscreteFilter": "true",
+            "pl7.app/discreteValues": "[\"Stable Binder\", \"Rescuer\", \"Parasite\", \"Weak Binder\"]",
+            "pl7.app/isScore": "true",
+            "pl7.app/score/rankValues": "decreasing",
+            "pl7.app/score/defaultCutoff": "[\"Stable Binder\", \"Rescuer\"]",
+            "pl7.app/table/visibility": "default",
+            "pl7.app/table/orderPriority": "95"
+          }
+        }
       }
+
       ]
 
   if addPresentInNegControl || addMaxNegControlEnrichment {
