@@ -198,6 +198,7 @@ def create_empty_outputs(
     # Create empty top enriched data with proper schema
     empty_top_enriched = pl.DataFrame(schema={
         'elementId': pl.Utf8, 'Label': pl.Utf8, 'Condition': pl.Utf8, 'Frequency': pl.Float64,
+        'Enrichment vs baseline': pl.Float64,
         'Binding Specificity': pl.Utf8, 'MaxNegControlEnrichment': pl.Float64, 'PresentInNegControl': pl.Boolean,
         'EnrichmentQuality': pl.Utf8, 'MaxPositiveEnrichment': pl.Float64
     })
@@ -958,7 +959,7 @@ def _process_outputs(
 
         # Top enriched needs specific columns
         top_enriched_cols = [
-            'elementId', 'Label', 'Condition', 'Frequency',
+            'elementId', 'Label', 'Condition', 'Frequency', 'Enrichment vs baseline',
             'Binding Specificity', 'MaxNegControlEnrichment', 'PresentInNegControl',
             'EnrichmentQuality', 'MaxPositiveEnrichment'
         ]
@@ -975,7 +976,6 @@ def _process_outputs(
                 'MaxNegControlEnrichment', 'PresentInNegControl', 'Binding Specificity', 'EnrichmentQuality'
             ]
             pl.DataFrame(schema=highest_cols).write_csv(highest_enrichment_csv)
-
 
 def _create_detailed_enrichment_table(
     enrichment_results: pl.DataFrame,
@@ -1132,6 +1132,20 @@ def _create_bubble_data(
         }
         return pl.DataFrame(schema=schema)
 
+def _get_enrichment_cols_vs_first(
+    enrichment_results: pl.DataFrame,
+    condition_order: List[str]
+) -> List[str]:
+    """Return enrichment column names for all conditions vs the first one."""
+    if len(condition_order) < 2:
+        return []
+    first_cond = condition_order[0]
+    cols = [
+        f'Enrichment {c} vs {first_cond}'
+        for c in condition_order[1:]
+        if f'Enrichment {c} vs {first_cond}' in enrichment_results.columns
+    ]
+    return cols
 
 def _create_top_enriched_data(
     enrichment_results: pl.DataFrame,
@@ -1149,9 +1163,12 @@ def _create_top_enriched_data(
         pl.col(max_col) >= min_enrichment
     )
 
+    enrichment_cols_vs_first = _get_enrichment_cols_vs_first(enrichment_results, condition_order)
+
     if filtered_results.height == 0:
         return pl.DataFrame(schema={
-            'elementId': pl.Utf8, 'Label': pl.Utf8, 'Condition': pl.Utf8, 'Frequency': pl.Float64
+            'elementId': pl.Utf8, 'Label': pl.Utf8, 'Condition': pl.Utf8, 'Frequency': pl.Float64,
+            'Enrichment vs baseline': pl.Float64
         })
 
     # Get top element IDs
@@ -1169,26 +1186,41 @@ def _create_top_enriched_data(
             extra_cols.append(col)
     extra_cols.append(max_col)
 
-    # Create frequency data
+    # Create frequency data (melt to get one row per elementId, Condition)
     freq_cols = [f'Frequency {cond}' for cond in condition_order]
+    select_cols = ['elementId', 'Label'] + extra_cols + freq_cols + enrichment_cols_vs_first
+    select_cols = [c for c in select_cols if c in enrichment_results.columns]
     freq_data = (
         enrichment_results
         .join(top_ids, on='elementId', how='inner')
-        .select(['elementId', 'Label'] + extra_cols + freq_cols)
+        .select(select_cols)
         .melt(
-            id_vars=['elementId', 'Label'] + extra_cols,
+            id_vars=['elementId', 'Label'] + extra_cols + enrichment_cols_vs_first,
             value_vars=freq_cols,
             variable_name='ConditionFull',
             value_name='Frequency'
         )
         .with_columns(
-            pl.col('ConditionFull').str.replace(
-                'Frequency ', '').alias('Condition')
+            pl.col('ConditionFull').str.replace('Frequency ', '').alias('Condition')
         )
-        .select(['elementId', 'Label', 'Condition', 'Frequency'] + extra_cols)
     )
 
-    return freq_data
+    # Add 'Enrichment vs baseline': enrichment of given Condition vs first for this clonotype
+    first_cond = condition_order[0]
+    enrichment_vs_baseline = pl.lit(None).cast(pl.Float64)
+    for cond in condition_order:
+        if cond == first_cond:
+            enrichment_vs_baseline = pl.when(pl.col('Condition') == cond).then(0.0).otherwise(enrichment_vs_baseline)
+        else:
+            col_name = f'Enrichment {cond} vs {first_cond}'
+            if col_name in freq_data.columns:
+                enrichment_vs_baseline = pl.when(pl.col('Condition') == cond).then(pl.col(col_name)).otherwise(enrichment_vs_baseline)
+
+    freq_data = freq_data.with_columns(enrichment_vs_baseline.alias('Enrichment vs baseline'))
+
+    return freq_data.select(
+        ['elementId', 'Label', 'Condition', 'Frequency', 'Enrichment vs baseline'] + extra_cols
+    )
 
 
 if __name__ == "__main__":

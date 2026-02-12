@@ -50,7 +50,9 @@ const dataColumnPredicate = (spec: PColumnSpec) =>
   inputElementAxis.value !== undefined
   && spec.axesSpec.length === 2
   && spec.axesSpec[0].name === inputElementAxis.value
-  && spec.axesSpec[1].name === 'pl7.app/vdj/condition';
+  && spec.axesSpec[1].name === 'pl7.app/vdj/condition'
+  && !['pl7.app/vdj/maxEnrichment', 'pl7.app/vdj/maxNegControlEnrichment',
+    'pl7.app/vdj/enrichmentVsBaseline'].includes(spec.name);
 
 const metaColumnPredicate = (spec: PColumnSpec) =>
   inputElementAxis.value !== undefined

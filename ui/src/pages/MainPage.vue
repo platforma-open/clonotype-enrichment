@@ -736,7 +736,7 @@ const isControlOrderOpen = ref(true); // Open by default
       <PlTooltip v-if="app.model.args.antigenControlConfig.antigenEnabled" class="info">
         <template #tooltip>
           <div>
-            Enable it to select the sample used as the sequenced naive library reference for enrichment (to be used as base condition). Please, make sure it has a unique value in the condition column.
+            When enabled, you can select a sample that represents your sequenced naive library. This sample will be used as the reference (baseline) for enrichment fold-change calculations, for both the target antigen and negative controls.
           </div>
         </template>
       </PlTooltip>
@@ -805,7 +805,7 @@ const isControlOrderOpen = ref(true); // Open by default
             Log2 Fold Change (Log2FC) thresholds used to define <strong>Enriched negative control clonotypes</strong>.<br/>
             A clonotype is considered enriched if its Log2FC value between conditions is equal or greater than the threshold. This threshold in combination with <strong>Enrichment threshold</strong> is used to define <strong>Binding Specificity</strong> categories:
             <br/><br/>
-            Being Target<sub>Max</sub> and Control<sub>Max</sub> the maximum Log2FC values for the target and control conditions respectively:
+            Target<sub>Max</sub> and Control<sub>Max</sub> are the maximum Log2FC values for the target and control conditions, respectively:
             <br/><br/>
             - <strong>Antigen-Specific:</strong> Target<sub>Max</sub> ≥ Enrichment Threshold and Control<sub>Max</sub> &lt; Control Threshold.
             <br/>

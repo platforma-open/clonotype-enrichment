@@ -15,6 +15,20 @@ getColumns := func(abundanceSpec, addPresentInNegControl, addMaxNegControlEnrich
           }
         }
       }, {
+        column: "Enrichment vs baseline",
+        id: "enrichment_vs_baseline",
+        allowNA: true,
+        spec: {
+          name: "pl7.app/vdj/enrichmentVsBaseline",
+          valueType: "Double",
+          domain: {},
+          annotations: {
+            "pl7.app/label": "Enrichment vs Baseline",
+            "pl7.app/table/visibility": "default",
+            "pl7.app/format": ".2f"
+          }
+        }
+      }, {
         column: "EnrichmentQuality",
         id: "enrichment_quality",
         allowNA: true,
