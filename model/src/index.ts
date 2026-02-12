@@ -264,6 +264,29 @@ export const model = BlockModel.create()
     return ctx.createPFrame(columns);
   })
 
+  // Returns the IDs for the condition column (conditionColId) and the antigen column (antigenColId) by resolving them from the block arguments.
+  .output('metadataColumnIds', (ctx) => {
+    const { conditionColumnRef, abundanceRef: anchor, antigenControlConfig: config } = ctx.args;
+    if (!conditionColumnRef || !anchor) return undefined;
+
+    const conditionCols = ctx.resultPool.getAnchoredPColumns(
+      { main: anchor },
+      JSON.parse(conditionColumnRef) as AnchoredPColumnSelector,
+    );
+    const conditionColId = conditionCols?.[0]?.id;
+
+    let antigenColId: string | undefined;
+    if (config?.antigenEnabled && config.antigenColumnRef) {
+      const antigenCols = ctx.resultPool.getAnchoredPColumns(
+        { main: anchor },
+        JSON.parse(config.antigenColumnRef) as AnchoredPColumnSelector,
+      );
+      antigenColId = antigenCols?.[0]?.id;
+    }
+
+    return { conditionColId, antigenColId };
+  })
+
   // Sample id → label map for all datasets from sample Samples & Data block
   .output('sampleLabels', (ctx) => {
     const { abundanceRef: anchor } = ctx.args;

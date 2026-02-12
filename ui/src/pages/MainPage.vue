@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { PlRef } from '@platforma-sdk/model';
-import { getRawPlatformaInstance, getSingleColumnData, PFrameImpl } from '@platforma-sdk/model';
+import { getRawPlatformaInstance, getSingleColumnData, type PObjectId } from '@platforma-sdk/model';
 import type {
   ListOption,
 } from '@platforma-sdk/ui-vue';
@@ -111,15 +111,13 @@ type MetadataFetched = {
 const metadataFetched = useWatchFetch(
   () => ({
     pframe: app.model.outputs.metadataColumnsPframe,
+    columnIds: app.model.outputs.metadataColumnIds,
     sampleIds: app.model.outputs.sampleIds as string[] | undefined,
   }),
-  async ({ pframe: pframeHandle, sampleIds }) => {
-    if (!pframeHandle) return undefined;
-    const pFrame = new PFrameImpl(pframeHandle);
-    const list = await pFrame.listColumns();
-    const conditionColId = list?.[0]?.columnId;
-    if (!conditionColId) return undefined;
+  async ({ pframe: pframeHandle, columnIds, sampleIds }) => {
+    if (!pframeHandle || !columnIds?.conditionColId) return undefined;
 
+    // Helper to extract data mapped by sample ID
     const buildBySample = (colData: { axesData: Record<string, (string | number | null)[]>; data: (string | number | null)[] }) => {
       const axisKeys = Object.keys(colData.axesData);
       if (!axisKeys.length) return {};
@@ -134,13 +132,12 @@ const metadataFetched = useWatchFetch(
     };
 
     // Always fetch condition column full data (sample id → value) for conditionBySample
-    const conditionColData = await getSingleColumnData(pframeHandle, conditionColId);
+    const conditionColData = await getSingleColumnData(pframeHandle, columnIds.conditionColId as PObjectId);
     let conditionBySample = buildBySample(conditionColData);
 
-    const antigenColId = list?.[1]?.columnId;
     let antigenBySample: Record<string, string> | undefined;
-    if (antigenColId) {
-      const antigenColData = await getSingleColumnData(pframeHandle, antigenColId);
+    if (columnIds.antigenColId) {
+      const antigenColData = await getSingleColumnData(pframeHandle, columnIds.antigenColId as PObjectId);
       antigenBySample = buildBySample(antigenColData);
     }
 
