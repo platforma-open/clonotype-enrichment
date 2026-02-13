@@ -168,7 +168,7 @@ export const model = BlockModel.create()
     const basicValid = abundanceRef !== undefined
       && conditionColumnRef !== undefined
       && conditionOrder.length > 0
-      && ctx.args.enrichmentThreshold > 0.5;
+      && ctx.args.enrichmentThreshold >= 0.6;
 
     if (!basicValid) return false;
 

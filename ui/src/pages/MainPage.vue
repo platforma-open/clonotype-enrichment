@@ -649,9 +649,10 @@ const isControlOrderOpen = ref(true); // Open by default
     <PlNumberField
       v-model="app.model.args.enrichmentThreshold"
       label="Enrichment threshold"
-      :minValue="0.5"
+      :minValue="0.6"
       :step="0.1"
       placeholder="2.0"
+      :error-message="app.model.args.enrichmentThreshold === undefined ? 'Value must be higher than 0.6' : undefined"
     >
       <template #tooltip>
         <p><strong>Enrichment threshold (E<sub>thres</sub>)</strong></p>
