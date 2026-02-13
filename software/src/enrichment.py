@@ -1064,7 +1064,9 @@ def _create_bubble_data(
         schema = {
             'elementId': pl.Utf8, 'Label': pl.Utf8, 'Numerator': pl.Utf8,
             'Denominator': pl.Utf8, 'Enrichment': pl.Float64,
-            'Frequency_Numerator': pl.Float64, max_col: pl.Float64
+            'Frequency_Numerator': pl.Float64, max_col: pl.Float64,
+            'Binding Specificity': pl.Utf8, 'MaxNegControlEnrichment': pl.Float64,
+            'PresentInNegControl': pl.Boolean, 'EnrichmentQuality': pl.Utf8
         }
         return pl.DataFrame(schema=schema)
 
@@ -1168,7 +1170,8 @@ def _create_top_enriched_data(
     if filtered_results.height == 0:
         return pl.DataFrame(schema={
             'elementId': pl.Utf8, 'Label': pl.Utf8, 'Condition': pl.Utf8, 'Frequency': pl.Float64,
-            'Enrichment vs baseline': pl.Float64
+            'Enrichment vs baseline': pl.Float64, 'EnrichmentQuality': pl.Utf8, 'MaxPositiveEnrichment': pl.Float64,
+            'Binding Specificity': pl.Utf8, 'MaxNegControlEnrichment': pl.Float64, 'PresentInNegControl': pl.Boolean
         })
 
     # Get top element IDs
