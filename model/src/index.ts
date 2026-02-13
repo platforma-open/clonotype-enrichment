@@ -6,13 +6,13 @@ import type {
   PlDataTableStateV2,
   PlRef,
   SUniversalPColumnId,
-  TreeNodeAccessor,
 } from '@platforma-sdk/model';
 import {
   BlockModel,
   createPFrameForGraphs,
   createPlDataTableStateV2,
   createPlDataTableV2,
+  readAnnotation,
 } from '@platforma-sdk/model';
 
 export type DownsamplingParameters = {
@@ -43,11 +43,16 @@ type AntigenControlConfig = {
   antigenEnabled: boolean;
   controlEnabled: boolean;
   antigenColumnRef?: SUniversalPColumnId; // Metadata column for antigen/control
-  targetCondition?: string; // e.g., "Target-Antigen"
-  negativeConditions: string[]; // e.g., ["BSA", "Plastic"]
-  targetThreshold: number; // Default: 2.0 log2 FC
+  targetAntigen?: string; // e.g., "Target-Antigen"
+  negativeAntigens: string[]; // e.g., ["BSA", "Plastic"]
   controlThreshold: number; // Default: 1.0 log2 FC
+  // singleControlFoldChangeThreshold: number; // Default: 10.0
+  singleControlFrequencyThreshold: number; // Default: 0.01
   controlConditionsOrder: string[]; // e.g., ["BSA", "Plastic"]
+  sequencedLibraryEnabled: boolean;
+  sequencedLibrarySampleId?: string;
+  hasSingleConditionNegativeControl: boolean;
+  hasMultiConditionNegativeControl: boolean;
 };
 
 export type UiState = {
@@ -56,6 +61,9 @@ export type UiState = {
   lineState: GraphMakerState;
   stackedState: GraphMakerState;
   scatterState: GraphMakerState;
+  boxState: GraphMakerState;
+  /** When set, the "conditions excluded by target" alert is hidden until the excluded list changes (key = sorted excluded conditions). */
+  excludedAlertDismissedKey?: string;
 };
 
 export type BlockArgs = {
@@ -69,6 +77,7 @@ export type BlockArgs = {
   clonotypeDefinition: SUniversalPColumnId[];
   additionalEnrichmentExports: string[];
   antigenControlConfig: AntigenControlConfig;
+  enrichmentThreshold: number; // Default: 2.0 log2 FC
   pseudoCount: number; // Default: 100
 };
 
@@ -100,11 +109,17 @@ export const model = BlockModel.create()
     antigenControlConfig: {
       antigenEnabled: false,
       controlEnabled: false,
-      negativeConditions: [],
-      targetThreshold: 2.0,
+      negativeAntigens: [],
       controlThreshold: 1.0,
+      // singleControlFoldChangeThreshold: 10.0,
+      singleControlFrequencyThreshold: 0.01,
       controlConditionsOrder: [],
+      sequencedLibraryEnabled: false,
+      sequencedLibrarySampleId: undefined,
+      hasSingleConditionNegativeControl: false,
+      hasMultiConditionNegativeControl: false,
     },
+    enrichmentThreshold: 2.0,
     pseudoCount: 100,
   })
 
@@ -140,13 +155,20 @@ export const model = BlockModel.create()
       template: 'dots',
       currentTab: null,
     },
+    boxState: {
+      title: 'Control Box Plot',
+      template: 'box',
+      currentTab: null,
+    },
+    excludedAlertDismissedKey: undefined,
   })
 
   .argsValid((ctx) => {
     const { abundanceRef, conditionColumnRef, conditionOrder, antigenControlConfig } = ctx.args;
     const basicValid = abundanceRef !== undefined
       && conditionColumnRef !== undefined
-      && conditionOrder.length > 0;
+      && conditionOrder.length > 0
+      && ctx.args.enrichmentThreshold > 0.5;
 
     if (!basicValid) return false;
 
@@ -155,13 +177,15 @@ export const model = BlockModel.create()
     }
 
     if (antigenControlConfig.antigenEnabled) {
-      if (!antigenControlConfig.targetCondition) return false;
+      if (!antigenControlConfig.targetAntigen) return false;
     }
 
     if (antigenControlConfig.controlEnabled) {
       if (!antigenControlConfig.antigenEnabled
-        || !antigenControlConfig.negativeConditions.length
-        || antigenControlConfig.controlConditionsOrder.length < 2) return false;
+        || !antigenControlConfig.negativeAntigens.length
+        || antigenControlConfig.controlConditionsOrder.length < 1
+        // || antigenControlConfig.singleControlFoldChangeThreshold === undefined
+        || antigenControlConfig.singleControlFrequencyThreshold === undefined) return false;
     }
 
     return true;
@@ -213,90 +237,113 @@ export const model = BlockModel.create()
     else return undefined;
   })
 
-  .output('conditionValues', (ctx) => {
-    const { conditionColumnRef, abundanceRef: anchor } = ctx.args;
+  /** PFrame with condition column and (when antigen enabled) antigen column for UI to fetch metadata values. */
+  .output('metadataColumnsPframe', (ctx) => {
+    const { conditionColumnRef, abundanceRef: anchor, antigenControlConfig: config } = ctx.args;
     if (!conditionColumnRef || !anchor) return undefined;
 
-    const pCols = ctx.resultPool.getAnchoredPColumns({ main: anchor },
+    // Resolve condition column from anchor + selector
+    const conditionCols = ctx.resultPool.getAnchoredPColumns(
+      { main: anchor },
       JSON.parse(conditionColumnRef) as AnchoredPColumnSelector,
     );
-    const data = pCols?.[0]?.data as TreeNodeAccessor | undefined;
+    const conditionCol = conditionCols?.[0];
+    if (!conditionCol) return undefined;
 
-    // @TODO need a convenient method in API
-    const values = data?.getDataAsJson<Record<string, string>>()?.['data'];
-    if (!values) return undefined;
-
-    // Convert all values to strings for consistency
-    return [...new Set(Object.values(values).map((v) => String(v)))];
-  })
-
-  .output('antigenValues', (ctx) => {
-    const config = ctx.args.antigenControlConfig;
-    if (!config?.antigenEnabled || !config.antigenColumnRef) return undefined;
-
-    const anchor = ctx.args.abundanceRef;
-    const { conditionColumnRef } = ctx.args;
-    if (anchor === undefined || !conditionColumnRef) return undefined;
-
-    const getValues = (ref: string) => {
-      const pCols = ctx.resultPool.getAnchoredPColumns({ main: anchor }, JSON.parse(ref) as AnchoredPColumnSelector);
-      return (pCols?.[0]?.data as TreeNodeAccessor | undefined)?.getDataAsJson<{ data: Record<string, string> }>()?.data;
-    };
-
-    const antigenValuesData = getValues(config.antigenColumnRef);
-    const conditionValuesData = getValues(conditionColumnRef);
-
-    if (!antigenValuesData || !conditionValuesData) return undefined;
-
-    const counts: Record<string, Set<string>> = {};
-    for (const [sampleId, antigenValue] of Object.entries(antigenValuesData)) {
-      if (!counts[antigenValue]) {
-        counts[antigenValue] = new Set();
-      }
-      const conditionValue = conditionValuesData[sampleId];
-      if (conditionValue !== undefined && conditionValue !== null) {
-        counts[antigenValue].add(String(conditionValue));
-      }
+    const columns = [conditionCol];
+    // Add antigen column when target/control selection is enabled
+    if (config?.antigenEnabled && config.antigenColumnRef) {
+      const antigenCols = ctx.resultPool.getAnchoredPColumns(
+        { main: anchor },
+        JSON.parse(config.antigenColumnRef) as AnchoredPColumnSelector,
+      );
+      const antigenCol = antigenCols?.[0];
+      if (antigenCol) columns.push(antigenCol);
     }
 
-    return Object.entries(counts)
-      .filter(([_, conditions]) => conditions.size >= 2)
-      .map(([antigen, _]) => antigen);
+    return ctx.createPFrame(columns);
   })
 
-  .output('negativeControlConditionValues', (ctx) => {
-    const config = ctx.args.antigenControlConfig;
-    if (!config?.controlEnabled) return undefined;
-
-    const { negativeConditions, antigenColumnRef } = config;
-    if (!negativeConditions?.length || !antigenColumnRef) return undefined;
-
-    const { conditionColumnRef, abundanceRef: anchor } = ctx.args;
+  // Returns the IDs for the condition column (conditionColId) and the antigen column (antigenColId) by resolving them from the block arguments.
+  .output('metadataColumnIds', (ctx) => {
+    const { conditionColumnRef, abundanceRef: anchor, antigenControlConfig: config } = ctx.args;
     if (!conditionColumnRef || !anchor) return undefined;
 
-    const getValues = (ref: string) => {
-      const pCols = ctx.resultPool.getAnchoredPColumns({ main: anchor }, JSON.parse(ref) as AnchoredPColumnSelector);
-      return (pCols?.[0]?.data as TreeNodeAccessor | undefined)?.getDataAsJson<{ data: Record<string, string> }>()?.data;
-    };
+    const conditionCols = ctx.resultPool.getAnchoredPColumns(
+      { main: anchor },
+      JSON.parse(conditionColumnRef) as AnchoredPColumnSelector,
+    );
+    const conditionColId = conditionCols?.[0]?.id;
 
-    const antigenValues = getValues(antigenColumnRef);
-    const conditionValues = getValues(conditionColumnRef);
-
-    if (!antigenValues || !conditionValues) return undefined;
-
-    // Find condition values for samples with negative antigen values
-    const negativeControlConditions = new Set<string>();
-    for (const [sampleId, antigenValue] of Object.entries(antigenValues)) {
-      if (negativeConditions.includes(antigenValue)) {
-        const conditionValue = conditionValues[sampleId];
-        if (conditionValue !== undefined && conditionValue !== null) {
-          // Convert to string immediately
-          negativeControlConditions.add(String(conditionValue));
-        }
-      }
+    let antigenColId: string | undefined;
+    if (config?.antigenEnabled && config.antigenColumnRef) {
+      const antigenCols = ctx.resultPool.getAnchoredPColumns(
+        { main: anchor },
+        JSON.parse(config.antigenColumnRef) as AnchoredPColumnSelector,
+      );
+      antigenColId = antigenCols?.[0]?.id;
     }
 
-    return [...negativeControlConditions];
+    return { conditionColId, antigenColId };
+  })
+
+  // Sample id → label map for all datasets from sample Samples & Data block
+  .output('sampleLabels', (ctx) => {
+    const { abundanceRef: anchor } = ctx.args;
+    if (!anchor) return undefined;
+    const spec = ctx.resultPool.getPColumnSpecByRef(anchor);
+    if (!spec || !spec.axesSpec[0]) return undefined;
+    return ctx.resultPool.findLabels(spec.axesSpec[0]);
+  })
+
+  // Get only the sample IDs from the selected abundance column
+  .output('sampleIds', (ctx) => {
+    const { abundanceRef: anchor } = ctx.args;
+    if (!anchor) return undefined;
+    const spec = ctx.resultPool.getPColumnSpecByRef(anchor);
+    if (!spec) return undefined;
+
+    // Get input dataset trace in array format
+    const traceJson = readAnnotation(spec, 'pl7.app/trace');
+    if (traceJson === undefined) return undefined;
+    let trace: Array<{ type?: string; id?: string }>;
+    try {
+      trace = JSON.parse(traceJson) as Array<{ type?: string; id?: string }>;
+    } catch {
+      return undefined;
+    }
+    if (!Array.isArray(trace)) return undefined;
+
+    // Get the dataset ID from the trace
+    const datasetStep = trace.find(
+      (s) => s.type === 'milaboratories.samples-and-data/dataset' && s.id,
+    );
+    // Get blockID
+    const samplesAndDataStep = trace.find(
+      (s) => s.type === 'milaboratories.samples-and-data' && s.id,
+    );
+    const datasetId = datasetStep?.id;
+    const samplesAndDataBlockId = samplesAndDataStep?.id;
+    if (!datasetId || !samplesAndDataBlockId) return undefined;
+
+    // Get dataset Pcolumn from reconstructed ref
+    const datasetRef: PlRef = {
+      __isRef: true,
+      blockId: samplesAndDataBlockId,
+      name: `pf.dataset.${datasetId}`,
+    };
+    const datasetSpec = ctx.resultPool.getPColumnSpecByRef(datasetRef);
+    if (!datasetSpec) return undefined;
+
+    // Get sampel IDs
+    const axisKeysJson = readAnnotation(datasetSpec, 'pl7.app/axisKeys/0')
+      ?? (datasetSpec.axesSpec?.[0] && readAnnotation(datasetSpec.axesSpec[0], 'pl7.app/axisKeys/0'));
+    if (axisKeysJson === undefined) return undefined;
+    try {
+      return JSON.parse(axisKeysJson) as string[];
+    } catch {
+      return undefined;
+    }
   })
 
   // Get all enrichment statistics
@@ -437,8 +484,17 @@ export const model = BlockModel.create()
       { type: 'link', href: '/stacked', label: 'Frequency Bar Plot' },
     ];
 
-    if (ctx.args.antigenControlConfig.controlEnabled) {
+    if (ctx.args.antigenControlConfig.hasMultiConditionNegativeControl
+      && !(ctx.args.antigenControlConfig.sequencedLibraryEnabled === false
+        && ctx.args.antigenControlConfig.controlConditionsOrder.length === 1)
+    ) {
       sections.push({ type: 'link', href: '/scatter', label: 'Control Scatter Plot' });
+    }
+    if (ctx.args.antigenControlConfig.hasSingleConditionNegativeControl
+      || (ctx.args.antigenControlConfig.sequencedLibraryEnabled === false
+        && ctx.args.antigenControlConfig.controlConditionsOrder.length === 1)
+    ) {
+      sections.push({ type: 'link', href: '/box', label: 'Control Box Plot' });
     }
     return sections;
   })

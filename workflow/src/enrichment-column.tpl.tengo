@@ -20,6 +20,7 @@ self.body(func(args) {
     topEnrichedColCsv := args.topEnrichedColCsv
     conditionOrder := args.conditionOrder
     antigenControlConfig := args.antigenControlConfig
+    enrichmentThreshold := args.enrichmentThreshold
     FilteringConfig := args.FilteringConfig
     blockId := args.blockId
     specLabel := args.specLabel
@@ -37,6 +38,7 @@ self.body(func(args) {
                                                                 string(overall75Percentile.getData()),
                                                                 downsampling,
                                                                 conditionOrder,
+                                                                enrichmentThreshold,
                                                                 antigenControlConfig,
                                                                 FilteringConfig,
                                                                 blockId,
@@ -50,6 +52,7 @@ self.body(func(args) {
                                                                 string(overall75Percentile.getData()),
                                                                 downsampling,
                                                                 conditionOrder,
+                                                                enrichmentThreshold,
                                                                 antigenControlConfig,
                                                                 FilteringConfig,
                                                                 blockId)

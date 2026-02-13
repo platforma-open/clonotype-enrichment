@@ -28,6 +28,7 @@ self.body(func(args) {
         topEnrichedColCsv: args.topEnrichedColCsv,
         conditionOrder: args.conditionOrder,
         antigenControlConfig: args.antigenControlConfig,
+        enrichmentThreshold: args.enrichmentThreshold,
         FilteringConfig: args.FilteringConfig,
         blockId: args.blockId,
         customBlockLabel: args.customBlockLabel,

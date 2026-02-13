@@ -1,40 +1,7 @@
 ll := import("@platforma-sdk/workflow-tengo:ll")
 
-getColumns := func(countsSpec) {
-  return {
-    axes: [
-      {
-        column: "elementId",
-        spec: countsSpec.axesSpec[1]
-      },
-      {
-        column: "Numerator",
-        id: "Condition",
-        allowNA: false,
-        spec: {
-          name: "pl7.app/vdj/condition",
-          type: "String",
-          domain: {},
-          annotations: {
-            "pl7.app/label": "Condition"
-          }
-        }
-      },
-      {
-        column: "Denominator",
-        id: "BaselineCondition",
-        allowNA: false,
-        spec: {
-          name: "pl7.app/vdj/Baseline-condition",
-          type: "String",
-          domain: {},
-          annotations: {
-            "pl7.app/label": "Baseline Condition"
-          }
-        }
-      }
-      ],
-    columns: [
+getColumns := func(countsSpec, addPresentInNegControl, addMaxNegControlEnrichment) {
+  columns := [
       {
         column: "Frequency_Numerator",
         id: "NumeratorFrequency",
@@ -75,8 +42,114 @@ getColumns := func(countsSpec) {
             "pl7.app/label": "Max Log2FC"
           }
         }
+      }, {
+        column: "EnrichmentQuality",
+        id: "enrichment_quality",
+        allowNA: true,
+        spec: {
+          name: "pl7.app/vdj/enrichmentQuality",
+          valueType: "String",
+          domain: {},
+          annotations: {
+            "pl7.app/label": "Enrichment Quality",
+            "pl7.app/isDiscreteFilter": "true",
+            "pl7.app/discreteValues": "[\"Stable Binder\", \"Rescuer\", \"Parasite\", \"Weak Binder\"]",
+            "pl7.app/isScore": "true",
+            "pl7.app/score/rankValues": "decreasing",
+            "pl7.app/score/defaultCutoff": "[\"Stable Binder\", \"Rescuer\"]",
+            "pl7.app/table/visibility": "default",
+            "pl7.app/table/orderPriority": "95"
+          }
+        }
+      }
+
+      ]
+
+  if addPresentInNegControl || addMaxNegControlEnrichment {
+    columns = columns + [{
+        column: "Binding Specificity",
+        id: "binding_specificity",
+        allowNA: true,
+        spec: {
+          name: "pl7.app/vdj/bindingSpecificity",
+          valueType: "String",
+          domain: {},
+          annotations: {
+            "pl7.app/label": "Binding Specificity",
+            "pl7.app/table/visibility": "default"
+          }
+        }
+      }]
+  }
+
+  if addMaxNegControlEnrichment {
+    columns = columns + [{
+      column: "MaxNegControlEnrichment",
+      id: "maxnegcontrolenrichment",
+      allowNA: true,
+      spec: {
+        name: "pl7.app/vdj/maxNegControlEnrichment",
+        valueType: "Double",
+        domain: {},
+        annotations: {
+          "pl7.app/label": "Max control Log2FC",
+          "pl7.app/table/visibility": "optional"
+        }
+      }
+    }]
+  }
+
+    if addPresentInNegControl {
+    columns = columns + [{
+      column: "PresentInNegControl",
+      id: "presentinnegcontrol",
+      allowNA: true,
+      spec: {
+        name: "pl7.app/vdj/presentInNegControl",
+        valueType: "String",
+        domain: {},
+        annotations: {
+          "pl7.app/label": "Present in control",
+          "pl7.app/table/visibility": "optional"
+        }
+      }
+    }]
+  }
+
+  return {
+    axes: [
+      {
+        column: "elementId",
+        spec: countsSpec.axesSpec[1]
+      },
+      {
+        column: "Numerator",
+        id: "Condition",
+        allowNA: false,
+        spec: {
+          name: "pl7.app/vdj/condition",
+          type: "String",
+          domain: {},
+          annotations: {
+            "pl7.app/label": "Condition"
+          }
+        }
+      },
+      {
+        column: "Denominator",
+        id: "BaselineCondition",
+        allowNA: false,
+        spec: {
+          name: "pl7.app/vdj/Baseline-condition",
+          type: "String",
+          domain: {},
+          annotations: {
+            "pl7.app/label": "Baseline Condition"
+          }
+        }
       }
       ],
+    columns: columns,
     storageFormat: "Parquet",
     partitionKeyLength: 0
   }

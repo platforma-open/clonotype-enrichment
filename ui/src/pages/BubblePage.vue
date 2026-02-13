@@ -8,9 +8,9 @@ import { useApp } from '../app';
 
 const app = useApp();
 
-const defaultOptions = computed((): PredefinedGraphOption<'bubble'>[] | undefined => {
+const defaultOptions = computed((): PredefinedGraphOption<'bubble'>[] | null => {
   if (!app.model.outputs.bubblePCols)
-    return undefined;
+    return null;
 
   const bubblePCols = app.model.outputs.bubblePCols;
 
@@ -59,9 +59,16 @@ const inputElementAxis = computed(() => {
   return undefined;
 });
 
+const dataColumnPredicate = (spec: PColumnSpec) =>
+  inputElementAxis.value !== undefined
+  && spec.axesSpec.length === 3
+  && spec.axesSpec[2].name === 'pl7.app/vdj/Baseline-condition'
+  && !['pl7.app/vdj/maxEnrichment', 'pl7.app/vdj/maxNegControlEnrichment'].includes(spec.name);
+
 const metaColumnPredicate = (spec: PColumnSpec) =>
   inputElementAxis.value !== undefined
-  && spec.axesSpec[0]?.name === inputElementAxis.value;
+  && spec.axesSpec[0]?.name === inputElementAxis.value
+  && !spec.annotations?.['pl7.app/trace']?.includes('clonotype-enrichment');
 
 </script>
 
@@ -71,7 +78,7 @@ const metaColumnPredicate = (spec: PColumnSpec) =>
     chartType="bubble"
     :p-frame="app.model.outputs.bubblePf"
     :defaultOptions="defaultOptions"
-    :dataColumnPredicate="(spec: PColumnSpec) => spec.axesSpec.length === 3 && spec.axesSpec[2].name === 'pl7.app/vdj/Baseline-condition'"
+    :dataColumnPredicate="dataColumnPredicate"
     :meta-column-predicate="metaColumnPredicate"
   />
 </template>

@@ -2,7 +2,7 @@ ll := import("@platforma-sdk/workflow-tengo:ll")
 maps := import("@platforma-sdk/workflow-tengo:maps")
 strings := import("@platforma-sdk/workflow-tengo:strings")
 
-getColumns := func(countsSpec, conditionOrder) {
+getColumns := func(countsSpec, conditionOrder, addPresentInNegControl, addMaxNegControlEnrichment) {
   lastCondition := conditionOrder[len(conditionOrder) - 1]
   columns := []
   
@@ -37,8 +37,10 @@ getColumns := func(countsSpec, conditionOrder) {
             "pl7.app/toPlot": "true"
           }
         }
-      },
-      {
+      }]
+
+  if addPresentInNegControl || addMaxNegControlEnrichment {
+    columns = columns + [{
         column: "Binding Specificity",
         id: "binding_specificity",
         allowNA: true,
@@ -52,7 +54,11 @@ getColumns := func(countsSpec, conditionOrder) {
             "pl7.app/toPlot": "true"
           }
         }
-      }, {
+      }]
+  }
+
+  if addMaxNegControlEnrichment {
+    columns = columns + [{
         column: "MaxNegControlEnrichment",
         id: "maxnegcontrolenrichment",
         allowNA: true,
@@ -67,8 +73,28 @@ getColumns := func(countsSpec, conditionOrder) {
             "pl7.app/toPlot": "true"
           }
         }
-      },
-      {
+      }]
+  }
+
+  if addPresentInNegControl {
+    columns = columns + [{
+        column: "PresentInNegControl",
+        id: "presentinnegcontrol",
+        allowNA: true,
+        spec: {
+          name: "pl7.app/vdj/presentInNegControl",
+          valueType: "String",
+          domain: {},
+          annotations: {
+            "pl7.app/label": "Present in control",
+            "pl7.app/table/visibility": "optional",
+            "pl7.app/toPlot": "true"
+          }
+        }
+      }]
+  }
+
+  columns = columns + [{
         column: "Frequency " + lastCondition,
         id: strings.substituteSpecialCharacters("frequency_" + lastCondition),
         allowNA: true,

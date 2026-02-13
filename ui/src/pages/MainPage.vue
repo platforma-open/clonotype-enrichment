@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { PlRef } from '@platforma-sdk/model';
-import { getRawPlatformaInstance } from '@platforma-sdk/model';
+import { getRawPlatformaInstance, getSingleColumnData, type PObjectId } from '@platforma-sdk/model';
 import type {
   ListOption,
 } from '@platforma-sdk/ui-vue';
@@ -25,6 +25,7 @@ import {
   PlSlideModal,
   PlTooltip,
   usePlDataTableSettingsV2,
+  useWatchFetch,
 } from '@platforma-sdk/ui-vue';
 import { asyncComputed } from '@vueuse/core';
 import { computed, ref, watch, watchEffect } from 'vue';
@@ -74,6 +75,12 @@ watchEffect(() => {
     label = label ? `${label}, ${conditionLabel}` : conditionLabel;
   }
 
+  // Add target antigen if defined
+  const antigenControlConfig = app.model.args.antigenControlConfig;
+  if (antigenControlConfig.targetAntigen && antigenControlConfig.antigenEnabled) {
+    label = label ? `${label}, ${antigenControlConfig.targetAntigen}` : antigenControlConfig.targetAntigen;
+  }
+
   // Add filtering mode at the end
   if (baseFilter) {
     const filteringLabel = baseFilter === 'none' ? 'No filtering' : (baseFilter === 'shared' ? 'Shared (all conditions)' : 'Multiple conditions');
@@ -94,40 +101,201 @@ const tableLoadingText = computed(() => {
   return 'Loading';
 });
 
-// Get list of available values within condition column
-// we will select them in list, being the first one denominator and rest numerators
-const conditionValues = computed(() => mapToOptions(app.model.outputs.conditionValues));
+type MetadataFetched = {
+  conditionValues: string[];
+  conditionBySample?: Record<string, string>;
+  antigenBySample?: Record<string, string>;
+};
 
+/** Fetch metadata column data once from the pframe and derive all metadata-derived lists. Filter by sampleIds when available so only samples in the abundance input are used. */
+const metadataFetched = useWatchFetch(
+  () => ({
+    pframe: app.model.outputs.metadataColumnsPframe,
+    columnIds: app.model.outputs.metadataColumnIds,
+    sampleIds: app.model.outputs.sampleIds as string[] | undefined,
+  }),
+  async ({ pframe: pframeHandle, columnIds, sampleIds }) => {
+    if (!pframeHandle || !columnIds?.conditionColId) return undefined;
+
+    // Helper to extract data mapped by sample ID
+    const buildBySample = (colData: { axesData: Record<string, (string | number | null)[]>; data: (string | number | null)[] }) => {
+      const axisKeys = Object.keys(colData.axesData);
+      if (!axisKeys.length) return {};
+      const sampleKey = axisKeys[0];
+      const out: Record<string, string> = {};
+      for (let i = 0; i < colData.data.length; i++) {
+        const sampleId = colData.axesData[sampleKey]?.[i];
+        const val = colData.data[i];
+        if (sampleId != null && val != null) out[String(sampleId)] = String(val);
+      }
+      return out;
+    };
+
+    // Always fetch condition column full data (sample id → value) for conditionBySample
+    const conditionColData = await getSingleColumnData(pframeHandle, columnIds.conditionColId as PObjectId);
+    let conditionBySample = buildBySample(conditionColData);
+
+    let antigenBySample: Record<string, string> | undefined;
+    if (columnIds.antigenColId) {
+      const antigenColData = await getSingleColumnData(pframeHandle, columnIds.antigenColId as PObjectId);
+      antigenBySample = buildBySample(antigenColData);
+    }
+
+    // Restrict to samples present in the abundance input (sampleIds from trace)
+    if (sampleIds?.length) {
+      const sampleIdSet = new Set(sampleIds);
+      conditionBySample = Object.fromEntries(
+        Object.entries(conditionBySample).filter(([id]) => sampleIdSet.has(id)),
+      );
+      if (antigenBySample) {
+        antigenBySample = Object.fromEntries(
+          Object.entries(antigenBySample).filter(([id]) => sampleIdSet.has(id)),
+        );
+      }
+    }
+
+    // Unique condition values from the (possibly filtered) condition map
+    const conditionValues = [...new Set(Object.values(conditionBySample))].filter(Boolean).sort();
+
+    return { conditionValues, conditionBySample, antigenBySample } satisfies MetadataFetched;
+  },
+);
+
+/** Condition values valid for the main order: all in dataset or only those in samples for the selected target antigen. */
+const effectiveConditionValues = computed(() => {
+  const raw = metadataFetched.value;
+  if (!raw?.conditionValues?.length) return [];
+  if (!raw.conditionBySample || !raw.antigenBySample) return raw.conditionValues;
+  const config = app.model.args.antigenControlConfig;
+  if (!config?.antigenEnabled || !config.targetAntigen) return raw.conditionValues;
+  // Restrict to conditions present in samples that have the selected target antigen
+  const target = config.targetAntigen;
+  const conditionsForTarget = new Set<string>();
+  for (const [sampleId, antigenValue] of Object.entries(raw.antigenBySample)) {
+    if (antigenValue === target) {
+      const c = raw.conditionBySample[sampleId];
+      if (c) conditionsForTarget.add(c);
+    }
+  }
+  return [...conditionsForTarget];
+});
+const effectiveConditionOptions = computed(() => mapToOptions(effectiveConditionValues.value));
+
+/** Conditions present in the experiment but excluded from the order because they are not in samples for the selected target antigen. */
+const conditionsExcludedByTarget = computed(() => {
+  const raw = metadataFetched.value;
+  const config = app.model.args.antigenControlConfig;
+  if (!raw?.conditionValues?.length || !config?.antigenEnabled || !config.targetAntigen) return [];
+  const effective = effectiveConditionValues.value;
+  const effectiveSet = new Set(effective);
+  return raw.conditionValues.filter((c) => !effectiveSet.has(c));
+});
+
+/** Stable key for current excluded conditions (persists across page changes; alert re-shows when key changes). */
+const conditionsExcludedAlertKey = computed(() =>
+  [...conditionsExcludedByTarget.value].sort().join(','));
+
+const conditionsExcludedAlertVisible = computed({
+  get: () => {
+    const key = conditionsExcludedAlertKey.value;
+    const dismissedKey = app.model.ui.excludedAlertDismissedKey ?? '';
+    return key !== '' && key !== dismissedKey;
+  },
+  set: (visible) => {
+    if (!visible && conditionsExcludedAlertKey.value) {
+      app.model.ui.excludedAlertDismissedKey = conditionsExcludedAlertKey.value;
+    }
+  },
+});
+
+// Clear dismissed state when exclusions go away (e.g. "Multiple target" unchecked) so the alert can show again if the same target is re-selected
+watch(conditionsExcludedAlertKey, (key) => {
+  if (key === '') {
+    app.model.ui.excludedAlertDismissedKey = undefined;
+  }
+});
+
+/** Options for condition order list and present-in-rounds filter (current order). */
 const conditionOrderOptions = computed(() => mapToOptions([...app.model.args.conditionOrder]));
 
-// Get list of available values within antigen column for target selection
-const antigenValues = computed(() => mapToOptions(app.model.outputs.antigenValues));
+/** Sample options (id as value, label from model or id fallback) for sequenced library selection. */
+const sampleOptions = computed(() => {
+  const bySample = metadataFetched.value?.conditionBySample;
+  if (!bySample) return [];
+  const labels = app.model.outputs.sampleLabels as Record<string | number, string> | undefined;
+  return Object.keys(bySample).sort().map((id) => ({
+    value: id,
+    label: labels?.[id] ?? id,
+  }));
+});
 
-// Get list of available values within antigen column (no selected as target) for negative control selection
+/** Antigens map to their conditions. */
+const antigenConditionsMap = computed(() => {
+  const raw = metadataFetched.value;
+  if (!raw?.conditionBySample || !raw?.antigenBySample) return {};
+  const counts: Record<string, Set<string>> = {};
+  for (const [sampleId, antigenValue] of Object.entries(raw.antigenBySample)) {
+    if (!counts[antigenValue]) counts[antigenValue] = new Set();
+    const c = raw.conditionBySample[sampleId];
+    if (c) counts[antigenValue].add(c);
+  }
+  return counts;
+});
+
+/** Antigens that appear in at least 2 conditions (required for target selection). */
+const antigenValuesList = computed(() => {
+  return Object.entries(antigenConditionsMap.value)
+    .filter(([, conditions]) => conditions.size >= 2)
+    .map(([antigen]) => antigen);
+});
+const antigenValues = computed(() => mapToOptions(antigenValuesList.value));
+
+/** Antigen options excluding the selected target (for negative control dropdown). */
 const negativeAntigenValues = computed(() => {
-  const target = app.model.args.antigenControlConfig.targetCondition;
-  const filtered = app.model.outputs.antigenValues?.filter((v) => v !== target);
+  const target = app.model.args.antigenControlConfig.targetAntigen;
+  // Use all antigens (>= 1 condition), not just those with >= 2 conditions
+  const allAntigens = Object.keys(antigenConditionsMap.value);
+  const filtered = allAntigens.filter((v) => v !== target);
   return mapToOptions(filtered);
 });
 
-// Check if there are condition values for negative control samples that are not in the main condition order
-// const hasExtraNegativeControlConditions = computed(() => {
-//   const negValues = app.model.outputs.negativeControlConditionValues;
-//   const order = app.model.args.conditionOrder;
-//   if (!negValues?.length || !order) return false;
+const hasSingleSampleNegativeControl = computed(() => {
+  const selected = app.model.args.antigenControlConfig.negativeAntigens;
+  const map = antigenConditionsMap.value;
+  return selected.some((antigen) => (map[antigen]?.size ?? 0) === 1);
+});
 
-//   // Check if any negative control condition is NOT in the main condition order
-//   const orderSet = new Set(order);
-//   return negValues.some((v) => !orderSet.has(v));
-// });
+const hasMultiSampleNegativeControl = computed(() => {
+  const selected = app.model.args.antigenControlConfig.negativeAntigens;
+  const map = antigenConditionsMap.value;
+  return selected.some((antigen) => (map[antigen]?.size ?? 0) > 1);
+});
 
-// Get condition values from samples that have negative antigen values
-const negativeControlConditionOptions = computed(() => mapToOptions(app.model.outputs.negativeControlConditionValues));
+/** Condition values in samples that have the selected negative control antigens. */
+const negativeControlConditionValues = computed(() => {
+  const raw = metadataFetched.value;
+  if (!raw?.conditionBySample || !raw?.antigenBySample) return [];
+  const config = app.model.args.antigenControlConfig;
+  if (!config?.controlEnabled || !config.negativeAntigens?.length) return [];
+  const negSet = new Set(config.negativeAntigens);
+  const conditions = new Set<string>();
+  for (const [sampleId, antigenValue] of Object.entries(raw.antigenBySample)) {
+    if (negSet.has(antigenValue)) {
+      const c = raw.conditionBySample[sampleId];
+      if (c) conditions.add(c);
+    }
+  }
+  return [...conditions];
+});
+const negativeControlConditionOptions = computed(() => mapToOptions(negativeControlConditionValues.value));
 
 // Generate comparison options based on condition order
 // Creates all possible numerator-denominator pairs where numerator comes after denominator
 const comparisonOptions = computed(() => {
-  const order = [...app.model.args.conditionOrder];
+  let order = [...app.model.args.conditionOrder];
+  if (app.model.args.antigenControlConfig.sequencedLibraryEnabled) {
+    order = ['0 - Library', ...order.filter((c) => c !== '0 - Library')];
+  }
   if (order.length < 2) return [];
 
   const comparisons = [];
@@ -145,38 +313,38 @@ const comparisonOptions = computed(() => {
   return comparisons;
 });
 
-const comparisonsMessage = computed(() => {
-  if (comparisonOptions.value.length === 0) {
-    return '';
-  }
-  return `Will calculate: ${comparisonOptions.value.map((c) => c.label).join(', ')}`;
-});
+// const comparisonsMessage = computed(() => {
+//   if (comparisonOptions.value.length === 0) {
+//     return '';
+//   }
+//   return `Will calculate: ${comparisonOptions.value.map((c) => c.label).join(', ')}`;
+// });
 
-const negativeComparisonOptions = computed(() => {
-  const order = [...app.model.args.antigenControlConfig.controlConditionsOrder];
-  if (order.length < 2) return [];
+// const negativeComparisonOptions = computed(() => {
+//   const order = [...app.model.args.antigenControlConfig.controlConditionsOrder];
+//   if (order.length < 2) return [];
 
-  const comparisons = [];
-  for (let num_i = 1; num_i < order.length; num_i++) {
-    for (let den_j = 0; den_j < num_i; den_j++) {
-      const numerator = order[num_i];
-      const denominator = order[den_j];
-      const comparisonName = `${numerator} vs ${denominator}`;
-      comparisons.push({
-        value: comparisonName,
-        label: comparisonName,
-      });
-    }
-  }
-  return comparisons;
-});
+//   const comparisons = [];
+//   for (let num_i = 1; num_i < order.length; num_i++) {
+//     for (let den_j = 0; den_j < num_i; den_j++) {
+//       const numerator = order[num_i];
+//       const denominator = order[den_j];
+//       const comparisonName = `${numerator} vs ${denominator}`;
+//       comparisons.push({
+//         value: comparisonName,
+//         label: comparisonName,
+//       });
+//     }
+//   }
+//   return comparisons;
+// });
 
-const negativeComparisonsMessage = computed(() => {
-  if (negativeComparisonOptions.value.length === 0) {
-    return '';
-  }
-  return `Will calculate: ${negativeComparisonOptions.value.map((c) => c.label).join(', ')}`;
-});
+// const negativeComparisonsMessage = computed(() => {
+//   if (negativeComparisonOptions.value.length === 0) {
+//     return '';
+//   }
+//   return `Will calculate: ${negativeComparisonOptions.value.map((c) => c.label).join(', ')}`;
+// });
 
 // Downsampling options
 const downsamplingOptions: ListOption<string | undefined>[] = [
@@ -229,7 +397,7 @@ const filteredTooMuch = asyncComputed(async () => {
 
 const availableToAdd = computed(() => {
   const current = new Set(app.model.args.conditionOrder);
-  return conditionValues.value.filter((opt) => !current.has(opt.value));
+  return effectiveConditionOptions.value.filter((opt) => !current.has(opt.value));
 });
 
 const availableToAddToControl = computed(() => {
@@ -238,14 +406,15 @@ const availableToAddToControl = computed(() => {
 });
 
 const resetConditionOrder = () => {
-  if (app.model.outputs.conditionValues) {
-    app.model.args.conditionOrder = [...app.model.outputs.conditionValues];
+  const vals = effectiveConditionValues.value;
+  if (vals?.length) {
+    app.model.args.conditionOrder = [...vals];
   }
 };
 
 const resetControlConditionOrder = () => {
-  if (app.model.outputs.negativeControlConditionValues) {
-    const vals = app.model.outputs.negativeControlConditionValues;
+  const vals = negativeControlConditionValues.value;
+  if (vals?.length) {
     const mainOrder = app.model.args.conditionOrder;
     const orderMap = new Map(mainOrder.map((v, i) => [v, i]));
     const sorted = [...vals].sort((a, b) => {
@@ -278,23 +447,21 @@ const isClusterId = computed(() => {
 const conditionSyncCol = ref<string | undefined>(app.model.args.conditionColumnRef);
 watchEffect(() => {
   const col = app.model.args.conditionColumnRef;
-  const vals = app.model.outputs.conditionValues;
+  const vals = effectiveConditionValues.value;
 
   if (vals && vals.length > 0) {
     const current = app.model.args.conditionOrder;
     const valSet = new Set(vals);
 
-    // If the current order contains values that are no longer in the selected column,
-    // it's "invalid" (likely due to a dataset change or column value update).
+    // If the current order contains values that are no longer valid (e.g. not present in samples
+    // for the selected target antigen), remove them but preserve order.
     const hasInvalidItems = current.some((v) => !valSet.has(v));
 
-    // Reset to default (all available values) if:
-    // 1. The user switched to a DIFFERENT column in conditionColumnRef.
-    // 2. The order is completely empty (fresh block initialization).
-    // 3. The current order contains values that no longer exist in the selected column.
-    if (col !== conditionSyncCol.value || current.length === 0 || hasInvalidItems) {
+    if (col !== conditionSyncCol.value || current.length === 0) {
       app.model.args.conditionOrder = [...vals];
       conditionSyncCol.value = col;
+    } else if (hasInvalidItems) {
+      app.model.args.conditionOrder = current.filter((v) => valSet.has(v));
     }
   }
 });
@@ -302,7 +469,7 @@ watchEffect(() => {
 const controlSyncCol = ref<string | undefined>(app.model.args.antigenControlConfig.antigenColumnRef);
 watchEffect(() => {
   const col = app.model.args.antigenControlConfig.antigenColumnRef;
-  const vals = app.model.outputs.negativeControlConditionValues;
+  const vals = negativeControlConditionValues.value;
 
   if (vals && vals.length > 0) {
     const current = app.model.args.antigenControlConfig.controlConditionsOrder;
@@ -362,6 +529,14 @@ watchEffect(() => {
 watch(() => app.model.args.antigenControlConfig.controlEnabled, (enabled) => {
   if (enabled) {
     app.model.args.antigenControlConfig.antigenEnabled = true;
+  }
+});
+
+// Sync control flags to model
+watchEffect(() => {
+  if (app.model.args.antigenControlConfig) {
+    app.model.args.antigenControlConfig.hasSingleConditionNegativeControl = hasSingleSampleNegativeControl.value;
+    app.model.args.antigenControlConfig.hasMultiConditionNegativeControl = hasMultiSampleNegativeControl.value;
   }
 });
 
@@ -460,11 +635,42 @@ const isControlOrderOpen = ref(true); // Open by default
             <PlMaskIcon24 name="reverse" />
           </template>
         </PlBtnGhost>
-        <div v-if="comparisonsMessage" style="color: #6b7280; font-size: 13px; margin-top: 8px;">
-          {{ comparisonsMessage }}
-        </div>
+        <PlAlert
+          v-if="conditionsExcludedByTarget.length > 0"
+          v-model="conditionsExcludedAlertVisible"
+          type="warn"
+          closeable
+        >
+          Conditions not present in samples for the selected target antigen were removed: {{ conditionsExcludedByTarget.join(', ') }}.
+        </PlAlert>
       </PlAccordionSection>
     </PlAccordion>
+
+    <PlNumberField
+      v-model="app.model.args.enrichmentThreshold"
+      label="Enrichment threshold"
+      :minValue="0.5"
+      :step="0.1"
+      placeholder="2.0"
+    >
+      <template #tooltip>
+        <p><strong>Enrichment threshold (E<sub>thres</sub>)</strong></p>
+        <p>Log2 Fold Change (Log2FC) used to define enriched clonotypes. A clonotype is considered enriched when its Log2FC between conditions is ≥ this value.</p>
+        <p>This value is used to define <strong>Enrichment quality</strong> categories in combination to data-derived percentiles (q):</p>
+        <p>
+          - High threshold: Max Log2FC greater than maximum between enrichment q75 and E<sub>thres</sub><br/>
+          - Stable threshold: Overall Log2FC greater than maximum between enrichment q50 and E<sub>thres</sub><br/>
+          - Low threshold: Max Log2FC greater than enrichment q25<br/>
+          - Frequency threshold: Frequency greater than frequency q75<br/>
+        </p>
+        <ul>
+          <li><strong>Stable Binder</strong> — high threshold &amp; stable threshold.</li>
+          <li><strong>Rescuer</strong> — high threshold &amp; NOT stable threshold.</li>
+          <li><strong>Parasite</strong> — low threshold &amp; frequency threshold.</li>
+          <li><strong>Weak Binder</strong> — All other clonotypes.</li>
+        </ul>
+      </template>
+    </PlNumberField>
 
     <PlRow>
       <div style="display: flex; align-items: center; gap: 4px;">
@@ -506,26 +712,48 @@ const isControlOrderOpen = ref(true); // Open by default
     <PlDropdown
       v-if="app.model.args.antigenControlConfig.antigenEnabled
         && !app.model.args.antigenControlConfig.controlEnabled"
-      v-model="app.model.args.antigenControlConfig.targetCondition"
+      v-model="app.model.args.antigenControlConfig.targetAntigen"
       :options="antigenValues"
       label="Target"
     />
     <PlRow v-if="app.model.args.antigenControlConfig.controlEnabled">
       <PlDropdown
-        v-model="app.model.args.antigenControlConfig.targetCondition"
+        v-model="app.model.args.antigenControlConfig.targetAntigen"
         :options="antigenValues"
         label="Target"
       />
       <PlDropdownMulti
-        v-model="app.model.args.antigenControlConfig.negativeConditions"
+        v-model="app.model.args.antigenControlConfig.negativeAntigens"
         :style="{minWidth: '148px'}"
         :options="negativeAntigenValues"
         label="Negative control(s)"
       />
     </PlRow>
+    <div style="display: flex; align-items: center; gap: 4px;">
+      <PlCheckbox
+        v-if="app.model.args.antigenControlConfig.antigenEnabled"
+        v-model="app.model.args.antigenControlConfig.sequencedLibraryEnabled"
+      >
+        Sequenced Library
+      </PlCheckbox>
+      <PlTooltip v-if="app.model.args.antigenControlConfig.antigenEnabled" class="info">
+        <template #tooltip>
+          <div>
+            When enabled, you can select a sample that represents your sequenced naive library. This sample will be used as the reference (baseline) for enrichment fold-change calculations, for both the target antigen and negative controls.
+          </div>
+        </template>
+      </PlTooltip>
+    </div>
+    <PlDropdown
+      v-if="app.model.args.antigenControlConfig.antigenEnabled && app.model.args.antigenControlConfig.sequencedLibraryEnabled"
+      v-model="app.model.args.antigenControlConfig.sequencedLibrarySampleId"
+      :options="sampleOptions"
+      label="Sample"
+      clearable
+    />
     <PlAccordion multiple>
       <PlAccordionSection
-        v-if="app.model.args.antigenControlConfig.controlEnabled"
+        v-if="app.model.args.antigenControlConfig.controlEnabled && hasMultiSampleNegativeControl"
         v-model="isControlOrderOpen" label="Negative Condition Order"
       >
         <div style="display: flex; margin-bottom: -15px;">
@@ -562,41 +790,36 @@ const isControlOrderOpen = ref(true); // Open by default
             <PlMaskIcon24 name="reverse" />
           </template>
         </PlBtnGhost>
-        <div v-if="negativeComparisonsMessage" style="color: #6b7280; font-size: 13px; margin-top: 8px;">
-          {{ negativeComparisonsMessage }}
-        </div>
       </PlAccordionSection>
     </PlAccordion>
-    <PlRow v-if="app.model.args.antigenControlConfig.controlEnabled">
-      <PlNumberField
-        v-model="app.model.args.antigenControlConfig.targetThreshold"
-        label="Target threshold"
-        :minValue="0"
-        :step="0.1"
-        placeholder="2.0"
-      >
-        <template #tooltip>
-          <div>
-            Log2 Fold Change (Log2FC) thresholds used to define <strong>Binding Specificity</strong> categories.<br/>
-            Being Target<sub>Max</sub> and Control<sub>Max</sub> the maximum Log2FC values for the target and control conditions respectively:
-            <br/><br/>
-            - <strong>Antigen-Specific:</strong> Target<sub>Max</sub> ≥ Target Threshold and Control<sub>Max</sub> &lt; Control Threshold.
-            <br/>
-            - <strong>Non-Specific:</strong> Both Target<sub>Max</sub> and Control<sub>Max</sub> ≥ thresholds (indicates "sticky" binders).
-            <br/>
-            - <strong>Negative-Control:</strong> Target<sub>Max</sub> &lt; Target Threshold and Control<sub>Max</sub> ≥ Control Threshold.
-            <br/>
-            - <strong>Not-Enriched:</strong> Both below thresholds.
-          </div>
-        </template>
-      </PlNumberField>
+    <PlRow
+      v-if="app.model.args.antigenControlConfig.controlEnabled
+        && hasMultiSampleNegativeControl"
+    >
       <PlNumberField
         v-model="app.model.args.antigenControlConfig.controlThreshold"
         label="Control threshold"
         :minValue="0"
         :step="0.1"
         placeholder="1.0"
-      />
+      >
+        <template #tooltip>
+          <div>
+            Log2 Fold Change (Log2FC) thresholds used to define <strong>Enriched negative control clonotypes</strong>.<br/>
+            A clonotype is considered enriched if its Log2FC value between conditions is equal or greater than the threshold. This threshold in combination with <strong>Enrichment threshold</strong> is used to define <strong>Binding Specificity</strong> categories:
+            <br/><br/>
+            Target<sub>Max</sub> and Control<sub>Max</sub> are the maximum Log2FC values for the target and control conditions, respectively:
+            <br/><br/>
+            - <strong>Antigen-Specific:</strong> Target<sub>Max</sub> ≥ Enrichment Threshold and Control<sub>Max</sub> &lt; Control Threshold.
+            <br/>
+            - <strong>Non-Specific:</strong> Target<sub>Max</sub> ≥ Enrichment Threshold and Control<sub>Max</sub> ≥ Control Threshold (indicates "sticky" binders).
+            <br/>
+            - <strong>Negative-Control:</strong> Target<sub>Max</sub> &lt; Enrichment Threshold and Control<sub>Max</sub> ≥ Control Threshold.
+            <br/>
+            - <strong>Not-Enriched:</strong> Both below thresholds.
+          </div>
+        </template>
+      </PlNumberField>
     </PlRow>
 
     <PlAccordionSection label="Downsampling">
@@ -728,6 +951,25 @@ const isControlOrderOpen = ref(true); // Open by default
       >
         <template #tooltip>
           (Default: 100) Represents detection threshold for display campaigns. For <em>in vivo</em> studies, consider lower values (10-50).
+        </template>
+      </PlNumberField>
+      <PlNumberField
+        v-if="hasSingleSampleNegativeControl ||
+          (app.model.args.antigenControlConfig.sequencedLibraryEnabled === false &&
+            app.model.args.antigenControlConfig.controlConditionsOrder.length === 1)"
+        v-model="app.model.args.antigenControlConfig.singleControlFrequencyThreshold"
+        label="Control Frequency Threshold"
+        :minValue="0"
+        :maxValue="1"
+        :step="0.01"
+        placeholder="0.01"
+      >
+        <template #tooltip>
+          <div>
+            <strong>Control Frequency Threshold</strong> (Default: 0.01)<br/><br/>
+            Minimum frequency required to consider a clonotype "present" in the control sample during <strong>specificity classification</strong>.<br/><br/>
+            Clonotypes are only considered present in the control if their frequency is <strong>greater than or equal to</strong> this value. This prevents low-abundance noise in the control from affecting specificity classification.
+          </div>
         </template>
       </PlNumberField>
       <PlDropdownMulti

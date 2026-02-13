@@ -156,10 +156,11 @@ wf.body(func(args) {
 		addFile("inputFile.csv", downsamplingFile).
 		arg("--input_data").arg("inputFile.csv").
 		arg("--conditions").arg(string(conditionOrder)).
+		arg("--enrichment_threshold").arg(string(args.enrichmentThreshold)).
 		arg("--enrichment").arg("enrichment_results.csv").
 		arg("--bubble").arg("bubble_data.csv").
 		arg("--top_enriched").arg("top_enriched.csv").
-		arg("--top_20").arg("top_20.csv").
+		arg("--top_10").arg("top_10.csv").
 		arg("--pseudo_count").arg(string(args.pseudoCount)).
 		// arg("--min_enrichment").arg(string(enrichmentThreshold)).
 		arg("--highest_enrichment_clonotype").arg("highest_enrichment_clonotype.csv").
@@ -172,15 +173,22 @@ wf.body(func(args) {
 
 	if antigenControlConfig.antigenEnabled || antigenControlConfig.controlEnabled {
 		calculateEnrichment = calculateEnrichment.
-			arg("--current_target").arg(string(antigenControlConfig.targetCondition))
+			arg("--current_target").arg(string(antigenControlConfig.targetAntigen))
+
+		if antigenControlConfig.sequencedLibraryEnabled {
+			calculateEnrichment = calculateEnrichment.
+				arg("--sequenced_library_enabled").
+				arg("--sequenced_library_sample_id").arg(string(antigenControlConfig.sequencedLibrarySampleId))
+		}
 		
 		if antigenControlConfig.controlEnabled {
 			calculateEnrichment = calculateEnrichment.
 				arg("--control_enabled").
-				arg("--negative_conditions").arg(string(antigenControlConfig.negativeConditions)).
+				arg("--negative_antigens").arg(string(antigenControlConfig.negativeAntigens)).
 				arg("--control_conditions_order").arg(string(antigenControlConfig.controlConditionsOrder)).
-				arg("--target_threshold").arg(string(antigenControlConfig.targetThreshold)).
-				arg("--control_threshold").arg(string(antigenControlConfig.controlThreshold))
+				arg("--control_threshold").arg(string(antigenControlConfig.controlThreshold)).
+				// arg("--single_control_fc_threshold").arg(string(antigenControlConfig.singleControlFoldChangeThreshold)).
+				arg("--single_control_frequency_threshold").arg(string(antigenControlConfig.singleControlFrequencyThreshold))
 		}
 	}
 
@@ -220,7 +228,7 @@ wf.body(func(args) {
 		saveFile("enrichment_results.csv").
 		saveFile("bubble_data.csv").
 		saveFile("top_enriched.csv").
-		saveFile("top_20.csv").
+		saveFile("top_10.csv").
 		saveFile("highest_enrichment_clonotype.csv").
 		saveFileContent("filtered_too_much.txt").
 		printErrStreamToStdout().
@@ -229,25 +237,40 @@ wf.body(func(args) {
 
 	// Convert script outputs to Pframes
 	enrichCsv := calculateEnrichment.getFile("enrichment_results.csv")
-	enrichmentImportParams := pfEnrichmentConv.getColumns(abundanceSpec, conditionOrder, antigenControlConfig.controlEnabled)
+
+    // Determine if we should add MaxNegControlEnrichment column
+    // It should be added only if there are multiple control conditions (either >1 conditions or >0 conditions + sequenced library)
+    addMaxNegControlEnrichment := antigenControlConfig.hasMultiConditionNegativeControl &&
+		!(len(antigenControlConfig.controlConditionsOrder) == 1  &&
+			antigenControlConfig.sequencedLibraryEnabled == false)
+		
+	addPresentInNegControl := antigenControlConfig.hasSingleConditionNegativeControl ||
+		(antigenControlConfig.sequencedLibraryEnabled == false &&
+			len(antigenControlConfig.controlConditionsOrder) == 1)
+
+	enrichmentImportParams := pfEnrichmentConv.getColumns(abundanceSpec, conditionOrder, 
+		antigenControlConfig.controlEnabled, addPresentInNegControl, 
+		addMaxNegControlEnrichment, antigenControlConfig.sequencedLibraryEnabled)
 	enrichmentPf := xsv.importFile(enrichCsv, "csv", enrichmentImportParams,
 									{ cpu: 1, mem: "32GiB" })
 	controlScatterPf := undefined
 	if antigenControlConfig.controlEnabled {
-		controlScatterImportParams := pfControlScatterConv.getColumns(abundanceSpec, conditionOrder)
+		controlScatterImportParams := pfControlScatterConv.getColumns(abundanceSpec, 
+			conditionOrder, addPresentInNegControl, addMaxNegControlEnrichment)
 		controlScatterPf = xsv.importFile(enrichCsv, "csv", controlScatterImportParams,
 			{ cpu: 1, mem: "32GiB" })
 	}
 
-	bubbleImportParams := pfBubbleConv.getColumns(abundanceSpec)
+	bubbleImportParams := pfBubbleConv.getColumns(abundanceSpec, addPresentInNegControl,
+		addMaxNegControlEnrichment)
 	bubblePf := xsv.importFile(calculateEnrichment.getFile("bubble_data.csv"), "csv", bubbleImportParams,
 							{ cpu: 1, mem: "32GiB" })
 
-	lineImportParams := pfStackedConv.getColumns(abundanceSpec)
-	linePf := xsv.importFile(calculateEnrichment.getFile("top_20.csv"), "csv", lineImportParams,
+	lineImportParams := pfStackedConv.getColumns(abundanceSpec, addPresentInNegControl, addMaxNegControlEnrichment)
+	linePf := xsv.importFile(calculateEnrichment.getFile("top_10.csv"), "csv", lineImportParams,
 							{ cpu: 1, mem: "32GiB" })
 
-	stackedImportParams := pfStackedConv.getColumns(abundanceSpec)
+	stackedImportParams := pfStackedConv.getColumns(abundanceSpec, addPresentInNegControl, addMaxNegControlEnrichment)
 	stackedPf := xsv.importFile(calculateEnrichment.getFile("top_enriched.csv"), "csv", stackedImportParams,
 								{ cpu: 1, mem: "32GiB" })
 
@@ -256,7 +279,9 @@ wf.body(func(args) {
 	// Export frequency
 	frequencyImportParams := pfFrequencyConv.getColumns(abundanceSpec, conditionOrder,
 														inputType, downsampling,
-														blockId)
+														blockId, addPresentInNegControl,
+														addMaxNegControlEnrichment,
+														antigenControlConfig.sequencedLibraryEnabled)
 	frequencyPf := xsv.importFile(enrichCsv, "csv", frequencyImportParams,
 								{ cpu: 1, mem: "32GiB" })
 
@@ -306,6 +331,7 @@ wf.body(func(args) {
 				FilteringConfig: FilteringConfig,
 				conditionOrder: conditionOrder,
 				antigenControlConfig: antigenControlConfig,
+				enrichmentThreshold: args.enrichmentThreshold,
 				blockId: blockId,
 				specLabel: specLabel,
 				customBlockLabel: args.customBlockLabel,
@@ -337,6 +363,7 @@ wf.body(func(args) {
 		FilteringConfig: FilteringConfig,
 		conditionOrder: conditionOrder,
 		antigenControlConfig: antigenControlConfig,
+		enrichmentThreshold: args.enrichmentThreshold,
 		blockId: blockId,
 		customBlockLabel: args.customBlockLabel,
 		defaultBlockLabel: args.defaultBlockLabel,

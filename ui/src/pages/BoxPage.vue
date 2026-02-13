@@ -8,7 +8,7 @@ import { useApp } from '../app';
 
 const app = useApp();
 
-const defaultOptions = computed((): PredefinedGraphOption<'scatterplot'>[] | null => {
+const defaultOptions = computed((): PredefinedGraphOption<'discrete'>[] | null => {
   if (!app.model.outputs.controlScatterPCols)
     return null;
 
@@ -19,33 +19,25 @@ const defaultOptions = computed((): PredefinedGraphOption<'scatterplot'>[] | nul
   };
 
   const maxEnrichmentSpec = getColSpec('pl7.app/vdj/maxEnrichment');
-  const negSignalSpec = getColSpec('pl7.app/vdj/maxNegControlEnrichment');
+  const negSignalSpec = getColSpec('pl7.app/vdj/presentInNegControl');
   const bindingSpecificitySpec = getColSpec('pl7.app/vdj/bindingSpecificity');
   const frequencySpec = getColSpec('pl7.app/vdj/frequency');
 
   if (!maxEnrichmentSpec || !negSignalSpec || !bindingSpecificitySpec || !frequencySpec)
     return null;
 
-  const defaults: PredefinedGraphOption<'scatterplot'>[] = [
-    {
-      inputName: 'x',
-      selectedSource: negSignalSpec,
-    },
+  const defaults: PredefinedGraphOption<'discrete'>[] = [
     {
       inputName: 'y',
       selectedSource: maxEnrichmentSpec,
     },
     {
-      inputName: 'grouping',
+      inputName: 'primaryGrouping',
+      selectedSource: negSignalSpec,
+    },
+    {
+      inputName: 'secondaryGrouping',
       selectedSource: bindingSpecificitySpec,
-    },
-    {
-      inputName: 'size',
-      selectedSource: frequencySpec,
-    },
-    {
-      inputName: 'tooltipContent',
-      selectedSource: frequencySpec.axesSpec[0],
     },
   ];
   return defaults;
@@ -73,8 +65,8 @@ const metaColumnPredicate = (spec: PColumnSpec) =>
 
 <template>
   <GraphMaker
-    v-model="app.model.ui.scatterState"
-    chartType="scatterplot"
+    v-model="app.model.ui.boxState"
+    chartType="discrete"
     :p-frame="app.model.outputs.controlScatterPf"
     :default-options="defaultOptions"
     :dataColumnPredicate="dataColumnPredicate"
