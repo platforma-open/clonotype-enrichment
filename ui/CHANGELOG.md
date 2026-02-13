@@ -1,5 +1,13 @@
 # @platforma-open/milaboratories.clonotype-enrichment.ui
 
+## 3.1.1
+
+### Patch Changes
+
+- 16510b7: Adjust enrichment threshold
+- Updated dependencies [16510b7]
+  - @platforma-open/milaboratories.clonotype-enrichment.model@3.1.1
+
 ## 3.1.0
 
 ### Minor Changes

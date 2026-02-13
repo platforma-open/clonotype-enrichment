@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.model
 
+## 3.1.1
+
+### Patch Changes
+
+- 16510b7: Adjust enrichment threshold
+
 ## 3.1.0
 
 ### Minor Changes
