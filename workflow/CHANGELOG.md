@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.workflow
 
+## 3.1.1
+
+### Patch Changes
+
+- 77b02ac: rename control columns
+
 ## 3.1.0
 
 ### Minor Changes
