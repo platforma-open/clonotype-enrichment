@@ -67,7 +67,7 @@ getColumns := func(countsSpec, conditionOrder, addPresentInNegControl, addMaxNeg
           valueType: "Double",
           domain: {},
           annotations: {
-            "pl7.app/label": "Max control Log2FC",
+            "pl7.app/label": "Control max Log2FC",
             "pl7.app/table/visibility": "optional",
             "pl7.app/format": ".2f",
             "pl7.app/toPlot": "true"

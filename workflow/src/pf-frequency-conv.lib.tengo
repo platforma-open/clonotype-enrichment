@@ -55,7 +55,7 @@ getColumns := func(abundanceSpec, conditionOrder, inputType, downsampling, block
         valueType: "Double",
         domain: {},
         annotations: {
-          "pl7.app/label": "Max control Log2FC",
+          "pl7.app/label": "Control max Log2FC",
           "pl7.app/table/visibility": "optional"
         }
       }
