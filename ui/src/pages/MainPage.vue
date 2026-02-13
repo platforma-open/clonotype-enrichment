@@ -292,7 +292,10 @@ const negativeControlConditionOptions = computed(() => mapToOptions(negativeCont
 // Generate comparison options based on condition order
 // Creates all possible numerator-denominator pairs where numerator comes after denominator
 const comparisonOptions = computed(() => {
-  const order = [...app.model.args.conditionOrder];
+  let order = [...app.model.args.conditionOrder];
+  if (app.model.args.antigenControlConfig.sequencedLibraryEnabled) {
+    order = ['0 - Library', ...order.filter((c) => c !== '0 - Library')];
+  }
   if (order.length < 2) return [];
 
   const comparisons = [];
