@@ -1,5 +1,18 @@
 # @platforma-open/milaboratories.clonotype-enrichment.workflow
 
+## 3.1.0
+
+### Minor Changes
+
+- b1ff4a5: Include library usage and enrichment based on a single negative control
+
+### Patch Changes
+
+- ca0ae15: Rename variable and improve conditions check
+- Updated dependencies [ca0ae15]
+- Updated dependencies [b1ff4a5]
+  - @platforma-open/milaboratories.clonotype-enrichment.software@3.1.0
+
 ## 3.0.0
 
 ### Major Changes

@@ -1,5 +1,16 @@
 # @platforma-open/milaboratories.clonotype-enrichment.model
 
+## 3.1.0
+
+### Minor Changes
+
+- b1ff4a5: Include library usage and enrichment based on a single negative control
+
+### Patch Changes
+
+- ca0ae15: Rename variable and improve conditions check
+- 9e22a47: Filter out non-antigen-specific conditions from options
+
 ## 3.0.0
 
 ### Major Changes
