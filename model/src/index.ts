@@ -484,18 +484,21 @@ export const model = BlockModel.create()
       { type: 'link', href: '/stacked', label: 'Frequency Bar Plot' },
     ];
 
-    if (ctx.args.antigenControlConfig.hasMultiConditionNegativeControl
-      && !(ctx.args.antigenControlConfig.sequencedLibraryEnabled === false
-        && ctx.args.antigenControlConfig.controlConditionsOrder.length === 1)
-    ) {
-      sections.push({ type: 'link', href: '/scatter', label: 'Control Scatter Plot' });
+    if (ctx.args.antigenControlConfig.controlEnabled) {
+      if (ctx.args.antigenControlConfig.hasMultiConditionNegativeControl
+        && !(ctx.args.antigenControlConfig.sequencedLibraryEnabled === false
+          && ctx.args.antigenControlConfig.controlConditionsOrder.length === 1)
+      ) {
+        sections.push({ type: 'link', href: '/scatter', label: 'Control Scatter Plot' });
+      }
+      if (ctx.args.antigenControlConfig.hasSingleConditionNegativeControl
+        || (ctx.args.antigenControlConfig.sequencedLibraryEnabled === false
+          && ctx.args.antigenControlConfig.controlConditionsOrder.length === 1)
+      ) {
+        sections.push({ type: 'link', href: '/box', label: 'Control Box Plot' });
+      }
     }
-    if (ctx.args.antigenControlConfig.hasSingleConditionNegativeControl
-      || (ctx.args.antigenControlConfig.sequencedLibraryEnabled === false
-        && ctx.args.antigenControlConfig.controlConditionsOrder.length === 1)
-    ) {
-      sections.push({ type: 'link', href: '/box', label: 'Control Box Plot' });
-    }
+
     return sections;
   })
 
