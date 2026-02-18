@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.workflow
 
+## 3.1.2
+
+### Patch Changes
+
+- 0605e4d: Fix logic showing negative control related options
+
 ## 3.1.1
 
 ### Patch Changes

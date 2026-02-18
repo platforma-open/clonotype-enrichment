@@ -1,5 +1,13 @@
 # @platforma-open/milaboratories.clonotype-enrichment.ui
 
+## 3.1.2
+
+### Patch Changes
+
+- 0605e4d: Fix logic showing negative control related options
+- Updated dependencies [0605e4d]
+  - @platforma-open/milaboratories.clonotype-enrichment.model@3.1.2
+
 ## 3.1.1
 
 ### Patch Changes
