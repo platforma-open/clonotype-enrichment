@@ -240,13 +240,17 @@ wf.body(func(args) {
 
     // Determine if we should add MaxNegControlEnrichment column
     // It should be added only if there are multiple control conditions (either >1 conditions or >0 conditions + sequenced library)
-    addMaxNegControlEnrichment := antigenControlConfig.hasMultiConditionNegativeControl &&
-		!(len(antigenControlConfig.controlConditionsOrder) == 1  &&
-			antigenControlConfig.sequencedLibraryEnabled == false)
-		
-	addPresentInNegControl := antigenControlConfig.hasSingleConditionNegativeControl ||
-		(antigenControlConfig.sequencedLibraryEnabled == false &&
-			len(antigenControlConfig.controlConditionsOrder) == 1)
+	addMaxNegControlEnrichment := false
+	addPresentInNegControl := false
+	if antigenControlConfig.controlEnabled {
+		addMaxNegControlEnrichment = antigenControlConfig.hasMultiConditionNegativeControl &&
+			!(len(antigenControlConfig.controlConditionsOrder) == 1  &&
+				antigenControlConfig.sequencedLibraryEnabled == false)
+			
+		addPresentInNegControl = antigenControlConfig.hasSingleConditionNegativeControl ||
+			(antigenControlConfig.sequencedLibraryEnabled == false &&
+				len(antigenControlConfig.controlConditionsOrder) == 1)
+	}
 
 	enrichmentImportParams := pfEnrichmentConv.getColumns(abundanceSpec, conditionOrder, 
 		antigenControlConfig.controlEnabled, addPresentInNegControl, 

@@ -260,12 +260,14 @@ const negativeAntigenValues = computed(() => {
 });
 
 const hasSingleSampleNegativeControl = computed(() => {
+  if (!app.model.args.antigenControlConfig.controlEnabled) return false;
   const selected = app.model.args.antigenControlConfig.negativeAntigens;
   const map = antigenConditionsMap.value;
   return selected.some((antigen) => (map[antigen]?.size ?? 0) === 1);
 });
 
 const hasMultiSampleNegativeControl = computed(() => {
+  if (!app.model.args.antigenControlConfig.controlEnabled) return false;
   const selected = app.model.args.antigenControlConfig.negativeAntigens;
   const map = antigenConditionsMap.value;
   return selected.some((antigen) => (map[antigen]?.size ?? 0) > 1);
@@ -795,7 +797,9 @@ const isControlOrderOpen = ref(true); // Open by default
     </PlAccordion>
     <PlRow
       v-if="app.model.args.antigenControlConfig.controlEnabled
-        && hasMultiSampleNegativeControl"
+        && hasMultiSampleNegativeControl
+        && !(app.model.args.antigenControlConfig.sequencedLibraryEnabled === false &&
+          app.model.args.antigenControlConfig.controlConditionsOrder.length === 1)"
     >
       <PlNumberField
         v-model="app.model.args.antigenControlConfig.controlThreshold"
@@ -955,9 +959,9 @@ const isControlOrderOpen = ref(true); // Open by default
         </template>
       </PlNumberField>
       <PlNumberField
-        v-if="hasSingleSampleNegativeControl ||
+        v-if="app.model.args.antigenControlConfig.controlEnabled && (hasSingleSampleNegativeControl ||
           (app.model.args.antigenControlConfig.sequencedLibraryEnabled === false &&
-            app.model.args.antigenControlConfig.controlConditionsOrder.length === 1)"
+            app.model.args.antigenControlConfig.controlConditionsOrder.length === 1))"
         v-model="app.model.args.antigenControlConfig.singleControlFrequencyThreshold"
         label="Control Frequency Threshold"
         :minValue="0"
