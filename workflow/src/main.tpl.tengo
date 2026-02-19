@@ -252,13 +252,12 @@ wf.body(func(args) {
 	addMaxNegControlEnrichment := false
 	addPresentInNegControl := false
 	if antigenControlConfig.controlEnabled {
-		addMaxNegControlEnrichment = antigenControlConfig.hasMultiConditionNegativeControl &&
-			!(len(antigenControlConfig.controlConditionsOrder) == 1  &&
-				antigenControlConfig.sequencedLibraryEnabled == false)
+		addMaxNegControlEnrichment = len(antigenControlConfig.controlConditionsOrder) > 1 ||
+			(len(antigenControlConfig.controlConditionsOrder) == 1  &&
+				antigenControlConfig.sequencedLibraryEnabled == true)
 			
-		addPresentInNegControl = antigenControlConfig.hasSingleConditionNegativeControl ||
-			(antigenControlConfig.sequencedLibraryEnabled == false &&
-				len(antigenControlConfig.controlConditionsOrder) == 1)
+		addPresentInNegControl = antigenControlConfig.sequencedLibraryEnabled == false &&
+			(antigenControlConfig.hasSingleConditionNegativeControl || len(antigenControlConfig.controlConditionsOrder) == 1)
 	}
 
 	enrichmentImportParams := pfEnrichmentConv.getColumns(abundanceSpec, conditionOrder, 

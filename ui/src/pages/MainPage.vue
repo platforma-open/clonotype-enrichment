@@ -221,7 +221,7 @@ const conditionOrderOptions = computed(() => mapToOptions([...app.model.args.con
 /** Antigens map to their conditions. */
 const antigenConditionsMap = computed(() => {
   const raw = metadataFetched.value;
-  if (!raw?.conditionBySample || !raw?.antigenBySample) return {};
+  if (!raw?.conditionBySample || !raw?.antigenBySample) return undefined;
   const counts: Record<string, Set<string>> = {};
   for (const [sampleId, antigenValue] of Object.entries(raw.antigenBySample)) {
     if (!counts[antigenValue]) counts[antigenValue] = new Set();
@@ -233,42 +233,68 @@ const antigenConditionsMap = computed(() => {
 
 /** Antigens that appear in at least 2 conditions (required for target selection). */
 const antigenValuesList = computed(() => {
-  return Object.entries(antigenConditionsMap.value)
+  const map = antigenConditionsMap.value;
+  if (!map) return [];
+  return Object.entries(map)
     .filter(([, conditions]) => conditions.size >= 2)
     .map(([antigen]) => antigen);
 });
-const antigenValues = computed(() => mapToOptions(antigenValuesList.value));
+const antigenValues = computed(() => {
+  const list = antigenValuesList.value;
+  const current = app.model.args.antigenControlConfig.targetAntigen;
+  // If we're loading or have a value not in the list (temporary state), include it to avoid UI error
+  if (current && !list.includes(current)) {
+    return mapToOptions([current, ...list]);
+  }
+  return mapToOptions(list);
+});
 
 /** Antigen options excluding the selected target (for negative control dropdown). */
 const negativeAntigenValues = computed(() => {
+  const current = app.model.args.antigenControlConfig.negativeAntigens;
   const target = app.model.args.antigenControlConfig.targetAntigen;
+  const map = antigenConditionsMap.value;
+  if (!map) {
+    // During loading, show current selections if any
+    return mapToOptions(current || []);
+  }
   // Use all antigens (>= 1 condition), not just those with >= 2 conditions
-  const allAntigens = Object.keys(antigenConditionsMap.value);
+  const allAntigens = Object.keys(map);
   const filtered = allAntigens.filter((v) => v !== target);
-  return mapToOptions(filtered);
+
+  // Ensure currently selected antigens are in the list (e.g. if one was removed from metadata)
+  const list = [...new Set([...filtered, ...current])];
+  return mapToOptions(list);
 });
 
 /** Antigen options excluding target and negative controls (for sequenced library dropdown). */
 const libraryAntigenValues = computed(() => {
+  const current = app.model.args.antigenControlConfig.sequencedLibraryAntigen;
   const target = app.model.args.antigenControlConfig.targetAntigen;
   const negatives = new Set(app.model.args.antigenControlConfig.negativeAntigens);
-  const allAntigens = Object.keys(antigenConditionsMap.value);
+  const map = antigenConditionsMap.value;
+  if (!map) {
+    // During loading, show current selection if any
+    return mapToOptions(current ? [current] : []);
+  }
+  const allAntigens = Object.keys(map);
   const filtered = allAntigens.filter((v) => v !== target && !negatives.has(v));
-  return mapToOptions(filtered);
+
+  // Ensure currently selected antigen is in the list
+  const list = current && !filtered.includes(current) ? [current, ...filtered] : filtered;
+  return mapToOptions(list);
 });
 
 const hasSingleSampleNegativeControl = computed(() => {
-  if (!app.model.args.antigenControlConfig.controlEnabled) return false;
-  const selected = app.model.args.antigenControlConfig.negativeAntigens;
   const map = antigenConditionsMap.value;
-  return selected.some((antigen) => (map[antigen]?.size ?? 0) === 1);
+  const config = app.model.args.antigenControlConfig;
+  return !!map && config.controlEnabled && config.negativeAntigens.some((a: string) => (map[a]?.size ?? 0) === 1);
 });
 
 const hasMultiSampleNegativeControl = computed(() => {
-  if (!app.model.args.antigenControlConfig.controlEnabled) return false;
-  const selected = app.model.args.antigenControlConfig.negativeAntigens;
   const map = antigenConditionsMap.value;
-  return selected.some((antigen) => (map[antigen]?.size ?? 0) > 1);
+  const config = app.model.args.antigenControlConfig;
+  return !!map && config.controlEnabled && config.negativeAntigens.some((a: string) => (map[a]?.size ?? 0) > 1);
 });
 
 /** Condition values in samples that have the selected negative control antigens. */
@@ -803,7 +829,7 @@ const isControlOrderOpen = ref(true); // Open by default
     <PlDropdown
       v-if="app.model.args.antigenControlConfig.antigenEnabled
         && app.model.args.antigenControlConfig.sequencedLibraryEnabled
-        && libraryAntigenValues.length > 0"
+        && (libraryAntigenValues.length > 0 || !metadataFetched.value)"
       v-model="app.model.args.antigenControlConfig.sequencedLibraryAntigen"
       :options="libraryAntigenValues"
       label="Library"
@@ -811,7 +837,8 @@ const isControlOrderOpen = ref(true); // Open by default
     <PlAlert
       v-if="app.model.args.antigenControlConfig.antigenEnabled
         && app.model.args.antigenControlConfig.sequencedLibraryEnabled
-        && libraryAntigenValues.length === 0"
+        && libraryAntigenValues.length === 0
+        && metadataFetched.value"
       type="error"
       icon
     >
