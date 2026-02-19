@@ -206,6 +206,9 @@ wf.body(func(args) {
 			calculateEnrichment = calculateEnrichment.arg("--filter_single_sample")
 		} else if FilteringConfig.baseFilter == "shared" {
 			calculateEnrichment = calculateEnrichment.arg("--filter_any_zero")
+			if FilteringConfig.excludeSequencedLibrary && antigenControlConfig.sequencedLibraryEnabled {
+				calculateEnrichment = calculateEnrichment.arg("--exclude_sequenced_library")
+			}
 		}
 	}
 

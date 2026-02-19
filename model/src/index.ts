@@ -37,6 +37,8 @@ type FilteringConfig = {
     rounds: string[];
     logic: 'OR' | 'AND';
   };
+
+  excludeSequencedLibrary: boolean;
 };
 
 type AntigenControlConfig = {
@@ -104,6 +106,7 @@ export const model = BlockModel.create()
         rounds: [],
         logic: 'OR',
       },
+      excludeSequencedLibrary: true,
     },
     additionalEnrichmentExports: [],
     antigenControlConfig: {

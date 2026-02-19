@@ -943,6 +943,22 @@ const isControlOrderOpen = ref(true); // Open by default
           </PlTooltip>
         </template>
       </PlRadioGroup>
+      <PlCheckbox
+        v-if="app.model.args.FilteringConfig.baseFilter === 'shared' &&
+          app.model.args.antigenControlConfig.sequencedLibraryEnabled &&
+          app.model.args.antigenControlConfig.sequencedLibraryAntigen !== undefined"
+        v-model="app.model.args.FilteringConfig.excludeSequencedLibrary"
+      >
+        Exclude Sequenced Library
+        <PlTooltip class="info">
+          <template #tooltip>
+            <div>
+              <strong>Exclude Library from Shared Filter</strong><br/><br/>
+              Libraries are often too diverse to be fully captured by sequencing. This option ensures enriched binders are not discarded just because they were stochastically missed in the Library sequencing.
+            </div>
+          </template>
+        </PlTooltip>
+      </PlCheckbox>
       <PlCheckbox v-model="app.model.args.FilteringConfig.minAbundance.enabled">
         Based on abundance
         <PlTooltip class="info">

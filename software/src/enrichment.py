@@ -16,7 +16,8 @@ def filter_clonotypes_by_criteria(
     present_in_rounds_logic: str = "OR",
     pseudo_count: float = 0.0,
     n_clonotypes: Optional[int] = None,
-    library_condition: Optional[str] = None
+    library_condition: Optional[str] = None,
+    exclude_sequenced_library: bool = False
 ) -> pl.DataFrame:
     """
     Filter clonotypes based on specified criteria.
@@ -34,6 +35,7 @@ def filter_clonotypes_by_criteria(
         pseudo_count: Pseudo-count for frequency normalization
         n_clonotypes: Number of unique clonotypes (for proper pseudo-count normalization)
         library_condition: Optional name of the library condition to exclude from some filters
+        exclude_sequenced_library: If True, exclude library from filter_any_zero requirement
 
     Returns:
         Filtered DataFrame with same structure as input
@@ -81,11 +83,13 @@ def filter_clonotypes_by_criteria(
 
     if filter_any_zero:
         # Filter out clonotypes with zero abundance in any sample
-        # EXCEPTION: Library shouldn't be included among the conditions for this filter.
-        # Since the library is usually the starting (and presumably very diverse) material 
-        # before the enrichment steps, it might not be deeply enough sequenced, and 
-        # some clonotypes enriched later may be lost.
-        target_cols = [c for c in condition_cols if c != library_condition]
+        # If exclude_sequenced_library is True, we exclude the library from this requirement.
+        # This is because the library is usually the starting material, and might not be
+        # deeply enough sequenced to capture all clonotypes that are enriched later.
+        if exclude_sequenced_library:
+            target_cols = [c for c in condition_cols if c != library_condition]
+        else:
+            target_cols = condition_cols
         
         if target_cols:
             # Keep only clonotypes with non-zero abundance in ALL target samples
@@ -266,6 +270,7 @@ def hybrid_enrichment_analysis(
     current_target: Optional[str] = None,
     sequenced_library_enabled: bool = False,
     sequenced_library_antigen: Optional[str] = None,
+    exclude_sequenced_library: bool = False,
 ) -> None:
     """
     Optimized hybrid enrichment analysis using polars for better performance and memory efficiency.
@@ -454,7 +459,8 @@ def hybrid_enrichment_analysis(
             min_frequency, target_total_reads_dict,
             present_in_rounds, present_in_rounds_logic,
             pseudo_count, target_n_clonotypes,
-            library_condition
+            library_condition,
+            exclude_sequenced_library
         )
 
     # After filtering, aggregate away sampleId and antigen for the pivot
@@ -1269,6 +1275,8 @@ if __name__ == "__main__":
                         help="Enable usage of the selected sequenced library sample's condition as base condition for enrichment")
     parser.add_argument("--sequenced_library_antigen", type=str, required=False,
                         help="Antigen column value identifying library samples (used as base condition when enabled)")
+    parser.add_argument("--exclude_sequenced_library", action="store_true",
+                        help="Exclude library from the Shared (all conditions) filter requirement")
 
     args = parser.parse_args()
 
@@ -1302,5 +1310,6 @@ if __name__ == "__main__":
         single_control_frequency_threshold=args.single_control_frequency_threshold,
         current_target=args.current_target,
         sequenced_library_enabled=args.sequenced_library_enabled,
-        sequenced_library_antigen=args.sequenced_library_antigen
+        sequenced_library_antigen=args.sequenced_library_antigen,
+        exclude_sequenced_library=args.exclude_sequenced_library
     )
