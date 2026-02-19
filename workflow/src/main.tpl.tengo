@@ -257,7 +257,7 @@ wf.body(func(args) {
 				antigenControlConfig.sequencedLibraryEnabled == true)
 			
 		addPresentInNegControl = antigenControlConfig.sequencedLibraryEnabled == false &&
-			(antigenControlConfig.hasSingleConditionNegativeControl || len(antigenControlConfig.controlConditionsOrder) == 1)
+			(len(antigenControlConfig.controlConditionsOrder) == 1)
 	}
 
 	enrichmentImportParams := pfEnrichmentConv.getColumns(abundanceSpec, conditionOrder, 
