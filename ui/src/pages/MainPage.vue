@@ -289,6 +289,29 @@ const negativeControlConditionValues = computed(() => {
 });
 const negativeControlConditionOptions = computed(() => mapToOptions(negativeControlConditionValues.value));
 
+/** Antigens whose samples have empty condition values (for error reporting). */
+const antigensWithEmptyConditions = computed(() => {
+  const raw = metadataFetched.value;
+  if (!raw?.conditionBySample || !raw?.antigenBySample) return [];
+
+  const config = app.model.args.antigenControlConfig;
+  const checkSet = new Set<string>();
+  if (config.antigenEnabled && config.targetAntigen) checkSet.add(config.targetAntigen);
+  if (config.controlEnabled && config.negativeAntigens?.length) {
+    config.negativeAntigens.forEach((a) => checkSet.add(a));
+  }
+
+  if (checkSet.size === 0) return [];
+
+  const found = new Set<string>();
+  for (const [sampleId, antigen] of Object.entries(raw.antigenBySample)) {
+    if (checkSet.has(antigen) && !raw.conditionBySample[sampleId]) {
+      found.add(antigen);
+    }
+  }
+  return [...found];
+});
+
 // Generate comparison options based on condition order
 // Creates all possible numerator-denominator pairs where numerator comes after denominator
 const comparisonOptions = computed(() => {
@@ -621,6 +644,14 @@ const isControlOrderOpen = ref(true); // Open by default
       @update:model-value="setInput"
     />
     <PlDropdown v-model="app.model.args.conditionColumnRef" :options="app.model.outputs.metadataOptions" label="Condition column" required />
+
+    <PlAlert
+      v-if="antigensWithEmptyConditions.length > 0"
+      type="error"
+    >
+      Some samples matching the <b>{{ antigensWithEmptyConditions.join(', ') }}</b> antigen have empty values in the condition column.
+      Please provide valid condition names in your metadata to include these samples in the analysis.
+    </PlAlert>
 
     <PlAccordion multiple>
       <PlAccordionSection v-model="isConditionOrderOpen" label="Condition Order">
