@@ -2,7 +2,8 @@ ll := import("@platforma-sdk/workflow-tengo:ll")
 canonical := import("@platforma-sdk/workflow-tengo:canonical")
 strings := import("@platforma-sdk/workflow-tengo:strings")
 
-getColumns := func(abundanceSpec, conditionOrder, inputType, downsampling, blockId, addPresentInNegControl, addMaxNegControlEnrichment, sequencedLibraryEnabled) {
+getColumns := func(abundanceSpec, conditionOrder, inputType, downsampling,
+  blockId, addPresentInNegControl, addMaxNegControlEnrichment, sequencedLibraryEnabled) {
   columns := []
   if sequencedLibraryEnabled {
     conditionOrder = ["0 - Library"] + conditionOrder

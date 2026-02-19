@@ -218,17 +218,6 @@ watch(conditionsExcludedAlertKey, (key) => {
 /** Options for condition order list and present-in-rounds filter (current order). */
 const conditionOrderOptions = computed(() => mapToOptions([...app.model.args.conditionOrder]));
 
-/** Sample options (id as value, label from model or id fallback) for sequenced library selection. */
-const sampleOptions = computed(() => {
-  const bySample = metadataFetched.value?.conditionBySample;
-  if (!bySample) return [];
-  const labels = app.model.outputs.sampleLabels as Record<string | number, string> | undefined;
-  return Object.keys(bySample).sort().map((id) => ({
-    value: id,
-    label: labels?.[id] ?? id,
-  }));
-});
-
 /** Antigens map to their conditions. */
 const antigenConditionsMap = computed(() => {
   const raw = metadataFetched.value;
@@ -256,6 +245,15 @@ const negativeAntigenValues = computed(() => {
   // Use all antigens (>= 1 condition), not just those with >= 2 conditions
   const allAntigens = Object.keys(antigenConditionsMap.value);
   const filtered = allAntigens.filter((v) => v !== target);
+  return mapToOptions(filtered);
+});
+
+/** Antigen options excluding target and negative controls (for sequenced library dropdown). */
+const libraryAntigenValues = computed(() => {
+  const target = app.model.args.antigenControlConfig.targetAntigen;
+  const negatives = new Set(app.model.args.antigenControlConfig.negativeAntigens);
+  const allAntigens = Object.keys(antigenConditionsMap.value);
+  const filtered = allAntigens.filter((v) => v !== target && !negatives.has(v));
   return mapToOptions(filtered);
 });
 
@@ -542,6 +540,30 @@ watchEffect(() => {
   }
 });
 
+// Clear sequenced library antigen when the available options change due to user action
+// (target or negative control selection changed), but NOT on component remount.
+const librarySyncKey = ref(
+  [
+    app.model.args.antigenControlConfig.targetAntigen,
+    ...app.model.args.antigenControlConfig.negativeAntigens,
+  ].join(','),
+);
+watchEffect(() => {
+  const key = [
+    app.model.args.antigenControlConfig.targetAntigen,
+    ...app.model.args.antigenControlConfig.negativeAntigens,
+  ].join(',');
+  const current = app.model.args.antigenControlConfig.sequencedLibraryAntigen;
+
+  if (key !== librarySyncKey.value) {
+    // User changed target or negative controls — clear if no longer valid
+    if (current && !libraryAntigenValues.value.some((opt) => opt.value === current)) {
+      app.model.args.antigenControlConfig.sequencedLibraryAntigen = undefined;
+    }
+    librarySyncKey.value = key;
+  }
+});
+
 // Filtering options
 const filteringOptions = [
   { value: 'none', label: 'No filtering' },
@@ -742,18 +764,28 @@ const isControlOrderOpen = ref(true); // Open by default
       <PlTooltip v-if="app.model.args.antigenControlConfig.antigenEnabled" class="info">
         <template #tooltip>
           <div>
-            When enabled, you can select a sample that represents your sequenced naive library. This sample will be used as the reference (baseline) for enrichment fold-change calculations, for both the target antigen and negative controls.
+            When enabled, you can select the library from the antigen column values. The samples associated with this library will be used as the reference (baseline) for enrichment fold-change calculations, for both the target antigen and negative controls.
           </div>
         </template>
       </PlTooltip>
     </div>
     <PlDropdown
-      v-if="app.model.args.antigenControlConfig.antigenEnabled && app.model.args.antigenControlConfig.sequencedLibraryEnabled"
-      v-model="app.model.args.antigenControlConfig.sequencedLibrarySampleId"
-      :options="sampleOptions"
-      label="Sample"
-      clearable
+      v-if="app.model.args.antigenControlConfig.antigenEnabled
+        && app.model.args.antigenControlConfig.sequencedLibraryEnabled
+        && libraryAntigenValues.length > 0"
+      v-model="app.model.args.antigenControlConfig.sequencedLibraryAntigen"
+      :options="libraryAntigenValues"
+      label="Library"
     />
+    <PlAlert
+      v-if="app.model.args.antigenControlConfig.antigenEnabled
+        && app.model.args.antigenControlConfig.sequencedLibraryEnabled
+        && libraryAntigenValues.length === 0"
+      type="error"
+      icon
+    >
+      No options available. Only antigen column values not used as target or negative controls are shown.
+    </PlAlert>
     <PlAccordion multiple>
       <PlAccordionSection
         v-if="app.model.args.antigenControlConfig.controlEnabled && hasMultiSampleNegativeControl"
@@ -874,7 +906,7 @@ const isControlOrderOpen = ref(true); // Open by default
             <template #tooltip>
               <strong>Condition-based filtering strategy:</strong><br/>
               <strong>No filtering:</strong> Analyze all clonotypes, including those specific to individual conditions (may include rare or condition-specific responses)<br/><br/>
-              <strong>Shared (all conditions):</strong> Focus only on clonotypes present in all conditions<br/><br/>
+              <strong>Shared (all conditions):</strong> Focus only on clonotypes present in all conditions (Library excluded)<br/><br/>
               <strong>Multiple conditions:</strong> Focus on clonotypes present in more than one condition (excludes condition-specific clonotypes that may represent noise or rare events)
             </template>
           </PlTooltip>

@@ -50,7 +50,7 @@ type AntigenControlConfig = {
   singleControlFrequencyThreshold: number; // Default: 0.01
   controlConditionsOrder: string[]; // e.g., ["BSA", "Plastic"]
   sequencedLibraryEnabled: boolean;
-  sequencedLibrarySampleId?: string;
+  sequencedLibraryAntigen?: string;
   hasSingleConditionNegativeControl: boolean;
   hasMultiConditionNegativeControl: boolean;
 };
@@ -115,7 +115,7 @@ export const model = BlockModel.create()
       singleControlFrequencyThreshold: 0.01,
       controlConditionsOrder: [],
       sequencedLibraryEnabled: false,
-      sequencedLibrarySampleId: undefined,
+      sequencedLibraryAntigen: undefined,
       hasSingleConditionNegativeControl: false,
       hasMultiConditionNegativeControl: false,
     },
@@ -186,6 +186,10 @@ export const model = BlockModel.create()
         || antigenControlConfig.controlConditionsOrder.length < 1
         // || antigenControlConfig.singleControlFoldChangeThreshold === undefined
         || antigenControlConfig.singleControlFrequencyThreshold === undefined) return false;
+    }
+
+    if (antigenControlConfig.sequencedLibraryEnabled) {
+      if (!antigenControlConfig.sequencedLibraryAntigen) return false;
     }
 
     return true;
@@ -285,15 +289,6 @@ export const model = BlockModel.create()
     }
 
     return { conditionColId, antigenColId };
-  })
-
-  // Sample id → label map for all datasets from sample Samples & Data block
-  .output('sampleLabels', (ctx) => {
-    const { abundanceRef: anchor } = ctx.args;
-    if (!anchor) return undefined;
-    const spec = ctx.resultPool.getPColumnSpecByRef(anchor);
-    if (!spec || !spec.axesSpec[0]) return undefined;
-    return ctx.resultPool.findLabels(spec.axesSpec[0]);
   })
 
   // Get only the sample IDs from the selected abundance column

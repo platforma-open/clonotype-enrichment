@@ -81,6 +81,12 @@ wf.body(func(args) {
 	additionalEnrichmentExports := args.additionalEnrichmentExports
 	antigenControlConfig := args.antigenControlConfig
 
+	// safety checks
+	// Sequenced library not used if there is no target
+	if antigenControlConfig.antigenEnabled == false {
+		antigenControlConfig.sequencedLibraryEnabled = false
+	}
+
 	// Prepare trace label (Frequencies are always the same, so we don't need to add the condition order)
 	// Downsampling will cause it to change, so lets add it
 	// Filtering will also cause changes, so include filtering mode
@@ -178,7 +184,7 @@ wf.body(func(args) {
 		if antigenControlConfig.sequencedLibraryEnabled {
 			calculateEnrichment = calculateEnrichment.
 				arg("--sequenced_library_enabled").
-				arg("--sequenced_library_sample_id").arg(string(antigenControlConfig.sequencedLibrarySampleId))
+				arg("--sequenced_library_antigen").arg(string(antigenControlConfig.sequencedLibraryAntigen))
 		}
 		
 		if antigenControlConfig.controlEnabled {
