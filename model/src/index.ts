@@ -190,6 +190,9 @@ export const model = BlockModel.create()
 
     if (antigenControlConfig.sequencedLibraryEnabled) {
       if (!antigenControlConfig.sequencedLibraryAntigen) return false;
+      if (conditionOrder.length === 0) return false; // no conditions to compare to
+    } else {
+      if (conditionOrder.length <= 1) return false; // no conditions to compare to
     }
 
     return true;
