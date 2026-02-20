@@ -15,7 +15,9 @@ def filter_clonotypes_by_criteria(
     present_in_rounds: Optional[List[str]] = None,
     present_in_rounds_logic: str = "OR",
     pseudo_count: float = 0.0,
-    n_clonotypes: Optional[int] = None
+    n_clonotypes: Optional[int] = None,
+    library_condition: Optional[str] = None,
+    exclude_sequenced_library: bool = False
 ) -> pl.DataFrame:
     """
     Filter clonotypes based on specified criteria.
@@ -32,6 +34,8 @@ def filter_clonotypes_by_criteria(
         present_in_rounds_logic: Logic for presence filtering ('OR' or 'AND')
         pseudo_count: Pseudo-count for frequency normalization
         n_clonotypes: Number of unique clonotypes (for proper pseudo-count normalization)
+        library_condition: Optional name of the library condition to exclude from some filters
+        exclude_sequenced_library: If True, exclude library from filter_any_zero requirement
 
     Returns:
         Filtered DataFrame with same structure as input
@@ -79,19 +83,27 @@ def filter_clonotypes_by_criteria(
 
     if filter_any_zero:
         # Filter out clonotypes with zero abundance in any sample
-        # Keep only clonotypes with non-zero abundance in ALL samples
-        all_non_zero = pivot_for_filtering.with_columns(
-            pl.concat_list([pl.when(pl.col(col) > 0).then(
-                1).otherwise(0) for col in condition_cols])
-            .list.sum()
-            .alias('non_zero_count')
-        )
+        # If exclude_sequenced_library is True, we exclude the library from this requirement.
+        # This is because the library is usually the starting material, and might not be
+        # deeply enough sequenced to capture all clonotypes that are enriched later.
+        if exclude_sequenced_library:
+            target_cols = [c for c in condition_cols if c != library_condition]
+        else:
+            target_cols = condition_cols
+        
+        if target_cols:
+            # Keep only clonotypes with non-zero abundance in ALL target samples
+            all_non_zero = pivot_for_filtering.with_columns(
+                pl.concat_list([pl.when(pl.col(col) > 0).then(1).otherwise(0) for col in target_cols])
+                .list.sum()
+                .alias('non_zero_count')
+            )
 
-        # Keep clonotypes present in ALL samples
-        any_zero_filter = all_non_zero.filter(
-            pl.col('non_zero_count') == len(condition_cols)).select('elementId')
-        elements_to_keep = any_zero_filter if elements_to_keep is None else elements_to_keep.join(
-            any_zero_filter, on='elementId', how='inner')
+            # Keep clonotypes present in ALL target samples
+            any_zero_filter = all_non_zero.filter(
+                pl.col('non_zero_count') == len(target_cols)).select('elementId')
+            elements_to_keep = any_zero_filter if elements_to_keep is None else elements_to_keep.join(
+                any_zero_filter, on='elementId', how='inner')
 
     if min_abundance > 0:
         # Filter out clonotypes with maximum abundance below threshold
@@ -257,7 +269,8 @@ def hybrid_enrichment_analysis(
     single_control_frequency_threshold: float = 0.01,
     current_target: Optional[str] = None,
     sequenced_library_enabled: bool = False,
-    sequenced_library_sample_id: Optional[str] = None,
+    sequenced_library_antigen: Optional[str] = None,
+    exclude_sequenced_library: bool = False,
 ) -> None:
     """
     Optimized hybrid enrichment analysis using polars for better performance and memory efficiency.
@@ -276,8 +289,8 @@ def hybrid_enrichment_analysis(
     - enrichment_threshold: Log2 fold change threshold for target conditions
     - control_threshold: Log2 fold change threshold for control conditions
     - current_target: The current target antigen for this iteration
-    - sequenced_library_enabled: Use the selected sequenced library sample's condition as base condition for enrichment
-    - sequenced_library_sample_id: Sample ID of the sequenced library (used as base condition when enabled)
+    - sequenced_library_enabled: Use the selected sequenced library antigen's samples as base condition for enrichment
+    - sequenced_library_antigen: Antigen column value identifying library samples (used as base condition when enabled)
     """
     # Read data with polars lazy evaluation
     # Force condition to be string to avoid type errors during comparison
@@ -289,48 +302,24 @@ def hybrid_enrichment_analysis(
     if present_in_rounds:
         present_in_rounds = [str(cond) for cond in present_in_rounds]
     library_condition: Optional[str] = None
-    if sequenced_library_enabled and sequenced_library_sample_id:
-        sample_cond = (
-            input_df.filter(pl.col("sampleId") == sequenced_library_sample_id)
-            .select("condition")
-            .unique()
-            .collect()
+    if sequenced_library_enabled and sequenced_library_antigen:
+        library_condition = "0 - Library"
+
+        # Avoid collision if any existing condition is already named "0 - Library"
+        input_df = input_df.with_columns(
+            pl.when(pl.col("condition") == "0 - Library")
+            .then(pl.lit("0 - Library_"))
+            .otherwise(pl.col("condition"))
+            .alias("condition")
         )
-        if sample_cond.height > 0:
-            raw = sample_cond["condition"][0]
-            # library_condition = "Library sample" if raw is None or str(raw).strip() == "" else str(raw)
-            # To make exports easier we will always rename for now
-            library_condition = "0 - Library"
-            
-            # If there are rows where condition is already "Library", rename them to "Library_" to avoid collision
-            input_df = input_df.with_columns(
-                pl.when(pl.col("condition") == "0 - Library")
-                .then(pl.lit("Library_"))
-                .otherwise(pl.col("condition"))
-                .alias("condition")
-            )
-            
-            # Rename to "Library" if empty, or if another sample has the same condition (to disambiguate)
-            need_rename = library_condition == "0 - Library"
-            if not need_rename:
-                other_with_same_condition = (
-                    input_df.filter(
-                        (pl.col("condition") == raw) & (pl.col("sampleId") != sequenced_library_sample_id)
-                    )
-                    .select("sampleId")
-                    .unique()
-                    .collect()
-                )
-                if other_with_same_condition.height > 0:
-                    need_rename = True
-                    library_condition = "0 - Library"
-            if need_rename:
-                input_df = input_df.with_columns(
-                    pl.when(pl.col("sampleId") == sequenced_library_sample_id)
-                    .then(pl.lit("0 - Library"))
-                    .otherwise(pl.col("condition"))
-                    .alias("condition")
-                )
+
+        # Rename condition to "0 - Library" for all samples matching the library antigen
+        input_df = input_df.with_columns(
+            pl.when(pl.col("antigen") == sequenced_library_antigen)
+            .then(pl.lit("0 - Library"))
+            .otherwise(pl.col("condition"))
+            .alias("condition")
+        )
 
     effective_condition_order: List[str] = (
         [library_condition] + [c for c in condition_order if c != library_condition]
@@ -442,14 +431,14 @@ def hybrid_enrichment_analysis(
     if has_antigen and current_target:
         target_reads = total_reads_df.filter(pl.col('antigen') == current_target)
         target_total_reads_dict = dict(zip(target_reads['condition'], target_reads['total_reads']))
-        # When sequenced library is enabled, include the library sample
-        if sequenced_library_enabled and sequenced_library_sample_id is not None:
+        # When sequenced library is enabled, include the library samples
+        if sequenced_library_enabled and sequenced_library_antigen is not None:
             library_sample_reads = aggregated_df.filter(
-                pl.col('sampleId') == sequenced_library_sample_id
+                pl.col('antigen') == sequenced_library_antigen
             ).select(pl.col('abundance').sum()).to_series().item()
             target_total_reads_dict[library_condition] = library_sample_reads
             target_track_df = aggregated_df.filter(
-                (pl.col('antigen') == current_target) | (pl.col('sampleId') == sequenced_library_sample_id)
+                (pl.col('antigen') == current_target) | (pl.col('antigen') == sequenced_library_antigen)
             )
         else:
             target_track_df = aggregated_df.filter(pl.col('antigen') == current_target)
@@ -469,7 +458,9 @@ def hybrid_enrichment_analysis(
             filter_single_sample, filter_any_zero, min_abundance,
             min_frequency, target_total_reads_dict,
             present_in_rounds, present_in_rounds_logic,
-            pseudo_count, target_n_clonotypes
+            pseudo_count, target_n_clonotypes,
+            library_condition,
+            exclude_sequenced_library
         )
 
     # After filtering, aggregate away sampleId and antigen for the pivot
@@ -545,8 +536,8 @@ def hybrid_enrichment_analysis(
     max_neg_enrichment_df = None
     if has_antigen and control_enabled and negative_antigens:
         neg_track_filter = pl.col('antigen').is_in(negative_antigens)
-        if sequenced_library_enabled and sequenced_library_sample_id is not None:
-            neg_track_filter = neg_track_filter | (pl.col('sampleId') == sequenced_library_sample_id)
+        if sequenced_library_enabled and sequenced_library_antigen is not None:
+            neg_track_filter = neg_track_filter | (pl.col('antigen') == sequenced_library_antigen)
             
         # Filter for all negative antigens; when sequenced library is enabled, include library sample too
         neg_track_df = aggregated_df.filter(neg_track_filter)
@@ -569,8 +560,8 @@ def hybrid_enrichment_analysis(
 
             for neg_antigen in unique_neg_antigens:
                 antigen_filter = pl.col('antigen') == neg_antigen
-                if sequenced_library_enabled and sequenced_library_sample_id is not None:
-                    antigen_filter = antigen_filter | (pl.col('sampleId') == sequenced_library_sample_id)
+                if sequenced_library_enabled and sequenced_library_antigen is not None:
+                    antigen_filter = antigen_filter | (pl.col('antigen') == sequenced_library_antigen)
                 
                 # Include library sample in each negative antigen's track when sequenced library is enabled
                 antigen_df = neg_track_df.filter(antigen_filter)
@@ -1282,8 +1273,10 @@ if __name__ == "__main__":
                         help="The current target antigen for this iteration")
     parser.add_argument("--sequenced_library_enabled", action="store_true",
                         help="Enable usage of the selected sequenced library sample's condition as base condition for enrichment")
-    parser.add_argument("--sequenced_library_sample_id", type=str, required=False,
-                        help="Sample ID of the sequenced library (used as base condition when enabled)")
+    parser.add_argument("--sequenced_library_antigen", type=str, required=False,
+                        help="Antigen column value identifying library samples (used as base condition when enabled)")
+    parser.add_argument("--exclude_sequenced_library", action="store_true",
+                        help="Exclude library from the Shared (all conditions) filter requirement")
 
     args = parser.parse_args()
 
@@ -1317,5 +1310,6 @@ if __name__ == "__main__":
         single_control_frequency_threshold=args.single_control_frequency_threshold,
         current_target=args.current_target,
         sequenced_library_enabled=args.sequenced_library_enabled,
-        sequenced_library_sample_id=args.sequenced_library_sample_id
+        sequenced_library_antigen=args.sequenced_library_antigen,
+        exclude_sequenced_library=args.exclude_sequenced_library
     )

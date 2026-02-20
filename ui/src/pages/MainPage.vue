@@ -218,21 +218,10 @@ watch(conditionsExcludedAlertKey, (key) => {
 /** Options for condition order list and present-in-rounds filter (current order). */
 const conditionOrderOptions = computed(() => mapToOptions([...app.model.args.conditionOrder]));
 
-/** Sample options (id as value, label from model or id fallback) for sequenced library selection. */
-const sampleOptions = computed(() => {
-  const bySample = metadataFetched.value?.conditionBySample;
-  if (!bySample) return [];
-  const labels = app.model.outputs.sampleLabels as Record<string | number, string> | undefined;
-  return Object.keys(bySample).sort().map((id) => ({
-    value: id,
-    label: labels?.[id] ?? id,
-  }));
-});
-
 /** Antigens map to their conditions. */
 const antigenConditionsMap = computed(() => {
   const raw = metadataFetched.value;
-  if (!raw?.conditionBySample || !raw?.antigenBySample) return {};
+  if (!raw?.conditionBySample || !raw?.antigenBySample) return undefined;
   const counts: Record<string, Set<string>> = {};
   for (const [sampleId, antigenValue] of Object.entries(raw.antigenBySample)) {
     if (!counts[antigenValue]) counts[antigenValue] = new Set();
@@ -244,33 +233,68 @@ const antigenConditionsMap = computed(() => {
 
 /** Antigens that appear in at least 2 conditions (required for target selection). */
 const antigenValuesList = computed(() => {
-  return Object.entries(antigenConditionsMap.value)
+  const map = antigenConditionsMap.value;
+  if (!map) return [];
+  return Object.entries(map)
     .filter(([, conditions]) => conditions.size >= 2)
     .map(([antigen]) => antigen);
 });
-const antigenValues = computed(() => mapToOptions(antigenValuesList.value));
+const antigenValues = computed(() => {
+  const list = antigenValuesList.value;
+  const current = app.model.args.antigenControlConfig.targetAntigen;
+  // If we're loading or have a value not in the list (temporary state), include it to avoid UI error
+  if (current && !list.includes(current)) {
+    return mapToOptions([current, ...list]);
+  }
+  return mapToOptions(list);
+});
 
 /** Antigen options excluding the selected target (for negative control dropdown). */
 const negativeAntigenValues = computed(() => {
+  const current = app.model.args.antigenControlConfig.negativeAntigens;
   const target = app.model.args.antigenControlConfig.targetAntigen;
+  const map = antigenConditionsMap.value;
+  if (!map) {
+    // During loading, show current selections if any
+    return mapToOptions(current || []);
+  }
   // Use all antigens (>= 1 condition), not just those with >= 2 conditions
-  const allAntigens = Object.keys(antigenConditionsMap.value);
+  const allAntigens = Object.keys(map);
   const filtered = allAntigens.filter((v) => v !== target);
-  return mapToOptions(filtered);
+
+  // Ensure currently selected antigens are in the list (e.g. if one was removed from metadata)
+  const list = [...new Set([...filtered, ...current])];
+  return mapToOptions(list);
+});
+
+/** Antigen options excluding target and negative controls (for sequenced library dropdown). */
+const libraryAntigenValues = computed(() => {
+  const current = app.model.args.antigenControlConfig.sequencedLibraryAntigen;
+  const target = app.model.args.antigenControlConfig.targetAntigen;
+  const negatives = new Set(app.model.args.antigenControlConfig.negativeAntigens);
+  const map = antigenConditionsMap.value;
+  if (!map) {
+    // During loading, show current selection if any
+    return mapToOptions(current ? [current] : []);
+  }
+  const allAntigens = Object.keys(map);
+  const filtered = allAntigens.filter((v) => v !== target && !negatives.has(v));
+
+  // Ensure currently selected antigen is in the list
+  const list = current && !filtered.includes(current) ? [current, ...filtered] : filtered;
+  return mapToOptions(list);
 });
 
 const hasSingleSampleNegativeControl = computed(() => {
-  if (!app.model.args.antigenControlConfig.controlEnabled) return false;
-  const selected = app.model.args.antigenControlConfig.negativeAntigens;
   const map = antigenConditionsMap.value;
-  return selected.some((antigen) => (map[antigen]?.size ?? 0) === 1);
+  const config = app.model.args.antigenControlConfig;
+  return !!map && config.controlEnabled && config.negativeAntigens.some((a: string) => (map[a]?.size ?? 0) === 1);
 });
 
 const hasMultiSampleNegativeControl = computed(() => {
-  if (!app.model.args.antigenControlConfig.controlEnabled) return false;
-  const selected = app.model.args.antigenControlConfig.negativeAntigens;
   const map = antigenConditionsMap.value;
-  return selected.some((antigen) => (map[antigen]?.size ?? 0) > 1);
+  const config = app.model.args.antigenControlConfig;
+  return !!map && config.controlEnabled && config.negativeAntigens.some((a: string) => (map[a]?.size ?? 0) > 1);
 });
 
 /** Condition values in samples that have the selected negative control antigens. */
@@ -290,6 +314,29 @@ const negativeControlConditionValues = computed(() => {
   return [...conditions];
 });
 const negativeControlConditionOptions = computed(() => mapToOptions(negativeControlConditionValues.value));
+
+/** Antigens whose samples have empty condition values (for error reporting). */
+const antigensWithEmptyConditions = computed(() => {
+  const raw = metadataFetched.value;
+  if (!raw?.conditionBySample || !raw?.antigenBySample) return [];
+
+  const config = app.model.args.antigenControlConfig;
+  const checkSet = new Set<string>();
+  if (config.antigenEnabled && config.targetAntigen) checkSet.add(config.targetAntigen);
+  if (config.controlEnabled && config.negativeAntigens?.length) {
+    config.negativeAntigens.forEach((a) => checkSet.add(a));
+  }
+
+  if (checkSet.size === 0) return [];
+
+  const found = new Set<string>();
+  for (const [sampleId, antigen] of Object.entries(raw.antigenBySample)) {
+    if (checkSet.has(antigen) && !raw.conditionBySample[sampleId]) {
+      found.add(antigen);
+    }
+  }
+  return [...found];
+});
 
 // Generate comparison options based on condition order
 // Creates all possible numerator-denominator pairs where numerator comes after denominator
@@ -542,6 +589,30 @@ watchEffect(() => {
   }
 });
 
+// Clear sequenced library antigen when the available options change due to user action
+// (target or negative control selection changed), but NOT on component remount.
+const librarySyncKey = ref(
+  [
+    app.model.args.antigenControlConfig.targetAntigen,
+    ...app.model.args.antigenControlConfig.negativeAntigens,
+  ].join(','),
+);
+watchEffect(() => {
+  const key = [
+    app.model.args.antigenControlConfig.targetAntigen,
+    ...app.model.args.antigenControlConfig.negativeAntigens,
+  ].join(',');
+  const current = app.model.args.antigenControlConfig.sequencedLibraryAntigen;
+
+  if (key !== librarySyncKey.value) {
+    // User changed target or negative controls — clear if no longer valid
+    if (current && !libraryAntigenValues.value.some((opt) => opt.value === current)) {
+      app.model.args.antigenControlConfig.sequencedLibraryAntigen = undefined;
+    }
+    librarySyncKey.value = key;
+  }
+});
+
 // Filtering options
 const filteringOptions = [
   { value: 'none', label: 'No filtering' },
@@ -600,6 +671,14 @@ const isControlOrderOpen = ref(true); // Open by default
     />
     <PlDropdown v-model="app.model.args.conditionColumnRef" :options="app.model.outputs.metadataOptions" label="Condition column" required />
 
+    <PlAlert
+      v-if="antigensWithEmptyConditions.length > 0"
+      type="error"
+    >
+      Some samples matching the <b>{{ antigensWithEmptyConditions.join(', ') }}</b> antigen have empty values in the condition column.
+      Please provide valid condition names in your metadata to include these samples in the analysis.
+    </PlAlert>
+
     <PlAccordion multiple>
       <PlAccordionSection v-model="isConditionOrderOpen" label="Condition Order">
         <div style="display: flex; margin-bottom: -15px;">
@@ -643,7 +722,7 @@ const isControlOrderOpen = ref(true); // Open by default
           type="warn"
           closeable
         >
-          Conditions not present in samples for the selected target antigen were removed: {{ conditionsExcludedByTarget.join(', ') }}.
+          When <strong>Target</strong> is defined, only target-specific conditions are allowed. Removed: {{ conditionsExcludedByTarget.join(', ') }}.
         </PlAlert>
       </PlAccordionSection>
     </PlAccordion>
@@ -742,18 +821,29 @@ const isControlOrderOpen = ref(true); // Open by default
       <PlTooltip v-if="app.model.args.antigenControlConfig.antigenEnabled" class="info">
         <template #tooltip>
           <div>
-            When enabled, you can select a sample that represents your sequenced naive library. This sample will be used as the reference (baseline) for enrichment fold-change calculations, for both the target antigen and negative controls.
+            When enabled, you can select the library from the antigen column values. The samples associated with this library will be used as the reference (baseline) for enrichment fold-change calculations, for both the target antigen and negative controls.
           </div>
         </template>
       </PlTooltip>
     </div>
     <PlDropdown
-      v-if="app.model.args.antigenControlConfig.antigenEnabled && app.model.args.antigenControlConfig.sequencedLibraryEnabled"
-      v-model="app.model.args.antigenControlConfig.sequencedLibrarySampleId"
-      :options="sampleOptions"
-      label="Sample"
-      clearable
+      v-if="app.model.args.antigenControlConfig.antigenEnabled
+        && app.model.args.antigenControlConfig.sequencedLibraryEnabled
+        && (libraryAntigenValues.length > 0 || !metadataFetched.value)"
+      v-model="app.model.args.antigenControlConfig.sequencedLibraryAntigen"
+      :options="libraryAntigenValues"
+      label="Library"
     />
+    <PlAlert
+      v-if="app.model.args.antigenControlConfig.antigenEnabled
+        && app.model.args.antigenControlConfig.sequencedLibraryEnabled
+        && libraryAntigenValues.length === 0
+        && metadataFetched.value"
+      type="error"
+      icon
+    >
+      No options available. Only antigen column values not used as target or negative controls are shown.
+    </PlAlert>
     <PlAccordion multiple>
       <PlAccordionSection
         v-if="app.model.args.antigenControlConfig.controlEnabled && hasMultiSampleNegativeControl"
@@ -874,12 +964,28 @@ const isControlOrderOpen = ref(true); // Open by default
             <template #tooltip>
               <strong>Condition-based filtering strategy:</strong><br/>
               <strong>No filtering:</strong> Analyze all clonotypes, including those specific to individual conditions (may include rare or condition-specific responses)<br/><br/>
-              <strong>Shared (all conditions):</strong> Focus only on clonotypes present in all conditions<br/><br/>
+              <strong>Shared (all conditions):</strong> Focus only on clonotypes present in all conditions (Library excluded)<br/><br/>
               <strong>Multiple conditions:</strong> Focus on clonotypes present in more than one condition (excludes condition-specific clonotypes that may represent noise or rare events)
             </template>
           </PlTooltip>
         </template>
       </PlRadioGroup>
+      <PlCheckbox
+        v-if="app.model.args.FilteringConfig.baseFilter === 'shared' &&
+          app.model.args.antigenControlConfig.sequencedLibraryEnabled &&
+          app.model.args.antigenControlConfig.sequencedLibraryAntigen !== undefined"
+        v-model="app.model.args.FilteringConfig.excludeSequencedLibrary"
+      >
+        Exclude Sequenced Library
+        <PlTooltip class="info">
+          <template #tooltip>
+            <div>
+              <strong>Exclude Library from Shared Filter</strong><br/><br/>
+              Libraries are often too diverse to be fully captured by sequencing. This option ensures enriched binders are not discarded just because they were stochastically missed in the Library sequencing.
+            </div>
+          </template>
+        </PlTooltip>
+      </PlCheckbox>
       <PlCheckbox v-model="app.model.args.FilteringConfig.minAbundance.enabled">
         Based on abundance
         <PlTooltip class="info">

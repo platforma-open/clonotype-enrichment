@@ -81,6 +81,12 @@ wf.body(func(args) {
 	additionalEnrichmentExports := args.additionalEnrichmentExports
 	antigenControlConfig := args.antigenControlConfig
 
+	// safety checks
+	// Sequenced library not used if there is no target
+	if antigenControlConfig.antigenEnabled == false {
+		antigenControlConfig.sequencedLibraryEnabled = false
+	}
+
 	// Prepare trace label (Frequencies are always the same, so we don't need to add the condition order)
 	// Downsampling will cause it to change, so lets add it
 	// Filtering will also cause changes, so include filtering mode
@@ -178,7 +184,7 @@ wf.body(func(args) {
 		if antigenControlConfig.sequencedLibraryEnabled {
 			calculateEnrichment = calculateEnrichment.
 				arg("--sequenced_library_enabled").
-				arg("--sequenced_library_sample_id").arg(string(antigenControlConfig.sequencedLibrarySampleId))
+				arg("--sequenced_library_antigen").arg(string(antigenControlConfig.sequencedLibraryAntigen))
 		}
 		
 		if antigenControlConfig.controlEnabled {
@@ -200,6 +206,9 @@ wf.body(func(args) {
 			calculateEnrichment = calculateEnrichment.arg("--filter_single_sample")
 		} else if FilteringConfig.baseFilter == "shared" {
 			calculateEnrichment = calculateEnrichment.arg("--filter_any_zero")
+			if FilteringConfig.excludeSequencedLibrary && antigenControlConfig.sequencedLibraryEnabled {
+				calculateEnrichment = calculateEnrichment.arg("--exclude_sequenced_library")
+			}
 		}
 	}
 
@@ -243,13 +252,12 @@ wf.body(func(args) {
 	addMaxNegControlEnrichment := false
 	addPresentInNegControl := false
 	if antigenControlConfig.controlEnabled {
-		addMaxNegControlEnrichment = antigenControlConfig.hasMultiConditionNegativeControl &&
-			!(len(antigenControlConfig.controlConditionsOrder) == 1  &&
-				antigenControlConfig.sequencedLibraryEnabled == false)
+		addMaxNegControlEnrichment = len(antigenControlConfig.controlConditionsOrder) > 1 ||
+			(len(antigenControlConfig.controlConditionsOrder) == 1  &&
+				antigenControlConfig.sequencedLibraryEnabled == true)
 			
-		addPresentInNegControl = antigenControlConfig.hasSingleConditionNegativeControl ||
-			(antigenControlConfig.sequencedLibraryEnabled == false &&
-				len(antigenControlConfig.controlConditionsOrder) == 1)
+		addPresentInNegControl = antigenControlConfig.sequencedLibraryEnabled == false &&
+			(len(antigenControlConfig.controlConditionsOrder) == 1)
 	}
 
 	enrichmentImportParams := pfEnrichmentConv.getColumns(abundanceSpec, conditionOrder, 
