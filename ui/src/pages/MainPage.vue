@@ -722,7 +722,7 @@ const isControlOrderOpen = ref(true); // Open by default
           type="warn"
           closeable
         >
-          Conditions not present in samples for the selected target antigen were removed: {{ conditionsExcludedByTarget.join(', ') }}.
+          When <strong>Target</strong> is defined, only target-specific conditions are allowed. Removed: {{ conditionsExcludedByTarget.join(', ') }}.
         </PlAlert>
       </PlAccordionSection>
     </PlAccordion>
