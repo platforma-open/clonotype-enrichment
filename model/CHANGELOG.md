@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.model
 
+## 3.2.0
+
+### Minor Changes
+
+- 8956099: Library selection by metadata and bug fixes
+
 ## 3.1.2
 
 ### Patch Changes

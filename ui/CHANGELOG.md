@@ -1,5 +1,16 @@
 # @platforma-open/milaboratories.clonotype-enrichment.ui
 
+## 3.2.0
+
+### Minor Changes
+
+- 8956099: Library selection by metadata and bug fixes
+
+### Patch Changes
+
+- Updated dependencies [8956099]
+  - @platforma-open/milaboratories.clonotype-enrichment.model@3.2.0
+
 ## 3.1.2
 
 ### Patch Changes
