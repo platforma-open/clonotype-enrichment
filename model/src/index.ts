@@ -362,7 +362,7 @@ export const model = BlockModel.create()
   })
 
   // Returns a map of results for main table
-  .outputWithStatus('pt', (ctx) => {
+  .retentiveOutputWithStatus('pt', (ctx) => {
     const pCols = ctx.outputs?.resolve('enrichmentPf')?.getPColumns();
 
     if (pCols === undefined) {
@@ -381,7 +381,7 @@ export const model = BlockModel.create()
   })
 
   // Returns a map of results for plot
-  .outputWithStatus('bubblePf', (ctx): PFrameHandle | undefined => {
+  .retentiveOutputWithStatus('bubblePf', (ctx): PFrameHandle | undefined => {
     const pCols = ctx.outputs?.resolve('bubblePf')?.getPColumns();
     if (pCols === undefined) {
       return undefined;
@@ -406,7 +406,7 @@ export const model = BlockModel.create()
     );
   })
 
-  .outputWithStatus('stackedPf', (ctx): PFrameHandle | undefined => {
+  .retentiveOutputWithStatus('stackedPf', (ctx): PFrameHandle | undefined => {
     const pCols = ctx.outputs?.resolve('stackedPf')?.getPColumns();
     if (pCols === undefined) {
       return undefined;
@@ -430,7 +430,7 @@ export const model = BlockModel.create()
     );
   })
 
-  .outputWithStatus('linePf', (ctx): PFrameHandle | undefined => {
+  .retentiveOutputWithStatus('linePf', (ctx): PFrameHandle | undefined => {
     const pCols = ctx.outputs?.resolve('linePf')?.getPColumns();
     if (pCols === undefined) {
       return undefined;
@@ -441,7 +441,7 @@ export const model = BlockModel.create()
 
   .output('isRunning', (ctx) => ctx.outputs?.getIsReadyOrError() === false)
 
-  .outputWithStatus('controlScatterPf', (ctx): PFrameHandle | undefined => {
+  .retentiveOutputWithStatus('controlScatterPf', (ctx): PFrameHandle | undefined => {
     const pCols = ctx.outputs?.resolve({ field: 'controlScatterPf', allowPermanentAbsence: true })?.getPColumns();
     if (pCols === undefined) {
       return undefined;
