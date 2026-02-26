@@ -1058,10 +1058,12 @@ const isControlOrderOpen = ref(true); // Open by default
         label="Pseudo-count"
         :minValue="0"
         :step="1"
-        placeholder="100"
+        placeholder="1"
       >
         <template #tooltip>
-          (Default: 100) Represents detection threshold for display campaigns. For <em>in vivo</em> studies, consider lower values (10-50).
+          <p><strong>Pseudo-count (Default: 1)</strong></p>
+          <p>A value added to all clonotype counts to stabilize fold-change estimates and avoid division by zero.</p>
+          <p>Increasing the pseudo-count reduces the impact of sampling noise and moderates extreme enrichment values. This is particularly useful for highly enriched clonotypes that are absent in the reference sample (e.g., in <strong>display campaigns</strong>).</p>
         </template>
       </PlNumberField>
       <PlNumberField
