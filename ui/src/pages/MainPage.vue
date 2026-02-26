@@ -1056,7 +1056,7 @@ const isControlOrderOpen = ref(true); // Open by default
       <PlNumberField
         v-model="app.model.args.pseudoCount"
         label="Pseudo-count"
-        :minValue="0"
+        :minValue="1"
         :step="1"
         placeholder="1"
       >
