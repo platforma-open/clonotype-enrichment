@@ -80,7 +80,7 @@ export type BlockArgs = {
   additionalEnrichmentExports: string[];
   antigenControlConfig: AntigenControlConfig;
   enrichmentThreshold: number; // Default: 2.0 log2 FC
-  pseudoCount: number; // Default: 100
+  pseudoCount: number; // Default: 1
 };
 
 export const model = BlockModel.create()
@@ -123,7 +123,7 @@ export const model = BlockModel.create()
       hasMultiConditionNegativeControl: false,
     },
     enrichmentThreshold: 2.0,
-    pseudoCount: 100,
+    pseudoCount: 1,
   })
 
   .withUiState<UiState>({
