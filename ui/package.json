@@ -1,6 +1,6 @@
 {
   "name": "@platforma-open/milaboratories.clonotype-enrichment.ui",
-  "version": "3.2.0",
+  "version": "3.2.1",
   "type": "module",
   "scripts": {
     "build": "ts-builder build --target block-ui",

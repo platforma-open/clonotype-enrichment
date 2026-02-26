@@ -1,5 +1,13 @@
 # @platforma-open/milaboratories.clonotype-enrichment.ui
 
+## 3.2.1
+
+### Patch Changes
+
+- bf55aca: Modify default pseudocount
+- Updated dependencies [bf55aca]
+  - @platforma-open/milaboratories.clonotype-enrichment.model@3.2.1
+
 ## 3.2.0
 
 ### Minor Changes
