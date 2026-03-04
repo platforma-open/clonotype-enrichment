@@ -392,21 +392,9 @@ def hybrid_enrichment_analysis(
     input_df = input_df.select(needed_cols).with_columns(
         pl.col('condition').cast(pl.Utf8))
 
-    # Calculate total reads per condition and antigen if applicable
-    group_total_reads = ['condition']
-    if has_antigen:
-        group_total_reads.append('antigen')
-
-    total_reads_df = (
-        input_df
-        .group_by(group_total_reads)
-        .agg(pl.col('abundance').sum().alias('total_reads'))
-        .collect()
-    )
-
-    # Create aggregated data first, then pivot (pivot requires DataFrame, not LazyFrame)
-    # We need to keep sampleId and antigen if we want to use them in filtering
-    group_cols = ['sampleId', 'elementId', 'condition']
+    # Aggregate at elementId+condition level directly — sampleId is not needed downstream.
+    # Single CSV scan; total_reads derived from the already-collected frame below.
+    group_cols = ['elementId', 'condition']
     if has_antigen:
         group_cols.append("antigen")
 
@@ -417,13 +405,23 @@ def hybrid_enrichment_analysis(
         .collect()
     )
 
+    # Derive total reads from already-collected data (no second CSV scan)
+    group_total_reads = ['condition']
+    if has_antigen:
+        group_total_reads.append('antigen')
+
+    total_reads_df = (
+        aggregated_df
+        .group_by(group_total_reads)
+        .agg(pl.col('abundance').sum().alias('total_reads'))
+    )
+
     # Generate consistent labels BEFORE filtering based on alphabetical elementId order
     # This ensures each clonotype gets the same label regardless of filtering
     all_element_ids = aggregated_df.select(
         'elementId').unique().sort('elementId')
     label_mapping = all_element_ids.with_row_index("_row_index").with_columns(
-        (pl.col('_row_index') +
-         1).map_elements(lambda x: f"C{int(x)}", return_dtype=pl.Utf8).alias('Label')
+        ("C" + (pl.col('_row_index') + 1).cast(pl.Utf8)).alias('Label')
     ).select(['elementId', 'Label'])
 
     # --- Target Track Processing ---
@@ -463,12 +461,15 @@ def hybrid_enrichment_analysis(
             exclude_sequenced_library
         )
 
-    # After filtering, aggregate away sampleId and antigen for the pivot
-    target_track_pivot_ready = (
-        target_track_df
-        .group_by(['elementId', 'condition'])
-        .agg(pl.col('abundance').sum().alias('abundance'))
-    )
+    # Aggregate away antigen for the pivot if needed; no sampleId to drop any more.
+    if has_antigen:
+        target_track_pivot_ready = (
+            target_track_df
+            .group_by(['elementId', 'condition'])
+            .agg(pl.col('abundance').sum().alias('abundance'))
+        )
+    else:
+        target_track_pivot_ready = target_track_df
 
     # Check if we have too few clonotypes after filtering
     if filtered_too_much_txt:
@@ -765,7 +766,7 @@ def hybrid_enrichment_analysis(
         
         # Generate max frequency column
         enrichment_results = enrichment_results.with_columns(
-            pl.concat_list(freq_cols).list.max().alias('_max_freq')
+            pl.max_horizontal(freq_cols).alias('_max_freq')
         )
         
         # Calculate thresholds (percentiles) from the current data
@@ -862,11 +863,11 @@ def _calculate_enrichments_vectorized(
     # Now calculate max positive enrichment to match original pandas behavior
     if enrichment_col_names:
         # Match original pandas behavior: clip negative values to 0, then find max
-        max_pos_enrich_expr = pl.concat_list([
+        max_pos_enrich_expr = pl.max_horizontal([
             pl.when(pl.col(col).is_null()).then(
                 0).otherwise(pl.col(col).clip(lower_bound=0))
             for col in enrichment_col_names
-        ]).list.max().alias('MaxPositiveEnrichment')
+        ]).alias('MaxPositiveEnrichment')
 
         result_df = result_df.with_columns(max_pos_enrich_expr)
 
@@ -882,6 +883,68 @@ def _calculate_enrichments_vectorized(
         result_cols = ['elementId'] + result_cols
         
     return result_df.select(result_cols)
+
+
+def _compute_highest_enrichment(
+    enrichment_results: pl.DataFrame,
+    enrichment_cols: List[str],
+    extra_cols: List[str],
+) -> pl.DataFrame:
+    """
+    Compute one row per clonotype: the pairwise comparison with the highest enrichment value.
+
+    Works directly on the wide enrichment_results frame (N rows) without building the
+    N×K tall intermediate table, so it scales O(N) instead of O(N*K).
+    """
+    output_cols = (
+        ['elementId', 'Label', 'Comparison', 'Numerator', 'Denominator',
+         'Enrichment', 'Frequency_Numerator'] + extra_cols
+    )
+    if not enrichment_cols:
+        return pl.DataFrame(schema={c: pl.Utf8 for c in output_cols})
+
+    # Per-row maximum enrichment across all comparisons; null → -inf so a non-null value always wins.
+    _NEG_INF = float('-inf')
+    max_enrich_expr = pl.max_horizontal([
+        pl.col(c).fill_null(_NEG_INF) for c in enrichment_cols
+    ]).alias('_max_enrich_val')
+
+    # Build when/then chains (reversed so the first matching column wins for ties).
+    comp_expr = pl.lit(None).cast(pl.Utf8)
+    num_expr  = pl.lit(None).cast(pl.Utf8)
+    den_expr  = pl.lit(None).cast(pl.Utf8)
+    freq_expr = pl.lit(None).cast(pl.Float64)
+
+    for col in reversed(enrichment_cols):
+        comparison = col.replace('Enrichment ', '')
+        numerator, denominator = comparison.split(' vs ')
+        freq_col = f'Frequency {numerator}'
+        freq_val = (
+            pl.col(freq_col)
+            if freq_col in enrichment_results.columns
+            else pl.lit(None).cast(pl.Float64)
+        )
+        cond = pl.col(col).is_not_null() & (pl.col(col) == pl.col('_max_enrich_val'))
+        comp_expr = pl.when(cond).then(pl.lit(comparison)).otherwise(comp_expr)
+        num_expr  = pl.when(cond).then(pl.lit(numerator)).otherwise(num_expr)
+        den_expr  = pl.when(cond).then(pl.lit(denominator)).otherwise(den_expr)
+        freq_expr = pl.when(cond).then(freq_val).otherwise(freq_expr)
+
+    return (
+        enrichment_results
+        .with_columns(max_enrich_expr)
+        # Keep only rows where at least one enrichment is non-null
+        .filter(pl.any_horizontal([pl.col(c).is_not_null() for c in enrichment_cols]))
+        .with_columns([
+            comp_expr.alias('Comparison'),
+            num_expr.alias('Numerator'),
+            den_expr.alias('Denominator'),
+            freq_expr.alias('Frequency_Numerator'),
+            pl.col('_max_enrich_val').alias('Enrichment'),
+        ])
+        .select(output_cols)
+        .sort(['Enrichment', 'elementId'], descending=[True, False])
+    )
 
 
 def _process_outputs(
@@ -903,19 +966,13 @@ def _process_outputs(
         col for col in enrichment_results.collect_schema().names() if col.startswith('Enrichment ')]
 
     if enrichment_cols:
-        # Create detailed enrichment table efficiently
-        enrichment_detailed = _create_detailed_enrichment_table(
-            enrichment_results, enrichment_cols, condition_order
-        )
-
         # Save highest enrichment if requested
         if highest_enrichment_csv:
-            highest_enrichment = (
-                enrichment_detailed
-                .filter(pl.col('Enrichment').is_not_null())
-                .group_by(['elementId', 'Label'])
-                .agg(pl.all().sort_by(['Enrichment', 'elementId'], descending=[True, False]).first())
-                .sort(['Enrichment', 'elementId'], descending=[True, False])
+            _extra = [c for c in ['Overall Log2FC', 'Binding Specificity', 'EnrichmentQuality',
+                                  'MaxNegControlEnrichment', 'PresentInNegControl']
+                      if c in enrichment_results.columns]
+            highest_enrichment = _compute_highest_enrichment(
+                enrichment_results, enrichment_cols, _extra
             )
             highest_enrichment.write_csv(highest_enrichment_csv)
 
@@ -974,66 +1031,44 @@ def _create_detailed_enrichment_table(
     condition_order: List[str]
 ) -> pl.DataFrame:
     """
-    Create detailed enrichment table efficiently using polars operations.
+    Create detailed enrichment table using direct column selection per comparison.
+    Avoids the expensive melt+melt+join pattern on large DataFrames.
     """
-    # Identify additional columns to preserve
     extra_cols = []
     for col in ['Overall Log2FC', 'Binding Specificity', 'EnrichmentQuality', 'MaxNegControlEnrichment', 'PresentInNegControl']:
         if col in enrichment_results.columns:
             extra_cols.append(col)
 
-    # Melt enrichment data
-    id_vars = ['elementId', 'Label'] + extra_cols
-    enrichment_melted = (
-        enrichment_results
-        .select(id_vars + enrichment_cols)
-        .melt(
-            id_vars=id_vars,
-            value_vars=enrichment_cols,
-            variable_name='Comparison',
-            value_name='Enrichment'
+    base_select = [pl.col(c) for c in ['elementId', 'Label'] + extra_cols]
+    output_cols = ['elementId', 'Label', 'Comparison', 'Numerator', 'Denominator', 'Enrichment', 'Frequency_Numerator'] + extra_cols
+
+    if not enrichment_cols:
+        return pl.DataFrame(schema={c: pl.Utf8 for c in output_cols})
+
+    parts = []
+    for col in enrichment_cols:
+        comparison = col.replace('Enrichment ', '')
+        numerator, denominator = comparison.split(' vs ')
+        freq_col = f'Frequency {numerator}'
+        freq_expr = (
+            pl.col(freq_col).alias('Frequency_Numerator')
+            if freq_col in enrichment_results.columns
+            else pl.lit(None).cast(pl.Float64).alias('Frequency_Numerator')
         )
-        .filter(pl.col('Enrichment').is_not_null())
-    )
-
-    # Extract numerator and denominator
-    enrichment_melted = enrichment_melted.with_columns([
-        pl.col('Comparison').str.replace(
-            'Enrichment ', '').alias('comparison_clean'),
-        pl.col('Comparison').str.replace('Enrichment ', '').str.split(
-            ' vs ').list.get(0).alias('Numerator'),
-        pl.col('Comparison').str.replace('Enrichment ', '').str.split(
-            ' vs ').list.get(1).alias('Denominator')
-    ])
-
-    # Add frequency data
-    freq_cols = [f'Frequency {cond}' for cond in condition_order]
-    freq_melted = (
-        enrichment_results
-        .select(['elementId', 'Label'] + freq_cols)
-        .melt(
-            id_vars=['elementId', 'Label'],
-            value_vars=freq_cols,
-            variable_name='ConditionFull',
-            value_name='Frequency_Numerator'
+        part = (
+            enrichment_results
+            .select(base_select + [
+                pl.lit(comparison).alias('Comparison'),
+                pl.lit(numerator).alias('Numerator'),
+                pl.lit(denominator).alias('Denominator'),
+                pl.col(col).alias('Enrichment'),
+                freq_expr,
+            ])
+            .filter(pl.col('Enrichment').is_not_null())
         )
-        .with_columns(
-            pl.col('ConditionFull').str.replace(
-                'Frequency ', '').alias('Numerator')
-        )
-        .select(['elementId', 'Label', 'Numerator', 'Frequency_Numerator'])
-    )
+        parts.append(part)
 
-    # Join enrichment with frequency data
-    result = enrichment_melted.join(
-        freq_melted,
-        on=['elementId', 'Label', 'Numerator'],
-        how='left'
-    ).select([
-        'elementId', 'Label', 'comparison_clean', 'Numerator', 'Denominator', 'Enrichment', 'Frequency_Numerator'
-    ] + extra_cols).rename({'comparison_clean': 'Comparison'})
-
-    return result
+    return pl.concat(parts).select(output_cols)
 
 
 def _create_bubble_data(
