@@ -1105,60 +1105,35 @@ def _create_bubble_data(
     )
 
     # Filter data for top clonotypes
-    bubble_data = filtered_data.join(
-        top_clonotypes, on='elementId', how='inner')
+    top_data = filtered_data.join(top_clonotypes, on='elementId', how='inner')
 
-    # Create bubble data efficiently
-    enrichment_cols = [
-        col for col in bubble_data.collect_schema().names() if col.startswith('Enrichment ')]
-    
-    # Identify extra columns to include
-    extra_cols = []
-    for col in ['Binding Specificity', 'MaxNegControlEnrichment', 'PresentInNegControl', 'EnrichmentQuality']:
-        if col in bubble_data.columns:
-            extra_cols.append(col)
-            
-    bubble_rows = []
+    enrichment_cols = [c for c in top_data.columns if c.startswith('Enrichment ')]
+    condition_order = [c.replace('Frequency ', '') for c in top_data.columns if c.startswith('Frequency ')]
 
-    for row in bubble_data.iter_rows(named=True):
-        element_id = row['elementId']
-        label = row['Label']
-        max_val = row[max_col]
-        
-        # Prepare extra data
-        extra_data = {col: row[col] for col in extra_cols}
+    # Wide → long via shared helper; keep only positive enrichments
+    result = (
+        _create_detailed_enrichment_table(top_data, enrichment_cols, condition_order)
+        .filter(pl.col('Enrichment') > 0)
+    )
 
-        for col in enrichment_cols:
-            enrich_val = row[col]
-            if enrich_val is not None and enrich_val > 0:
-                # Parse comparison
-                comparison = col.replace('Enrichment ', '')
-                numerator, denominator = comparison.split(' vs ')
-                freq_val = row.get(f'Frequency {numerator}', None)
-
-                row_data = {
-                    'elementId': element_id,
-                    'Label': label,
-                    'Numerator': numerator,
-                    'Denominator': denominator,
-                    'Enrichment': enrich_val,
-                    'Frequency_Numerator': freq_val,
-                    max_col: max_val
-                }
-                row_data.update(extra_data)
-                bubble_rows.append(row_data)
-
-    if bubble_rows:
-        return pl.DataFrame(bubble_rows)
-    else:
+    if result.height == 0:
         schema = {
             'elementId': pl.Utf8, 'Label': pl.Utf8, 'Numerator': pl.Utf8,
             'Denominator': pl.Utf8, 'Enrichment': pl.Float64,
             'Frequency_Numerator': pl.Float64, 'MaxPositiveEnrichment': pl.Float64,
-            'Binding Specificity': pl.Utf8, 'MaxNegControlEnrichment': pl.Float64, 'PresentInNegControl': pl.Boolean,
-            'EnrichmentQuality': pl.Utf8
+            'Binding Specificity': pl.Utf8, 'MaxNegControlEnrichment': pl.Float64,
+            'PresentInNegControl': pl.Boolean, 'EnrichmentQuality': pl.Utf8
         }
         return pl.DataFrame(schema=schema)
+
+    # Join MaxPositiveEnrichment back (not part of _create_detailed_enrichment_table output)
+    result = result.join(top_data.select(['elementId', max_col]), on='elementId', how='left')
+
+    extra_cols = [c for c in ['Binding Specificity', 'MaxNegControlEnrichment', 'PresentInNegControl', 'EnrichmentQuality']
+                  if c in result.columns]
+    output_cols = ['elementId', 'Label', 'Numerator', 'Denominator', 'Enrichment',
+                   'Frequency_Numerator', max_col] + extra_cols
+    return result.select([c for c in output_cols if c in result.columns])
 
 def _get_enrichment_cols_vs_first(
     enrichment_results: pl.DataFrame,
