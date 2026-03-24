@@ -1,5 +1,13 @@
 # @platforma-open/milaboratories.clonotype-enrichment.ui
 
+## 3.2.2
+
+### Patch Changes
+
+- 870d494: Update default values
+- Updated dependencies [870d494]
+  - @platforma-open/milaboratories.clonotype-enrichment.model@3.2.2
+
 ## 3.2.1
 
 ### Patch Changes
