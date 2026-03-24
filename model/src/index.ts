@@ -90,12 +90,12 @@ export const model = BlockModel.create()
     customBlockLabel: '',
     conditionOrder: [],
     downsampling: {
-      type: 'hypergeometric',
+      type: 'none',
       valueChooser: 'auto',
     },
     clonotypeDefinition: [],
     FilteringConfig: {
-      baseFilter: 'none',
+      baseFilter: 'single-sample',
       minAbundance: {
         enabled: false,
         threshold: 100,

@@ -562,7 +562,7 @@ watchEffect(() => {
     // 2. The dataset type (clustered vs regular) has changed (self-correction for lag).
     if (abundanceRefStr !== syncAbundanceRef.value || isClustered !== syncIsClustered.value) {
       if (isClustered) {
-        app.model.args.FilteringConfig.baseFilter = 'shared';
+        app.model.args.FilteringConfig.baseFilter = 'single-sample';
         app.model.args.FilteringConfig.minAbundance.enabled = false;
       } else {
         app.model.args.FilteringConfig.baseFilter = 'none';
