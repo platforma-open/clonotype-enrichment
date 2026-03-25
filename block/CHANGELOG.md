@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment
 
+## 2.2.42
+
+### Patch Changes
+
+- 2925661: Downgrade @milaboratories/graph-maker to 1.1.224
+
 ## 2.2.41
 
 ### Patch Changes
