@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.ui
 
+## 3.2.3
+
+### Patch Changes
+
+- 1529eae: update graph-maker version
+
 ## 3.2.2
 
 ### Patch Changes
