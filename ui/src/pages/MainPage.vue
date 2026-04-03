@@ -53,6 +53,13 @@ watchEffect(() => {
   const sequenceColumnOptions = app.model.outputs.sequenceColumnOptions;
   const baseFilter = app.model.args.FilteringConfig.baseFilter;
 
+  // Skip label update when sequenceColumnOptions is transiently unavailable but clonotype
+  // definitions are selected — avoids arg churn that marks the block stale and flickers the
+  // run button while upstream blocks are recalculating.
+  if (clonotypeDefinition && clonotypeDefinition.length > 0 && !sequenceColumnOptions) {
+    return;
+  }
+
   let label = '';
 
   // Add clonotype definition prefix if selected
@@ -581,9 +588,10 @@ watch(() => app.model.args.antigenControlConfig.controlEnabled, (enabled) => {
   }
 });
 
-// Sync control flags to model
+// Sync control flags to model — only when metadata is loaded to avoid transient arg changes
+// that mark the block stale and flicker the run button while upstream blocks recalculate.
 watchEffect(() => {
-  if (app.model.args.antigenControlConfig) {
+  if (app.model.args.antigenControlConfig && antigenConditionsMap.value) {
     app.model.args.antigenControlConfig.hasSingleConditionNegativeControl = hasSingleSampleNegativeControl.value;
     app.model.args.antigenControlConfig.hasMultiConditionNegativeControl = hasMultiSampleNegativeControl.value;
   }
