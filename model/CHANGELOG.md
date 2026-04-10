@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.model
 
+## 3.2.3
+
+### Patch Changes
+
+- 8a37399: Add clone sequence column
+
 ## 3.2.2
 
 ### Patch Changes

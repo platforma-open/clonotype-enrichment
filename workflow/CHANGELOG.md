@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.workflow
 
+## 3.2.1
+
+### Patch Changes
+
+- 8a37399: Add clone sequence column
+
 ## 3.2.0
 
 ### Minor Changes
