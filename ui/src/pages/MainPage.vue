@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import type { PlRef } from '@platforma-sdk/model';
-import { getRawPlatformaInstance, getSingleColumnData, type PObjectId } from '@platforma-sdk/model';
+import type { PColumnIdAndSpec, PlRef, PlSelectionModel } from '@platforma-sdk/model';
+import { Annotation, getRawPlatformaInstance, getSingleColumnData, type PObjectId, readAnnotationJson } from '@platforma-sdk/model';
+import { PlMultiSequenceAlignment } from '@milaboratories/multi-sequence-alignment';
 import type {
   ListOption,
 } from '@platforma-sdk/ui-vue';
@@ -38,6 +39,17 @@ const showSettings = () => {
   settingsAreShown.value = true;
 };
 const statsOpen = ref(false);
+const msaOpen = ref(false);
+const selection = ref<PlSelectionModel>({ axesSpec: [], selectedKeys: [] });
+
+const isSequenceColumn = ({ spec }: PColumnIdAndSpec) => {
+  const isBulkSequence = spec.domain?.['pl7.app/alphabet'] === 'aminoacid';
+  const isSingleCellSequence = spec.domain?.['pl7.app/vdj/scClonotypeChain/index'] === 'primary'
+    && spec.domain?.['pl7.app/alphabet'] === 'aminoacid'
+    && spec.axesSpec[0]?.name === 'pl7.app/vdj/scClonotypeKey';
+  return (isBulkSequence || isSingleCellSequence)
+    && { default: readAnnotationJson(spec, Annotation.VDJ.IsAssemblingFeature) ?? false };
+};
 
 const mapToOptions = (values?: string[]) => values?.map((v) => ({ value: v, label: v })) ?? [];
 
@@ -637,6 +649,9 @@ const isControlOrderOpen = ref(true); // Open by default
           <PlMaskIcon24 name="statistics" />
         </template>
       </PlBtnGhost>
+      <PlBtnGhost icon="dna" @click.stop="() => (msaOpen = true)">
+        MSA
+      </PlBtnGhost>
       <PlBtnGhost @click.stop="showSettings">
         Settings
         <template #append>
@@ -655,12 +670,23 @@ const isControlOrderOpen = ref(true); // Open by default
     </PlAlert>
     <PlAgDataTableV2
       v-model="app.model.ui.tableState"
+      v-model:selection="selection"
       :settings="tableSettings"
       :loading-text="tableLoadingText"
       not-ready-text="Data is not computed"
       show-export-button
     />
   </PlBlockPage>
+
+  <PlSlideModal v-model="msaOpen" width="100%" :close-on-outside-click="false">
+    <template #title>Multiple Sequence Alignment</template>
+    <PlMultiSequenceAlignment
+      v-model="app.model.ui.alignmentModel"
+      :sequence-column-predicate="isSequenceColumn"
+      :p-frame="app.model.outputs.msaPf"
+      :selection="selection"
+    />
+  </PlSlideModal>
 
   <PlSlideModal v-model="settingsAreShown">
     <template #title>Settings</template>

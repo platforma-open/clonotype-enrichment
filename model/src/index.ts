@@ -4,6 +4,7 @@ import type {
   PColumnIdAndSpec,
   PFrameHandle,
   PlDataTableStateV2,
+  PlMultiSequenceAlignmentModel,
   PlRef,
   SUniversalPColumnId,
 } from '@platforma-sdk/model';
@@ -66,6 +67,7 @@ export type UiState = {
   stackedState: GraphMakerState;
   scatterState: GraphMakerState;
   boxState: GraphMakerState;
+  alignmentModel: PlMultiSequenceAlignmentModel;
   /** When set, the "conditions excluded by target" alert is hidden until the excluded list changes (key = sorted excluded conditions). */
   excludedAlertDismissedKey?: string;
 };
@@ -165,6 +167,7 @@ export const model = BlockModel.create()
       template: 'box',
       currentTab: null,
     },
+    alignmentModel: {},
     excludedAlertDismissedKey: undefined,
   })
 
@@ -407,6 +410,31 @@ export const model = BlockModel.create()
         coreJoinType: 'inner',
       },
     );
+  })
+
+  // PFrame for Multiple Sequence Alignment (enrichment columns + sequences from result pool)
+  .output('msaPf', (ctx) => {
+    const pCols = ctx.outputs?.resolve('enrichmentPf')?.getPColumns();
+    if (!pCols?.length) return undefined;
+
+    const anchor = ctx.args.abundanceRef;
+    if (!anchor) return undefined;
+
+    const enrichmentAxisName = pCols[0]?.spec.axesSpec[0]?.name;
+    const seqCols = (ctx.resultPool.getAnchoredPColumns(
+      { main: anchor },
+      [{ axes: [{ anchor: 'main', idx: 1 }], name: 'pl7.app/vdj/sequence' }],
+      { dontWaitAllData: true },
+    ) ?? []).filter((col) =>
+      readAnnotationJson(col.spec, Annotation.VDJ.IsAssemblingFeature) !== false
+      && col.spec.axesSpec[0]?.name === enrichmentAxisName);
+
+    if (seqCols.length === 0) return undefined;
+
+    // Use ctx.createPFrame (not createPFrameForGraphs) to avoid pulling in
+    // unrelated columns from the result pool via linker traversal (e.g. centroid
+    // sequences showing up when enrichment runs on clonotypes, not clusters)
+    return ctx.createPFrame([...pCols, ...seqCols]);
   })
 
   // Returns a map of results for plot
