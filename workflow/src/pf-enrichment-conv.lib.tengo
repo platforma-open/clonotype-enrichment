@@ -73,7 +73,8 @@ getColumns := func(countsSpec, conditionOrder, controlEnabled, addPresentInNegCo
           annotations: {
             "pl7.app/label": "Overall Log2FC",
             "pl7.app/table/visibility": "default",
-            "pl7.app/format": ".2f"
+            "pl7.app/format": ".2f",
+            "pl7.app/table/orderPriority": "90000"
           }
         }
       }, {
@@ -87,7 +88,8 @@ getColumns := func(countsSpec, conditionOrder, controlEnabled, addPresentInNegCo
           annotations: {
             "pl7.app/label": "Max Log2FC",
             "pl7.app/table/visibility": "default",
-            "pl7.app/format": ".2f"
+            "pl7.app/format": ".2f",
+            "pl7.app/table/orderPriority": "80000"
           }
         }
       }, {
@@ -101,7 +103,7 @@ getColumns := func(countsSpec, conditionOrder, controlEnabled, addPresentInNegCo
           annotations: {
             "pl7.app/label": "Enrichment Quality",
             "pl7.app/table/visibility": "default",
-            "pl7.app/table/orderPriority": "95"
+            "pl7.app/table/orderPriority": "70000"
           }
         }
       }]
@@ -117,7 +119,8 @@ getColumns := func(countsSpec, conditionOrder, controlEnabled, addPresentInNegCo
           domain: {},
           annotations: {
             "pl7.app/label": "Binding Specificity",
-            "pl7.app/table/visibility": "default"
+            "pl7.app/table/visibility": "default",
+            "pl7.app/table/orderPriority": "60000"
           }
         }
       }]
@@ -131,10 +134,11 @@ getColumns := func(countsSpec, conditionOrder, controlEnabled, addPresentInNegCo
           name: "pl7.app/vdj/maxNegControlEnrichment",
           valueType: "Double",
           domain: {},
-          annotations: {
+          annotations: { 
             "pl7.app/label": "Control max Log2FC",
             "pl7.app/table/visibility": "optional",
-            "pl7.app/format": ".2f"
+            "pl7.app/format": ".2f",
+            "pl7.app/table/orderPriority": "50000"
           }
         }
       }]
@@ -151,7 +155,8 @@ getColumns := func(countsSpec, conditionOrder, controlEnabled, addPresentInNegCo
           domain: {},
           annotations: {
             "pl7.app/label": "Present in control",
-            "pl7.app/table/visibility": "optional"
+            "pl7.app/table/visibility": "optional",
+            "pl7.app/table/orderPriority": "40000"
           }
         }
       }]
