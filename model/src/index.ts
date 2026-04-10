@@ -383,7 +383,7 @@ export const model = BlockModel.create()
           const alphabet = col.spec.domain?.['pl7.app/alphabet'];
           // !== false (not === true) to also match cluster centroid sequences,
           // where clonotype-clustering deletes the isAssemblingFeature annotation
-          return (alphabet === 'aminoacid' || alphabet === 'nucleotide')
+          return (alphabet === 'aminoacid')
             && readAnnotationJson(col.spec, Annotation.VDJ.IsAssemblingFeature) !== false
             // Skip if axis doesn't match enrichment (e.g. stale results after switching input)
             && col.spec.axesSpec[0]?.name === enrichmentAxisName;
