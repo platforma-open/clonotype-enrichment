@@ -371,34 +371,53 @@ export const model = BlockModel.create()
       return undefined;
     }
 
-    // Pull assembling feature sequences from result pool to show in the table
+    // Pull sequence columns from result pool to show in the table
     const anchor = ctx.args.abundanceRef;
     const enrichmentAxisName = pCols[0]?.spec.axesSpec[0]?.name;
-    const seqCols = anchor
+    const allSeqCols = anchor
       ? (ctx.resultPool.getAnchoredPColumns(
           { main: anchor },
           [{ axes: [{ anchor: 'main', idx: 1 }], name: 'pl7.app/vdj/sequence' }],
           { dontWaitAllData: true },
-        ) ?? []).filter((col) => {
-          const alphabet = col.spec.domain?.['pl7.app/alphabet'];
-          // !== false (not === true) to also match cluster centroid sequences,
-          // where clonotype-clustering deletes the isAssemblingFeature annotation
-          return (alphabet === 'aminoacid')
-            && readAnnotationJson(col.spec, Annotation.VDJ.IsAssemblingFeature) !== false
-            // Skip if axis doesn't match enrichment (e.g. stale results after switching input)
-            && col.spec.axesSpec[0]?.name === enrichmentAxisName;
-        }).map((col) => ({
-          ...col,
-          spec: {
-            ...col.spec,
-            annotations: { ...col.spec.annotations, 'pl7.app/table/visibility': 'default', 'pl7.app/table/orderPriority': '1' },
-          },
-        }))
+        ) ?? []).filter((col) =>
+          // Skip if axis doesn't match enrichment (e.g. stale results after switching input)
+          col.spec.axesSpec[0]?.name === enrichmentAxisName,
+        )
       : [];
+
+    // Assembling feature (or centroid) amino acid sequences — visible by default
+    const mainSeqCols = allSeqCols
+      .filter((col) => {
+        const alphabet = col.spec.domain?.['pl7.app/alphabet'];
+        // !== false (not === true) to also match cluster centroid sequences,
+        // where clonotype-clustering deletes the isAssemblingFeature annotation
+        return (alphabet === 'aminoacid')
+          && readAnnotationJson(col.spec, Annotation.VDJ.IsAssemblingFeature) !== false;
+      })
+      .map((col) => ({
+        ...col,
+        spec: {
+          ...col.spec,
+          annotations: { ...col.spec.annotations, 'pl7.app/table/visibility': 'default', 'pl7.app/table/orderPriority': '1' },
+        },
+      }));
+
+    // Other region sequences (CDR1, CDR2, FR1, etc.) — not shown by default, available in column picker
+    const otherRegionCols = allSeqCols
+      .filter((col) =>
+        readAnnotationJson(col.spec, Annotation.VDJ.IsAssemblingFeature) === false,
+      )
+      .map((col) => ({
+        ...col,
+        spec: {
+          ...col.spec,
+          annotations: { ...col.spec.annotations, 'pl7.app/table/visibility': 'optional' },
+        },
+      }));
 
     return createPlDataTableV2(
       ctx,
-      [...pCols, ...seqCols],
+      [...pCols, ...mainSeqCols, ...otherRegionCols],
       ctx.uiState.tableState,
       {
         // Sequence columns are non-core so they are left-joined: they won't
