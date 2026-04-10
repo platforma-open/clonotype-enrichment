@@ -387,7 +387,13 @@ export const model = BlockModel.create()
             && readAnnotationJson(col.spec, Annotation.VDJ.IsAssemblingFeature) !== false
             // Skip if axis doesn't match enrichment (e.g. stale results after switching input)
             && col.spec.axesSpec[0]?.name === enrichmentAxisName;
-        })
+        }).map((col) => ({
+          ...col,
+          spec: {
+            ...col.spec,
+            annotations: { ...col.spec.annotations, 'pl7.app/table/visibility': 'default', 'pl7.app/table/orderPriority': '1' },
+          },
+        }))
       : [];
 
     return createPlDataTableV2(
