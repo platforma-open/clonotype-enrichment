@@ -8,11 +8,13 @@ import type {
   SUniversalPColumnId,
 } from '@platforma-sdk/model';
 import {
+  Annotation,
   BlockModel,
   createPFrameForGraphs,
   createPlDataTableStateV2,
   createPlDataTableV2,
   readAnnotation,
+  readAnnotationJson,
 } from '@platforma-sdk/model';
 
 export type DownsamplingParameters = {
@@ -369,14 +371,35 @@ export const model = BlockModel.create()
       return undefined;
     }
 
-    // const maxEnrichPcol = pCols.filter((col) => (
-    //   col.spec.name === 'pl7.app/vdj/maxEnrichment'),
-    // );
+    // Pull assembling feature sequences from result pool to show in the table
+    const anchor = ctx.args.abundanceRef;
+    const enrichmentAxisName = pCols[0]?.spec.axesSpec[0]?.name;
+    const seqCols = anchor
+      ? (ctx.resultPool.getAnchoredPColumns(
+          { main: anchor },
+          [{ axes: [{ anchor: 'main', idx: 1 }], name: 'pl7.app/vdj/sequence' }],
+          { dontWaitAllData: true },
+        ) ?? []).filter((col) => {
+          const alphabet = col.spec.domain?.['pl7.app/alphabet'];
+          // !== false (not === true) to also match cluster centroid sequences,
+          // where clonotype-clustering deletes the isAssemblingFeature annotation
+          return (alphabet === 'aminoacid' || alphabet === 'nucleotide')
+            && readAnnotationJson(col.spec, Annotation.VDJ.IsAssemblingFeature) !== false
+            // Skip if axis doesn't match enrichment (e.g. stale results after switching input)
+            && col.spec.axesSpec[0]?.name === enrichmentAxisName;
+        })
+      : [];
 
     return createPlDataTableV2(
       ctx,
-      pCols,
+      [...pCols, ...seqCols],
       ctx.uiState.tableState,
+      {
+        // Sequence columns are non-core so they are left-joined: they won't
+        // bring back clonotypes that were filtered out during enrichment
+        coreColumnPredicate: ({ spec }) => spec.name !== 'pl7.app/vdj/sequence',
+        coreJoinType: 'inner',
+      },
     );
   })
 
