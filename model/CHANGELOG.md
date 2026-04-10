@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.model
 
+## 3.2.4
+
+### Patch Changes
+
+- 9ea6985: Add other VDJ region sequence columns (CDR1, CDR2, FR1, etc.) to the enrichment table as optional columns
+
 ## 3.2.3
 
 ### Patch Changes
