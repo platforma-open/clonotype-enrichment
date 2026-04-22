@@ -323,6 +323,15 @@ wf.body(func(args) {
 			// Convert display name (e.g., "Treatment vs Control") to column ID format (enrichment_Treatment_Control)
 			colId := strings.substituteSpecialCharacters("enrichment_" + vsPattern.replace(comparison, "_"))
 
+			// Persisted selections can outlive their conditionOrder (e.g. user
+			// changes the Condition column between runs). enrichmentPf only has
+			// columns for current pairs — skip stale entries so pFrameBuilder.add
+			// isn't called with undefined data. The UI prunes these proactively;
+			// this guard covers projects loaded before that watcher settles.
+			if enrichmentPf[colId + ".data"] == undefined {
+				continue
+			}
+
 			annotationStats := calculateAnnotationValues(enrichCsv, "Enrichment " + comparison)
 
 			specLabel := {

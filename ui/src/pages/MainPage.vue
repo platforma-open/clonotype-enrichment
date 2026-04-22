@@ -362,6 +362,18 @@ const comparisonOptions = computed(() => {
   return comparisons;
 });
 
+// additionalEnrichmentExports is persisted, but the workflow only produces
+// enrichment columns for the current conditionOrder pairs. Drop stale entries
+// (e.g. "R2 vs R1" saved before the user switched the Condition column), else
+// the workflow fails with "Data is undefined for column 'Enrichment - ...'".
+watchEffect(() => {
+  const validValues = new Set(comparisonOptions.value.map((o) => o.value));
+  const current = app.model.args.additionalEnrichmentExports;
+  if (current.some((v) => !validValues.has(v))) {
+    app.model.args.additionalEnrichmentExports = current.filter((v) => validValues.has(v));
+  }
+});
+
 // const comparisonsMessage = computed(() => {
 //   if (comparisonOptions.value.length === 0) {
 //     return '';
