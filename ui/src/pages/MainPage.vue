@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { PlRef } from '@platforma-sdk/model';
+import type { PlRef, SUniversalPColumnId } from '@platforma-sdk/model';
 import { getRawPlatformaInstance, getSingleColumnData, type PObjectId } from '@platforma-sdk/model';
 import type {
   ListOption,
@@ -105,6 +105,15 @@ type MetadataFetched = {
   conditionValues: string[];
   conditionBySample?: Record<string, string>;
   antigenBySample?: Record<string, string>;
+  /** Refs/IDs the fetched data corresponds to. Used to detect staleness
+   * during column switches: `useWatchFetch` keeps the previous value until
+   * the new fetch settles, so consumers must check this before acting.
+   * We store the refs (not just IDs) because refs update synchronously with
+   * user actions, whereas output-derived IDs may lag. */
+  fetchedFor: {
+    conditionColumnRef: SUniversalPColumnId | undefined;
+    antigenColumnRef: SUniversalPColumnId | undefined;
+  };
 };
 
 /** Fetch metadata column data once from the pframe and derive all metadata-derived lists. Filter by sampleIds when available so only samples in the abundance input are used. */
@@ -116,6 +125,14 @@ const metadataFetched = useWatchFetch(
   }),
   async ({ pframe: pframeHandle, columnIds, sampleIds }) => {
     if (!pframeHandle || !columnIds?.conditionColId) return undefined;
+
+    // Snapshot the refs that triggered this fetch, synchronously before any
+    // await. The fetched data is authoritative only for these refs — if the
+    // user has since changed them, consumers must skip until a fresh fetch.
+    const fetchedFor = {
+      conditionColumnRef: app.model.args.conditionColumnRef,
+      antigenColumnRef: app.model.args.antigenControlConfig.antigenColumnRef,
+    };
 
     // Helper to extract data mapped by sample ID
     const buildBySample = (colData: { axesData: Record<string, (string | number | null)[]>; data: (string | number | null)[] }) => {
@@ -157,7 +174,12 @@ const metadataFetched = useWatchFetch(
     // Unique condition values from the (possibly filtered) condition map
     const conditionValues = [...new Set(Object.values(conditionBySample))].filter(Boolean).sort();
 
-    return { conditionValues, conditionBySample, antigenBySample } satisfies MetadataFetched;
+    return {
+      conditionValues,
+      conditionBySample,
+      antigenBySample,
+      fetchedFor,
+    } satisfies MetadataFetched;
   },
 );
 
@@ -493,10 +515,30 @@ const isClusterId = computed(() => {
  *    relevant or contains invalid entries from a different column.
  */
 
+/** True when `metadataFetched.value` reflects the currently selected condition column.
+ * `useWatchFetch` returns the previous fetch result until the new one settles, so
+ * sync logic that reads `metadataFetched` must skip while stale to avoid committing
+ * old-column values against a new-column tracker.
+ * We compare against `args.conditionColumnRef` (not an output-derived ID) because
+ * args update synchronously with user actions — output recomputation may lag. */
+const fetchedForCurrentConditionCol = computed(() => {
+  const fetched = metadataFetched.value;
+  if (!fetched) return true; // nothing fetched yet — guard by `vals.length > 0`
+  return fetched.fetchedFor.conditionColumnRef === app.model.args.conditionColumnRef;
+});
+
+const fetchedForCurrentAntigenCol = computed(() => {
+  const fetched = metadataFetched.value;
+  if (!fetched) return true;
+  return fetched.fetchedFor.antigenColumnRef === app.model.args.antigenControlConfig.antigenColumnRef;
+});
+
 const conditionSyncCol = ref<string | undefined>(app.model.args.conditionColumnRef);
 watchEffect(() => {
   const col = app.model.args.conditionColumnRef;
   const vals = effectiveConditionValues.value;
+
+  if (!fetchedForCurrentConditionCol.value) return;
 
   if (vals && vals.length > 0) {
     const current = app.model.args.conditionOrder;
@@ -519,6 +561,8 @@ const controlSyncCol = ref<string | undefined>(app.model.args.antigenControlConf
 watchEffect(() => {
   const col = app.model.args.antigenControlConfig.antigenColumnRef;
   const vals = negativeControlConditionValues.value;
+
+  if (!fetchedForCurrentAntigenCol.value) return;
 
   if (vals && vals.length > 0) {
     const current = app.model.args.antigenControlConfig.controlConditionsOrder;
@@ -610,6 +654,43 @@ watchEffect(() => {
       app.model.args.antigenControlConfig.sequencedLibraryAntigen = undefined;
     }
     librarySyncKey.value = key;
+  }
+});
+
+// Clear antigen-valued selections when the antigen column itself changes.
+// These hold string values from the selected column, so a different column
+// invalidates them outright. Plain `watch` doesn't fire on mount, so persisted
+// selections survive component remount.
+watch(() => app.model.args.antigenControlConfig.antigenColumnRef, () => {
+  const config = app.model.args.antigenControlConfig;
+  config.targetAntigen = undefined;
+  config.negativeAntigens = [];
+  config.sequencedLibraryAntigen = undefined;
+});
+
+// Drop stale comparison-export selections when the valid comparison set changes
+// (condition column change, condition reorder, target-antigen filter, sequenced
+// library toggle). Keyed on the option list so reorders are caught too.
+const validComparisonsKey = computed(() =>
+  comparisonOptions.value.map((o) => o.value).join(','),
+);
+watch(validComparisonsKey, () => {
+  const validSet = new Set(comparisonOptions.value.map((o) => o.value));
+  const current = app.model.args.additionalEnrichmentExports;
+  const filtered = current.filter((v) => validSet.has(v));
+  if (filtered.length !== current.length) {
+    app.model.args.additionalEnrichmentExports = filtered;
+  }
+});
+
+// Drop stale "present in rounds" selections when the condition order changes.
+const conditionOrderKey = computed(() => app.model.args.conditionOrder.join(','));
+watch(conditionOrderKey, () => {
+  const validSet = new Set(app.model.args.conditionOrder);
+  const current = app.model.args.FilteringConfig.presentInRounds.rounds;
+  const filtered = current.filter((v) => validSet.has(v));
+  if (filtered.length !== current.length) {
+    app.model.args.FilteringConfig.presentInRounds.rounds = filtered;
   }
 });
 
