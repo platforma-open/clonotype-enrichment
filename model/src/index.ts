@@ -16,6 +16,7 @@ import {
   readAnnotation,
   readAnnotationJson,
 } from '@platforma-sdk/model';
+export type * from '@milaboratories/helpers';
 
 export type DownsamplingParameters = {
   type?: 'none' | 'hypergeometric' ;
@@ -541,7 +542,7 @@ export const model = BlockModel.create()
     for (const ax of spec.axesSpec) {
       if (ax.name === 'pl7.app/variantKey') return 'peptide';
       if (ax.name === 'pl7.app/vdj/clonotypeKey' || ax.name === 'pl7.app/vdj/scClonotypeKey') return 'antibody_tcr';
-      // cluster abundances
+      // clustered abundances
       for (const key of Object.keys(ax.domain ?? {})) {
         if (key.startsWith('pl7.app/peptide/')) return 'peptide';
         if (key.startsWith('pl7.app/vdj/')) return 'antibody_tcr';

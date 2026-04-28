@@ -436,7 +436,9 @@ const createStatsTable = () => {
 // Check if the output enrichment file is empty
 const isEmpty = asyncComputed(async () => {
   if (!app.model.outputs.pt.ok || !app.model.outputs.pt.value) return undefined;
-  return (await getRawPlatformaInstance().pFrameDriver.getShape(app.model.outputs.pt.value.fullTableHandle)).rows === 0;
+  const handle = app.model.outputs.pt.value.fullTableHandle;
+  if (!handle) return undefined;
+  return (await getRawPlatformaInstance().pFrameDriver.getShape(handle)).rows === 0;
 });
 
 // Check if the filters removed too many clonotypes
