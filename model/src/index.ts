@@ -131,7 +131,7 @@ export const model = BlockModel.create()
   .withUiState<UiState>({
     tableState: createPlDataTableStateV2(),
     bubbleState: {
-      title: 'Clonotype enrichment',
+      title: 'Enrichment',
       template: 'bubble',
       layersSettings: {
         bubble: {
@@ -141,7 +141,7 @@ export const model = BlockModel.create()
       currentTab: null,
     },
     lineState: {
-      title: 'Top 10 enriched clonotype frequencies',
+      title: 'Top enriched sequences',
       template: 'curve_dots',
       currentTab: null,
       layersSettings: {
@@ -151,7 +151,7 @@ export const model = BlockModel.create()
       },
     },
     stackedState: {
-      title: 'Top 10 enriched clonotype frequencies',
+      title: 'Top enriched sequences',
       template: 'stackedArea',
       currentTab: null,
     },
@@ -222,12 +222,20 @@ export const model = BlockModel.create()
     const anchor = ctx.args.abundanceRef;
     if (anchor === undefined) return undefined;
     return ctx.resultPool.getCanonicalOptions({ main: anchor },
-      [{
-        axes: [
-          { anchor: 'main', idx: 1 },
-        ],
-        name: 'pl7.app/vdj/sequence',
-      }],
+      [
+        {
+          axes: [
+            { anchor: 'main', idx: 1 },
+          ],
+          name: 'pl7.app/vdj/sequence',
+        },
+        {
+          axes: [
+            { anchor: 'main', idx: 1 },
+          ],
+          name: 'pl7.app/sequence',
+        },
+      ],
     );
   })
 
@@ -377,7 +385,10 @@ export const model = BlockModel.create()
     const allSeqCols = anchor
       ? (ctx.resultPool.getAnchoredPColumns(
           { main: anchor },
-          [{ axes: [{ anchor: 'main', idx: 1 }], name: 'pl7.app/vdj/sequence' }],
+          [
+            { axes: [{ anchor: 'main', idx: 1 }], name: 'pl7.app/vdj/sequence' },
+            { axes: [{ anchor: 'main', idx: 1 }], name: 'pl7.app/sequence' },
+          ],
           { dontWaitAllData: true },
         ) ?? []).filter((col) =>
           // Skip if axis doesn't match enrichment (e.g. stale results after switching input)
@@ -422,7 +433,8 @@ export const model = BlockModel.create()
       {
         // Sequence columns are non-core so they are left-joined: they won't
         // bring back clonotypes that were filtered out during enrichment
-        coreColumnPredicate: ({ spec }) => spec.name !== 'pl7.app/vdj/sequence',
+        coreColumnPredicate: ({ spec }) =>
+          spec.name !== 'pl7.app/vdj/sequence' && spec.name !== 'pl7.app/sequence',
         coreJoinType: 'inner',
       },
     );
@@ -521,7 +533,24 @@ export const model = BlockModel.create()
     return undefined;
   })
 
-  .title(() => 'Clonotype enrichment')
+  .output('modality', (ctx) => {
+    const spec = ctx.args.abundanceRef
+      ? ctx.resultPool.getPColumnSpecByRef(ctx.args.abundanceRef)
+      : undefined;
+    if (!spec) return undefined;
+    for (const ax of spec.axesSpec) {
+      if (ax.name === 'pl7.app/variantKey') return 'peptide';
+      if (ax.name === 'pl7.app/vdj/clonotypeKey' || ax.name === 'pl7.app/vdj/scClonotypeKey') return 'antibody_tcr';
+      // cluster abundances
+      for (const key of Object.keys(ax.domain ?? {})) {
+        if (key.startsWith('pl7.app/peptide/')) return 'peptide';
+        if (key.startsWith('pl7.app/vdj/')) return 'antibody_tcr';
+      }
+    }
+    return undefined;
+  }, { retentive: true })
+
+  .title(() => 'Enrichment Analysis')
 
   .subtitle((ctx) => ctx.args.customBlockLabel || ctx.args.defaultBlockLabel)
 

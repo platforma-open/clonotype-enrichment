@@ -17,18 +17,18 @@ const defaultOptions = computed((): PredefinedGraphOption<'discrete'>[] | null =
       && p.spec.annotations?.['pl7.app/vdj/isScore'] === undefined
     ))].spec;
 
-  const frequencyColSpec = getColSpec('pl7.app/vdj/frequency');
+  const frequencyColSpec = getColSpec('pl7.app/frequency');
   const defaults: PredefinedGraphOption<'discrete'>[] = [
     {
       inputName: 'y',
       selectedSource: frequencyColSpec,
     },
-    // pl7.app/vdj/clonotypeKey
+    // input element axis (vdj clonotypeKey / peptide variantKey)
     {
       inputName: 'secondaryGrouping',
       selectedSource: frequencyColSpec.axesSpec[0],
     },
-    // pl7.app/vdj/round
+    // pl7.app/condition
     {
       inputName: 'primaryGrouping',
       selectedSource: frequencyColSpec.axesSpec[1],
@@ -49,8 +49,8 @@ const dataColumnPredicate = (spec: PColumnSpec) =>
   inputElementAxis.value !== undefined
   && spec.axesSpec.length === 2
   && spec.axesSpec[0].name === inputElementAxis.value
-  && spec.axesSpec[1].name === 'pl7.app/vdj/condition'
-  && !['pl7.app/vdj/maxEnrichment', 'pl7.app/vdj/maxNegControlEnrichment'].includes(spec.name);
+  && spec.axesSpec[1].name === 'pl7.app/condition'
+  && !['pl7.app/maxEnrichment', 'pl7.app/maxNegControlEnrichment'].includes(spec.name);
 
 const metaColumnPredicate = (spec: PColumnSpec) =>
   inputElementAxis.value !== undefined

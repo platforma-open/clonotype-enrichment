@@ -18,8 +18,8 @@ const defaultOptions = computed((): PredefinedGraphOption<'bubble'>[] | null => 
       && p.spec.annotations?.['pl7.app/vdj/isScore'] === undefined
     ))].spec;
 
-  const enrichmentCol = getColSpec('pl7.app/vdj/enrichment');
-  const frequencyCol = getColSpec('pl7.app/vdj/numerator-frequency');
+  const enrichmentCol = getColSpec('pl7.app/enrichment');
+  const frequencyCol = getColSpec('pl7.app/numerator-frequency');
 
   const defaults: PredefinedGraphOption<'bubble'>[] = [
     {
@@ -61,8 +61,8 @@ const inputElementAxis = computed(() => {
 const dataColumnPredicate = (spec: PColumnSpec) =>
   inputElementAxis.value !== undefined
   && spec.axesSpec.length === 3
-  && spec.axesSpec[2].name === 'pl7.app/vdj/Baseline-condition'
-  && !['pl7.app/vdj/maxEnrichment', 'pl7.app/vdj/maxNegControlEnrichment'].includes(spec.name);
+  && spec.axesSpec[2].name === 'pl7.app/Baseline-condition'
+  && !['pl7.app/maxEnrichment', 'pl7.app/maxNegControlEnrichment'].includes(spec.name);
 
 const metaColumnPredicate = (spec: PColumnSpec) =>
   inputElementAxis.value !== undefined

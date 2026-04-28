@@ -477,7 +477,8 @@ const resetControlConditionOrder = () => {
 
 const isClusterId = computed(() => {
   if (app.model.outputs.datasetSpec === undefined) return false;
-  return app.model.outputs.datasetSpec?.axesSpec.length >= 2 && app.model.outputs.datasetSpec?.axesSpec[1]?.name === 'pl7.app/vdj/clusterId';
+  return app.model.outputs.datasetSpec?.axesSpec.length >= 2
+    && app.model.outputs.datasetSpec?.axesSpec[1]?.name === 'pl7.app/clusterId';
 });
 
 /**
@@ -545,7 +546,7 @@ const syncAbundanceRef = ref(app.model.args.abundanceRef ? JSON.stringify(app.mo
 const syncIsClustered = ref<boolean | undefined>(
   app.model.outputs.datasetSpec?.axesSpec !== undefined
   && app.model.outputs.datasetSpec.axesSpec.length >= 2
-  && app.model.outputs.datasetSpec.axesSpec[1].name === 'pl7.app/vdj/clusterId',
+  && app.model.outputs.datasetSpec.axesSpec[1].name === 'pl7.app/clusterId',
 );
 
 // Watch for changes in the dataset spec to initialize defaults
@@ -555,7 +556,8 @@ watchEffect(() => {
 
   if (abundanceRef && spec?.axesSpec) {
     const abundanceRefStr = JSON.stringify(abundanceRef);
-    const isClustered = spec.axesSpec.length >= 2 && spec.axesSpec[1]?.name === 'pl7.app/vdj/clusterId';
+    const isClustered = spec.axesSpec.length >= 2
+      && spec.axesSpec[1]?.name === 'pl7.app/clusterId';
 
     // Reset to default if:
     // 1. The user switched to a DIFFERENT dataset.
@@ -628,7 +630,7 @@ const isControlOrderOpen = ref(true); // Open by default
   <PlBlockPage
     v-model:subtitle="app.model.args.customBlockLabel"
     :subtitle-placeholder="app.model.args.defaultBlockLabel"
-    title="Clonotype Enrichment"
+    title="Enrichment Analysis"
   >
     <template #append>
       <PlBtnGhost @click.stop="() => (statsOpen = true)">

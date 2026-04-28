@@ -23,7 +23,7 @@
       "ui": "@platforma-open/milaboratories.clonotype-enrichment.ui/dist"
     },
     "meta": {
-      "title": "Clonotype Enrichment",
+      "title": "Enrichment Analysis",
       "logo": "file:../logos/block-logo.png",
       "url": "https://github.com/platforma-open/clonotype-enrichment",
       "docs": "https://docs.platforma.bio/guides/antibody-discovery/enrichment-analysis/",
