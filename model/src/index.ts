@@ -548,7 +548,8 @@ export const model = BlockModel.create()
         if (key.startsWith('pl7.app/vdj/')) return 'antibody_tcr';
       }
     }
-    return undefined;
+    // Fallback when the input is resolved but unrecognized.
+    return 'antibody_tcr';
   }, { retentive: true })
 
   .title(() => 'Enrichment Analysis')
