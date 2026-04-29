@@ -13,7 +13,7 @@ import {
   createPFrameForGraphs,
   createPlDataTableStateV2,
   createPlDataTableV2,
-  readAnnotation,
+  getUniquePartitionKeys,
   readAnnotationJson,
 } from '@platforma-sdk/model';
 
@@ -299,54 +299,21 @@ export const model = BlockModel.create()
     return { conditionColId, antigenColId };
   })
 
-  // Get only the sample IDs from the selected abundance column
+  // Sample IDs that participate in the abundance column. Read partition keys
+  // from the abundance column data: it is partitioned on `pl7.app/sampleId`
+  // (axis 0), so the partition keys at that index are the sample IDs.
+  // Avoids relying on the upstream dataset's `pl7.app/axisKeys/0` annotation,
+  // which carries `sampleGroupId` (not `sampleId`) for `MultiplexedFastq`.
   .output('sampleIds', (ctx) => {
-    const { abundanceRef: anchor } = ctx.args;
-    if (!anchor) return undefined;
-    const spec = ctx.resultPool.getPColumnSpecByRef(anchor);
-    if (!spec) return undefined;
-
-    // Get input dataset trace in array format
-    const traceJson = readAnnotation(spec, 'pl7.app/trace');
-    if (traceJson === undefined) return undefined;
-    let trace: Array<{ type?: string; id?: string }>;
-    try {
-      trace = JSON.parse(traceJson) as Array<{ type?: string; id?: string }>;
-    } catch {
-      return undefined;
-    }
-    if (!Array.isArray(trace)) return undefined;
-
-    // Get the dataset ID from the trace
-    const datasetStep = trace.find(
-      (s) => s.type === 'milaboratories.samples-and-data/dataset' && s.id,
-    );
-    // Get blockID
-    const samplesAndDataStep = trace.find(
-      (s) => s.type === 'milaboratories.samples-and-data' && s.id,
-    );
-    const datasetId = datasetStep?.id;
-    const samplesAndDataBlockId = samplesAndDataStep?.id;
-    if (!datasetId || !samplesAndDataBlockId) return undefined;
-
-    // Get dataset Pcolumn from reconstructed ref
-    const datasetRef: PlRef = {
-      __isRef: true,
-      blockId: samplesAndDataBlockId,
-      name: `pf.dataset.${datasetId}`,
-    };
-    const datasetSpec = ctx.resultPool.getPColumnSpecByRef(datasetRef);
-    if (!datasetSpec) return undefined;
-
-    // Get sampel IDs
-    const axisKeysJson = readAnnotation(datasetSpec, 'pl7.app/axisKeys/0')
-      ?? (datasetSpec.axesSpec?.[0] && readAnnotation(datasetSpec.axesSpec[0], 'pl7.app/axisKeys/0'));
-    if (axisKeysJson === undefined) return undefined;
-    try {
-      return JSON.parse(axisKeysJson) as string[];
-    } catch {
-      return undefined;
-    }
+    const { abundanceRef } = ctx.args;
+    if (!abundanceRef) return undefined;
+    const pCol = ctx.resultPool.getPColumnByRef(abundanceRef);
+    if (!pCol) return undefined;
+    const sampleAxisIdx = pCol.spec.axesSpec.findIndex((a) => a.name === 'pl7.app/sampleId');
+    if (sampleAxisIdx < 0) return undefined;
+    const keysPerAxis = getUniquePartitionKeys(pCol.data);
+    if (!keysPerAxis || sampleAxisIdx >= keysPerAxis.length) return undefined;
+    return keysPerAxis[sampleAxisIdx].map((v) => String(v));
   })
 
   // Get all enrichment statistics
