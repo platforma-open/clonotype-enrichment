@@ -3,7 +3,7 @@ canonical := import("@platforma-sdk/workflow-tengo:canonical")
 strings := import("@platforma-sdk/workflow-tengo:strings")
 
 getColumns := func(abundanceSpec, conditionOrder, inputType, downsampling,
-  blockId, addPresentInNegControl, addMaxNegControlEnrichment, sequencedLibraryEnabled) {
+  blockId, addPresentInNegControl, addMaxNegControlEnrichment, sequencedLibraryEnabled, emitBindingSpecificity) {
   columns := []
   if sequencedLibraryEnabled {
     conditionOrder = ["0 - Library"] + conditionOrder
@@ -29,7 +29,7 @@ getColumns := func(abundanceSpec, conditionOrder, inputType, downsampling,
                         }]
   }
 
-  if addPresentInNegControl || addMaxNegControlEnrichment {
+  if (addPresentInNegControl || addMaxNegControlEnrichment) && emitBindingSpecificity {
   columns = columns + [{
         column: "Binding Specificity",
         id: "binding_specificity",

@@ -154,7 +154,21 @@ wf.body(func(args) {
 	} else if abundanceSpec.axesSpec[1].name == "pl7.app/variantKey" {
 		inputType = "Peptide"
 	}
-	
+
+	// Suppress Binding Specificity column for peptide modality.
+	isPeptide := abundanceSpec.axesSpec[1].name == "pl7.app/variantKey"
+	if !isPeptide {
+		for ax in abundanceSpec.axesSpec {
+			domain := is_undefined(ax.domain) ? {} : ax.domain
+			for k, v in domain {
+				if text.has_prefix(k, "pl7.app/peptide/") {
+					isPeptide = true
+				}
+			}
+		}
+	}
+	emitBindingSpecificity := !isPeptide
+
 	//////////// Enrichment analysis ////////////
 	// Run enrichment script with boolean filtering flags for reliable cache differentiation
 	calculateEnrichment := exec.builder().
@@ -262,29 +276,31 @@ wf.body(func(args) {
 			(len(antigenControlConfig.controlConditionsOrder) == 1)
 	}
 
-	enrichmentImportParams := pfEnrichmentConv.getColumns(abundanceSpec, conditionOrder, 
-		antigenControlConfig.controlEnabled, addPresentInNegControl, 
-		addMaxNegControlEnrichment, antigenControlConfig.sequencedLibraryEnabled)
+	enrichmentImportParams := pfEnrichmentConv.getColumns(abundanceSpec, conditionOrder,
+		antigenControlConfig.controlEnabled, addPresentInNegControl,
+		addMaxNegControlEnrichment, antigenControlConfig.sequencedLibraryEnabled,
+		emitBindingSpecificity)
 	enrichmentPf := xsv.importFile(enrichCsv, "csv", enrichmentImportParams,
 									{ cpu: 1, mem: "32GiB" })
 	controlScatterPf := undefined
 	if antigenControlConfig.controlEnabled {
-		controlScatterImportParams := pfControlScatterConv.getColumns(abundanceSpec, 
-			conditionOrder, addPresentInNegControl, addMaxNegControlEnrichment)
+		controlScatterImportParams := pfControlScatterConv.getColumns(abundanceSpec,
+			conditionOrder, addPresentInNegControl, addMaxNegControlEnrichment,
+			emitBindingSpecificity)
 		controlScatterPf = xsv.importFile(enrichCsv, "csv", controlScatterImportParams,
 			{ cpu: 1, mem: "32GiB" })
 	}
 
 	bubbleImportParams := pfBubbleConv.getColumns(abundanceSpec, addPresentInNegControl,
-		addMaxNegControlEnrichment)
+		addMaxNegControlEnrichment, emitBindingSpecificity)
 	bubblePf := xsv.importFile(calculateEnrichment.getFile("bubble_data.csv"), "csv", bubbleImportParams,
 							{ cpu: 1, mem: "32GiB" })
 
-	lineImportParams := pfStackedConv.getColumns(abundanceSpec, addPresentInNegControl, addMaxNegControlEnrichment)
+	lineImportParams := pfStackedConv.getColumns(abundanceSpec, addPresentInNegControl, addMaxNegControlEnrichment, emitBindingSpecificity)
 	linePf := xsv.importFile(calculateEnrichment.getFile("top_10.csv"), "csv", lineImportParams,
 							{ cpu: 1, mem: "32GiB" })
 
-	stackedImportParams := pfStackedConv.getColumns(abundanceSpec, addPresentInNegControl, addMaxNegControlEnrichment)
+	stackedImportParams := pfStackedConv.getColumns(abundanceSpec, addPresentInNegControl, addMaxNegControlEnrichment, emitBindingSpecificity)
 	stackedPf := xsv.importFile(calculateEnrichment.getFile("top_enriched.csv"), "csv", stackedImportParams,
 								{ cpu: 1, mem: "32GiB" })
 
@@ -295,7 +311,8 @@ wf.body(func(args) {
 														inputType, downsampling,
 														blockId, addPresentInNegControl,
 														addMaxNegControlEnrichment,
-														antigenControlConfig.sequencedLibraryEnabled)
+														antigenControlConfig.sequencedLibraryEnabled,
+														emitBindingSpecificity)
 	frequencyPf := xsv.importFile(enrichCsv, "csv", frequencyImportParams,
 								{ cpu: 1, mem: "32GiB" })
 
@@ -349,7 +366,8 @@ wf.body(func(args) {
 				blockId: blockId,
 				specLabel: specLabel,
 				customBlockLabel: args.customBlockLabel,
-				defaultBlockLabel: args.defaultBlockLabel
+				defaultBlockLabel: args.defaultBlockLabel,
+				emitBindingSpecificity: emitBindingSpecificity
 			})
 
 			exportsAdditionalEnrichments.add(
@@ -381,7 +399,8 @@ wf.body(func(args) {
 		blockId: blockId,
 		customBlockLabel: args.customBlockLabel,
 		defaultBlockLabel: args.defaultBlockLabel,
-		filteredTooMuch: calculateEnrichment.getFileContent("filtered_too_much.txt")
+		filteredTooMuch: calculateEnrichment.getFileContent("filtered_too_much.txt"),
+		emitBindingSpecificity: emitBindingSpecificity
 	})
 
 	exports := buildExports.output("exports")

@@ -26,11 +26,12 @@ self.body(func(args) {
     specLabel := args.specLabel
     customBlockLabel := args.customBlockLabel
     defaultBlockLabel := args.defaultBlockLabel
+    emitBindingSpecificity := args.emitBindingSpecificity
 
     enrichmentImportParamsExport := undefined
     // In case of additional exports we will modify some spec values using specLabel
     if specLabel != undefined {
-        enrichmentImportParamsExport = pfEnrichmentConvExport.getColumns(abundanceSpec, 
+        enrichmentImportParamsExport = pfEnrichmentConvExport.getColumns(abundanceSpec,
                                                                 inputType,
                                                                 string(min.getData()),
                                                                 string(max.getData()),
@@ -42,9 +43,10 @@ self.body(func(args) {
                                                                 antigenControlConfig,
                                                                 FilteringConfig,
                                                                 blockId,
+                                                                emitBindingSpecificity,
                                                                 specLabel)
     } else {
-        enrichmentImportParamsExport = pfEnrichmentConvExport.getColumns(abundanceSpec, 
+        enrichmentImportParamsExport = pfEnrichmentConvExport.getColumns(abundanceSpec,
                                                                 inputType,
                                                                 string(min.getData()),
                                                                 string(max.getData()),
@@ -55,7 +57,8 @@ self.body(func(args) {
                                                                 enrichmentThreshold,
                                                                 antigenControlConfig,
                                                                 FilteringConfig,
-                                                                blockId)
+                                                                blockId,
+                                                                emitBindingSpecificity)
     }
 
     exportFile := xsv.importFile(topEnrichedColCsv, 
@@ -113,7 +116,7 @@ self.body(func(args) {
             enrichmentQualityData: exportFile["enrichment_quality.data"]
         }
 
-        if antigenControlConfig != undefined && antigenControlConfig.controlEnabled == true {
+        if antigenControlConfig != undefined && antigenControlConfig.controlEnabled == true && emitBindingSpecificity {
             res.bindingSpecificitySpec = trace.inject(exportFile["binding_specificity.spec"])
             res.bindingSpecificityData = exportFile["binding_specificity.data"]
         } else {
