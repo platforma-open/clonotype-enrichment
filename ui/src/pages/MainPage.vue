@@ -231,12 +231,19 @@ const antigenConditionsMap = computed(() => {
   return counts;
 });
 
-/** Antigens that appear in at least 2 conditions (required for target selection). */
+/** Antigens valid as Target. By default require >=2 conditions. When a sequenced library is
+ * enabled, relax to >=1 */
 const antigenValuesList = computed(() => {
   const map = antigenConditionsMap.value;
   if (!map) return [];
+  const config = app.model.args.antigenControlConfig;
+  const libraryFallback
+    = config.sequencedLibraryEnabled && !!config.sequencedLibraryAntigen;
   return Object.entries(map)
-    .filter(([, conditions]) => conditions.size >= 2)
+    .filter(([antigen, conditions]) =>
+      antigen !== config.sequencedLibraryAntigen
+      && (conditions.size >= 2 || libraryFallback),
+    )
     .map(([antigen]) => antigen);
 });
 const antigenValues = computed(() => {
