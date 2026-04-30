@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.workflow
 
+## 4.0.0
+
+### Major Changes
+
+- d74e7e0: Support peptides
+
 ## 3.2.1
 
 ### Patch Changes
