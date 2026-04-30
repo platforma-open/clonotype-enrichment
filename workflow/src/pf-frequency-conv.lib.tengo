@@ -14,11 +14,11 @@ getColumns := func(abundanceSpec, conditionOrder, inputType, downsampling,
                           id: strings.substituteSpecialCharacters("frequency_" + condition),
                           allowNA: true,
                           spec: {
-                            name: "pl7.app/vdj/frequency",
+                            name: "pl7.app/frequency",
                             valueType: "Double",
                             domain: {
                               "pl7.app/downsampling": canonical.encode(downsampling),
-                              "pl7.app/condition": strings.substituteSpecialCharacters(condition),
+                              "pl7.app/enrichment/condition": strings.substituteSpecialCharacters(condition),
                               "pl7.app/blockId": blockId
                             },
                             annotations: {
@@ -52,7 +52,7 @@ getColumns := func(abundanceSpec, conditionOrder, inputType, downsampling,
       id: "maxnegcontrolenrichment",
       allowNA: true,
       spec: {
-        name: "pl7.app/vdj/maxNegControlEnrichment",
+        name: "pl7.app/maxNegControlEnrichment",
         valueType: "Double",
         domain: {},
         annotations: {
@@ -69,7 +69,7 @@ getColumns := func(abundanceSpec, conditionOrder, inputType, downsampling,
       id: "presentinnegcontrol",
       allowNA: true,
       spec: {
-        name: "pl7.app/vdj/presentInNegControl",
+        name: "pl7.app/presentInNegControl",
         valueType: "String",
         domain: {},
         annotations: {

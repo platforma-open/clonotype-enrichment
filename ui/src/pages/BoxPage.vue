@@ -17,10 +17,10 @@ const defaultOptions = computed((): PredefinedGraphOption<'discrete'>[] | null =
     return idx !== -1 ? controlScatterPCols[idx].spec : undefined;
   };
 
-  const maxEnrichmentSpec = getColSpec('pl7.app/vdj/maxEnrichment');
-  const negSignalSpec = getColSpec('pl7.app/vdj/presentInNegControl');
+  const maxEnrichmentSpec = getColSpec('pl7.app/maxEnrichment');
+  const negSignalSpec = getColSpec('pl7.app/presentInNegControl');
   const bindingSpecificitySpec = getColSpec('pl7.app/vdj/bindingSpecificity');
-  const frequencySpec = getColSpec('pl7.app/vdj/frequency');
+  const frequencySpec = getColSpec('pl7.app/frequency');
 
   if (!maxEnrichmentSpec || !negSignalSpec || !bindingSpecificitySpec || !frequencySpec)
     return null;
