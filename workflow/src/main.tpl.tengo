@@ -146,11 +146,13 @@ wf.body(func(args) {
 	
 	// Check if inputs are individual clonotypes or clusters
 	inputType := "Unknown"
-	if abundanceSpec.axesSpec[1].name == "pl7.app/vdj/clusterId" {
+	if abundanceSpec.axesSpec[1].name == "pl7.app/clusterId" {
 		inputType = "Cluster"
-	} else if abundanceSpec.axesSpec[1].name == "pl7.app/vdj/clonotypeKey" || 
+	} else if abundanceSpec.axesSpec[1].name == "pl7.app/vdj/clonotypeKey" ||
 				abundanceSpec.axesSpec[1].name == "pl7.app/vdj/scClonotypeKey" {
 		inputType = "Clonotype"
+	} else if abundanceSpec.axesSpec[1].name == "pl7.app/variantKey" {
+		inputType = "Peptide"
 	}
 	
 	//////////// Enrichment analysis ////////////

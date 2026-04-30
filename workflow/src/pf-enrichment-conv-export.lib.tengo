@@ -15,28 +15,28 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percenti
   enrichmentThresholdStr := string(enrichmentThreshold)
   controlThreshold := undefined
   baseDomain := {
-    "pl7.app/vdj/enrichment/filteringConfig": canonical.encode(filteringConfig),
-    "pl7.app/vdj/enrichment/conditionsOrder": canonical.encode(conditionOrder),
-    "pl7.app/vdj/enrichment/enrichmentThreshold": enrichmentThresholdStr,
+    "pl7.app/enrichment/filteringConfig": canonical.encode(filteringConfig),
+    "pl7.app/enrichment/conditionsOrder": canonical.encode(conditionOrder),
+    "pl7.app/enrichment/enrichmentThreshold": enrichmentThresholdStr,
     "pl7.app/blockId": blockId
   }
   if antigenControlConfig.antigenEnabled {
-    baseDomain["pl7.app/vdj/antigenType"] = antigenControlConfig.targetAntigen
+    baseDomain["pl7.app/enrichment/antigenType"] = antigenControlConfig.targetAntigen
     if antigenControlConfig.controlEnabled {
-      baseDomain["pl7.app/vdj/enrichment/controlEnabled"] = "true"
+      baseDomain["pl7.app/enrichment/controlEnabled"] = "true"
       controlThreshold = string(antigenControlConfig.controlThreshold)
     }
   }
 
   // Define columns for exports
   maxDomain := copy(baseDomain)
-  maxDomain["pl7.app/vdj/enrichment/type"] = "max"
+  maxDomain["pl7.app/enrichment/type"] = "max"
   columns := [{
         column: "Enrichment",
         id: "enrichment",
         allowNA: true,
         spec: {
-          name: "pl7.app/vdj/enrichment",
+          name: "pl7.app/enrichment",
           valueType: "Double",
           domain: maxDomain,
           annotations: {
@@ -58,7 +58,7 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percenti
         id: "enrichment_quality",
         allowNA: true,
         spec: {
-          name: "pl7.app/vdj/enrichmentQuality",
+          name: "pl7.app/enrichmentQuality",
           valueType: "String",
           domain: baseDomain,
           annotations: {
@@ -76,8 +76,8 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percenti
 
   // Prepare a domain map for overall Log2FC column
   overallDomain := copy(baseDomain)
-  overallDomain["pl7.app/vdj/enrichment/type"] = "overall"
-  overallDomain["pl7.app/vdj/enrichment/comparison"] = conditionOrder[len(conditionOrder) - 1] + " vs " + conditionOrder[0]
+  overallDomain["pl7.app/enrichment/type"] = "overall"
+  overallDomain["pl7.app/enrichment/comparison"] = conditionOrder[len(conditionOrder) - 1] + " vs " + conditionOrder[0]
   overallDomain["pl7.app/comparison"] = "Overall Enrichment"
 
   // Overall Log2FC columns will have additional specs if target was selected
@@ -86,7 +86,7 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percenti
         id: "overall_log2fc",
         allowNA: true,
         spec: {
-          name: "pl7.app/vdj/enrichment",
+          name: "pl7.app/enrichment",
           valueType: "Double",
           domain: overallDomain,
           annotations: {
@@ -104,7 +104,7 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percenti
   if antigenControlConfig.controlEnabled && len(opts) == 0 {
     // Prepare a domain map for binding specificity column
     bindingDomain := copy(baseDomain)
-    bindingDomain["pl7.app/vdj/enrichment/controlThreshold"] = controlThreshold
+    bindingDomain["pl7.app/enrichment/controlThreshold"] = controlThreshold
 
     columns = columns + [{
         column: "Binding Specificity",

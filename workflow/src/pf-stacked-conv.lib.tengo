@@ -7,7 +7,7 @@ getColumns := func(abundanceSpec, addPresentInNegControl, addMaxNegControlEnrich
         id: "frequency",
         allowNA: false,
         spec: {
-          name: "pl7.app/vdj/frequency",
+          name: "pl7.app/frequency",
           valueType: "Double",
           domain: {},
           annotations: {
@@ -19,7 +19,7 @@ getColumns := func(abundanceSpec, addPresentInNegControl, addMaxNegControlEnrich
         id: "enrichment_vs_baseline",
         allowNA: true,
         spec: {
-          name: "pl7.app/vdj/enrichmentVsBaseline",
+          name: "pl7.app/enrichmentVsBaseline",
           valueType: "Double",
           domain: {},
           annotations: {
@@ -33,7 +33,7 @@ getColumns := func(abundanceSpec, addPresentInNegControl, addMaxNegControlEnrich
         id: "enrichment_quality",
         allowNA: true,
         spec: {
-          name: "pl7.app/vdj/enrichmentQuality",
+          name: "pl7.app/enrichmentQuality",
           valueType: "String",
           domain: {},
           annotations: {
@@ -52,7 +52,7 @@ getColumns := func(abundanceSpec, addPresentInNegControl, addMaxNegControlEnrich
         id: "maxenrichment",
         allowNA: false,
         spec: {
-          name: "pl7.app/vdj/maxEnrichment",
+          name: "pl7.app/maxEnrichment",
           valueType: "Double",
           domain: {},
           annotations: {
@@ -87,7 +87,7 @@ getColumns := func(abundanceSpec, addPresentInNegControl, addMaxNegControlEnrich
       id: "maxnegcontrolenrichment",
       allowNA: true,
       spec: {
-        name: "pl7.app/vdj/maxNegControlEnrichment",
+        name: "pl7.app/maxNegControlEnrichment",
         valueType: "Double",
         domain: {},
         annotations: {
@@ -104,7 +104,7 @@ getColumns := func(abundanceSpec, addPresentInNegControl, addMaxNegControlEnrich
       id: "presentinnegcontrol",
       allowNA: true,
       spec: {
-        name: "pl7.app/vdj/presentInNegControl",
+        name: "pl7.app/presentInNegControl",
         valueType: "String",
         domain: {},
         annotations: {
@@ -126,7 +126,7 @@ getColumns := func(abundanceSpec, addPresentInNegControl, addMaxNegControlEnrich
         id: "Condition",
         allowNA: false,
         spec: {
-          name: "pl7.app/vdj/condition",
+          name: "pl7.app/condition",
           type: "String",
           domain: {},
           annotations: {

@@ -1,6 +1,6 @@
 {
   "name": "@platforma-open/milaboratories.clonotype-enrichment.model",
-  "version": "3.2.4",
+  "version": "4.0.0",
   "description": "Block model",
   "type": "module",
   "main": "dist/index.js",
@@ -14,7 +14,8 @@
   },
   "dependencies": {
     "@platforma-sdk/model": "catalog:",
-    "@milaboratories/graph-maker": "catalog:"
+    "@milaboratories/graph-maker": "catalog:",
+    "@milaboratories/helpers": "catalog:"
   },
   "devDependencies": {
     "@milaboratories/ts-builder": "catalog:",
