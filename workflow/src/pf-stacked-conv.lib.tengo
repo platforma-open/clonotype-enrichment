@@ -1,6 +1,6 @@
 ll := import("@platforma-sdk/workflow-tengo:ll")
 
-getColumns := func(abundanceSpec, addPresentInNegControl, addMaxNegControlEnrichment, emitBindingSpecificity) {
+getColumns := func(abundanceSpec, addPresentInNegControl, addMaxNegControlEnrichment) {
   columns := [
       {
         column: "Frequency",
@@ -64,7 +64,7 @@ getColumns := func(abundanceSpec, addPresentInNegControl, addMaxNegControlEnrich
       }
       ]
 
-  if (addPresentInNegControl || addMaxNegControlEnrichment) && emitBindingSpecificity {
+  if addPresentInNegControl || addMaxNegControlEnrichment {
     columns = columns + [{
         column: "Binding Specificity",
         id: "binding_specificity",

@@ -32,8 +32,7 @@ self.body(func(args) {
         FilteringConfig: args.FilteringConfig,
         blockId: args.blockId,
         customBlockLabel: args.customBlockLabel,
-        defaultBlockLabel: args.defaultBlockLabel,
-        emitBindingSpecificity: args.emitBindingSpecificity
+        defaultBlockLabel: args.defaultBlockLabel
     })
 
     // Define output variables
@@ -44,9 +43,9 @@ self.body(func(args) {
         exportColumnRender.output("columnSpec"),
         exportColumnRender.output("columnData")
     )
-    if args.antigenControlConfig.controlEnabled == true && args.emitBindingSpecificity == true {
+    if args.antigenControlConfig.controlEnabled == true {
         exports.add(
-            "Binding Specificity",
+            "Binding Specificity", 
             exportColumnRender.output("bindingSpecificitySpec"),
             exportColumnRender.output("bindingSpecificityData")
         )

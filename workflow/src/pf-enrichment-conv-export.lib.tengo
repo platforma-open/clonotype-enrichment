@@ -1,7 +1,7 @@
 ll := import("@platforma-sdk/workflow-tengo:ll")
 canonical := import("@platforma-sdk/workflow-tengo:canonical")
 
-getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percentile, downsampling, conditionOrder, enrichmentThreshold, antigenControlConfig, filteringConfig, blockId, emitBindingSpecificity, ...opts) {
+getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percentile, downsampling, conditionOrder, enrichmentThreshold, antigenControlConfig, filteringConfig, blockId, ...opts) {
   ll.assert(len(opts) <= 1, "expected at most one options map")
 
   specLabel := "Max Log2FC"
@@ -101,7 +101,7 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percenti
         }
       }
 
-  if antigenControlConfig.controlEnabled && emitBindingSpecificity && len(opts) == 0 {
+  if antigenControlConfig.controlEnabled && len(opts) == 0 {
     // Prepare a domain map for binding specificity column
     bindingDomain := copy(baseDomain)
     bindingDomain["pl7.app/enrichment/controlThreshold"] = controlThreshold
