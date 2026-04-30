@@ -172,7 +172,9 @@ const metadataFetched = useWatchFetch(
     }
 
     // Unique condition values from the (possibly filtered) condition map
-    const conditionValues = [...new Set(Object.values(conditionBySample))].filter(Boolean).sort();
+    const conditionValues = [...new Set(Object.values(conditionBySample))]
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
 
     return {
       conditionValues,
