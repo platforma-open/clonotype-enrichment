@@ -483,6 +483,8 @@ const isClusterId = computed(() => {
     && app.model.outputs.datasetSpec?.axesSpec[1]?.name === 'pl7.app/clusterId';
 });
 
+const isPeptide = computed(() => app.model.outputs.modality === 'peptide');
+
 /**
  * Synchronization logic to initialize and validate condition orders.
  *
@@ -650,12 +652,12 @@ const isControlOrderOpen = ref(true); // Open by default
     </template>
     <PlAlert v-if="isEmpty === true && filteredTooMuch !== true" type="warn" icon>
       <template #title>Empty dataset selection</template>
-      The input dataset you have selected is empty or has too few clonotypes.
+      The input dataset you have selected is empty or has too few sequences.
       Please choose a different dataset.
     </PlAlert>
     <PlAlert v-if="filteredTooMuch === true" type="warn" icon>
-      <template #title>Too few clonotypes</template>
-      Current filters removed all clonotypes. Consider relaxing filter criteria.
+      <template #title>Too few sequences</template>
+      Current filters removed all sequences. Consider relaxing filter criteria.
     </PlAlert>
     <PlAgDataTableV2
       v-model="app.model.ui.tableState"
@@ -741,7 +743,7 @@ const isControlOrderOpen = ref(true); // Open by default
     >
       <template #tooltip>
         <p><strong>Enrichment threshold (E<sub>thres</sub>)</strong></p>
-        <p>Log2 Fold Change (Log2FC) used to define enriched clonotypes. A clonotype is considered enriched when its Log2FC between conditions is ≥ this value.</p>
+        <p>Log2 Fold Change (Log2FC) used to define enriched sequences. A sequence is considered enriched when its Log2FC between conditions is ≥ this value.</p>
         <p>This value is used to define <strong>Enrichment quality</strong> categories in combination to data-derived percentiles (q):</p>
         <p>
           - High threshold: Max Log2FC greater than maximum between enrichment q75 and E<sub>thres</sub><br/>
@@ -753,7 +755,7 @@ const isControlOrderOpen = ref(true); // Open by default
           <li><strong>Stable Binder</strong> — high threshold &amp; stable threshold.</li>
           <li><strong>Rescuer</strong> — high threshold &amp; NOT stable threshold.</li>
           <li><strong>Parasite</strong> — low threshold &amp; frequency threshold.</li>
-          <li><strong>Weak Binder</strong> — All other clonotypes.</li>
+          <li><strong>Weak Binder</strong> — All other sequences.</li>
         </ul>
       </template>
     </PlNumberField>
@@ -783,7 +785,7 @@ const isControlOrderOpen = ref(true); // Open by default
           <template #tooltip>
             <div>
               Enables specificity analysis by comparing your target against control samples.<br/><br/>
-              You can select multiple negative controls (e.g., irrelevant antigens). The analysis calculates enrichment for each one independently and uses the <strong>maximum value</strong> found across all controls as a baseline for background binding. This helps filter out "sticky" or non-specific clonotypes that appear in your control samples.
+              You can select multiple negative controls (e.g., irrelevant antigens). The analysis calculates enrichment for each one independently and uses the <strong>maximum value</strong> found across all controls as a baseline for background binding. This helps filter out "sticky" or non-specific sequences that appear in your control samples.
             </div>
           </template>
         </PlTooltip>
@@ -904,8 +906,8 @@ const isControlOrderOpen = ref(true); // Open by default
       >
         <template #tooltip>
           <div>
-            Log2 Fold Change (Log2FC) thresholds used to define <strong>Enriched negative control clonotypes</strong>.<br/>
-            A clonotype is considered enriched if its Log2FC value between conditions is equal or greater than the threshold. This threshold in combination with <strong>Enrichment threshold</strong> is used to define <strong>Binding Specificity</strong> categories:
+            Log2 Fold Change (Log2FC) thresholds used to define <strong>Enriched negative control sequences</strong>.<br/>
+            A sequence is considered enriched if its Log2FC value between conditions is equal or greater than the threshold. This threshold in combination with <strong>Enrichment threshold</strong> is used to define <strong>Binding Specificity</strong> categories:
             <br/><br/>
             Target<sub>Max</sub> and Control<sub>Max</sub> are the maximum Log2FC values for the target and control conditions, respectively:
             <br/><br/>
@@ -932,7 +934,7 @@ const isControlOrderOpen = ref(true); // Open by default
             Normalizes sequencing depth across samples to ensure fair comparison of diversity and abundance.
             <br/><br/>
             <strong>None:</strong> Use raw abundance values. Recommended only if sequencing depth is already uniform.<br/><br/>
-            <strong>Random Sampling:</strong> Resamples all samples to a target read depth (total number of reads) while maintaining relative clonotype proportions. Choose <strong>Fixed</strong> (manual), <strong>Min</strong> (smallest sample), or <strong>Auto</strong> to set the target depth.
+            <strong>Random Sampling:</strong> Resamples all samples to a target read depth (total number of reads) while maintaining relative sequence proportions. Choose <strong>Fixed</strong> (manual), <strong>Min</strong> (smallest sample), or <strong>Auto</strong> to set the target depth.
           </div>
         </template>
       </PlBtnGroup>
@@ -957,7 +959,7 @@ const isControlOrderOpen = ref(true); // Open by default
       />
     </PlAccordionSection>
 
-    <PlAccordionSection label="Clonotype Filtering">
+    <PlAccordionSection label="Sequence Filtering">
       <PlRadioGroup
         v-model="app.model.args.FilteringConfig.baseFilter"
         :options="filteringOptions"
@@ -967,9 +969,9 @@ const isControlOrderOpen = ref(true); // Open by default
           <PlTooltip class="info" :style="{display: 'inline-block'}">
             <template #tooltip>
               <strong>Condition-based filtering strategy:</strong><br/>
-              <strong>No filtering:</strong> Analyze all clonotypes, including those specific to individual conditions (may include rare or condition-specific responses)<br/><br/>
-              <strong>Shared (all conditions):</strong> Focus only on clonotypes present in all conditions (Library excluded)<br/><br/>
-              <strong>Multiple conditions:</strong> Focus on clonotypes present in more than one condition (excludes condition-specific clonotypes that may represent noise or rare events)
+              <strong>No filtering:</strong> Analyze all sequences, including those specific to individual conditions (may include rare or condition-specific responses)<br/><br/>
+              <strong>Shared (all conditions):</strong> Focus only on sequences present in all conditions (Library excluded)<br/><br/>
+              <strong>Multiple conditions:</strong> Focus on sequences present in more than one condition (excludes condition-specific sequences that may represent noise or rare events)
             </template>
           </PlTooltip>
         </template>
@@ -995,7 +997,7 @@ const isControlOrderOpen = ref(true); // Open by default
         <PlTooltip class="info">
           <template #tooltip>
             <div>
-              Remove clonotypes below a specific threshold based on their maximum abundance across all conditions. Filters sampling noise in display campaigns<br/><br/>
+              Remove sequences below a specific threshold based on their maximum abundance across all conditions. Filters sampling noise in display campaigns<br/><br/>
               <strong>Counts:</strong> Filter by raw/downsampled number of reads (e.g., 100).<br/>
               <strong>Frequency:</strong> Filter by fraction of reads aggregated across same condition samples (0 to 1.0).<br/><br/>
               For <em>in vivo</em> studies with lower sequencing depth, consider lower values (10-50 counts).
@@ -1033,10 +1035,10 @@ const isControlOrderOpen = ref(true); // Open by default
         <PlTooltip class="info">
           <template #tooltip>
             <div>
-              Filter clonotypes based on their occurrence across conditions.<br/><br/>
-              <strong>Present in any (OR):</strong> Keeps clonotypes detected in at least one of the selected conditions.<br/>
-              <strong>Present in all (AND):</strong> Only keeps clonotypes detected in every one of the selected conditions.<br/><br/>
-              Useful to focus on persistent clonotypes or those appearing in later selection conditions.
+              Filter sequences based on their occurrence across conditions.<br/><br/>
+              <strong>Present in any (OR):</strong> Keeps sequences detected in at least one of the selected conditions.<br/>
+              <strong>Present in all (AND):</strong> Only keeps sequences detected in every one of the selected conditions.<br/><br/>
+              Useful to focus on persistent sequences or those appearing in later selection conditions.
             </div>
           </template>
         </PlTooltip>
@@ -1066,8 +1068,8 @@ const isControlOrderOpen = ref(true); // Open by default
       >
         <template #tooltip>
           <p><strong>Pseudo-count (Default: 1)</strong></p>
-          <p>A value added to all clonotype counts to stabilize fold-change estimates and avoid division by zero.</p>
-          <p>Increasing the pseudo-count reduces the impact of sampling noise and moderates extreme enrichment values. This is particularly useful for highly enriched clonotypes that are absent in the reference sample (e.g., in <strong>display campaigns</strong>).</p>
+          <p>A value added to all sequence counts to stabilize fold-change estimates and avoid division by zero.</p>
+          <p>Increasing the pseudo-count reduces the impact of sampling noise and moderates extreme enrichment values. This is particularly useful for highly enriched sequences that are absent in the reference sample (e.g., in <strong>display campaigns</strong>).</p>
         </template>
       </PlNumberField>
       <PlNumberField
@@ -1084,19 +1086,19 @@ const isControlOrderOpen = ref(true); // Open by default
         <template #tooltip>
           <div>
             <strong>Control Frequency Threshold</strong> (Default: 0.01)<br/><br/>
-            Minimum frequency required to consider a clonotype "present" in the control sample during <strong>specificity classification</strong>.<br/><br/>
-            Clonotypes are only considered present in the control if their frequency is <strong>greater than or equal to</strong> this value. This prevents low-abundance noise in the control from affecting specificity classification.
+            Minimum frequency required to consider a sequence "present" in the control sample during <strong>specificity classification</strong>.<br/><br/>
+            Sequences are only considered present in the control if their frequency is <strong>greater than or equal to</strong> this value. This prevents low-abundance noise in the control from affecting specificity classification.
           </div>
         </template>
       </PlNumberField>
       <PlDropdownMulti
-        v-if="!isClusterId"
+        v-if="!isClusterId && !isPeptide"
         v-model="app.model.args.clonotypeDefinition"
         :options="app.model.outputs.sequenceColumnOptions"
         label="Clonotype definition"
       >
         <template #tooltip>
-          Select columns that define a clonotype. By default, it's a nucletotide sequence of the clonotype.
+          Select columns that define a clonotype. By default, it's a nucleotide sequence of the clonotype.
           Here you can override this behavior and calculate enrichment score based on e.g. amino acid sequence of CDR3.
         </template>
       </PlDropdownMulti>
@@ -1128,7 +1130,7 @@ const isControlOrderOpen = ref(true); // Open by default
       <div>
         <div>Enrichment statistics</div>
         <div style="color: #6b7280; font-size: 14px; margin-top: 4px; line-height: 1.2; margin-bottom: 0;">
-          Derived from each clonotype's highest enrichment value among all comparisons
+          Derived from each sequence's highest enrichment value among all comparisons
         </div>
       </div>
     </template>
