@@ -28,13 +28,14 @@
       "url": "https://github.com/platforma-open/clonotype-enrichment",
       "docs": "https://docs.platforma.bio/guides/antibody-discovery/enrichment-analysis/",
       "support": "mailto:support@milaboratories.com",
-      "description": "Identifies and ranks clonotypes enriched through selection rounds, showing how their frequencies change across conditions.",
+      "description": "Identifies and ranks sequences (clonotypes or peptides) enriched through selection rounds, showing how their frequencies change across conditions.",
       "longDescription": "file:../docs/description.md",
       "changelog": "file:../CHANGELOG.md",
       "tags": [
         "AIRR",
         "downstream",
-        "enrichment"
+        "enrichment",
+        "peptide"
       ],
       "organization": {
         "name": "MiLaboratories Inc",
