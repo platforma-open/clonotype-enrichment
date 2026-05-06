@@ -5,10 +5,15 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percenti
   ll.assert(len(opts) <= 1, "expected at most one options map")
 
   specLabel := "Max Log2FC"
+  comparison := undefined
 
-  // this same comparisons defines downstream which column will be used
+  // For per-comparison additional exports, opts[0].comparison disambiguates
+  // the spec domain so each emitted Log2FC column has a unique (name, domain, axes).
+  // Without it every comparison would collapse onto the Max column in the result pool.
   if len(opts) == 1 {
     specLabel = opts[0].label
+    ll.assert(opts[0].comparison != undefined, "expected opts.comparison for per-comparison enrichment export")
+    comparison = opts[0].comparison
   }
 
   // Extract control info
@@ -28,9 +33,16 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percenti
     }
   }
 
-  // Define columns for exports
-  maxDomain := copy(baseDomain)
-  maxDomain["pl7.app/enrichment/type"] = "max"
+  // Define columns for exports.
+  // Main path: type=max (Max Log2FC). Per-comparison path: type=comparison plus
+  // comparison=<X vs Y>, mirroring the Overall Log2FC disambiguation below.
+  enrichmentDomain := copy(baseDomain)
+  if comparison != undefined {
+    enrichmentDomain["pl7.app/enrichment/type"] = "comparison"
+    enrichmentDomain["pl7.app/enrichment/comparison"] = comparison
+  } else {
+    enrichmentDomain["pl7.app/enrichment/type"] = "max"
+  }
   columns := [{
         column: "Enrichment",
         id: "enrichment",
@@ -38,7 +50,7 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percenti
         spec: {
           name: "pl7.app/enrichment",
           valueType: "Double",
-          domain: maxDomain,
+          domain: enrichmentDomain,
           annotations: {
             "pl7.app/label": specLabel,
             "pl7.app/table/orderPriority": "9000",
