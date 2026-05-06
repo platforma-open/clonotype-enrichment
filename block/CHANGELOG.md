@@ -1,5 +1,13 @@
 # @platforma-open/milaboratories.clonotype-enrichment
 
+## 3.0.2
+
+### Patch Changes
+
+- ade5149: Fix `additionalEnrichments` per-comparison Log2FC columns colliding in the result pool. Each per-comparison column now carries `domain["pl7.app/enrichment/type"] = "comparison"` and `domain["pl7.app/enrichment/comparison"] = <X vs Y>`, mirroring the disambiguation pattern already used for the Overall Log2FC column. Per-comparison columns are now visible to downstream blocks (Clonotype Browser, Antibody Lead Selection).
+- Updated dependencies [ade5149]
+  - @platforma-open/milaboratories.clonotype-enrichment.workflow@4.0.1
+
 ## 3.0.1
 
 ### Patch Changes
