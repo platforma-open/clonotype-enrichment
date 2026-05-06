@@ -11,8 +11,9 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percenti
   // the spec domain so each emitted Log2FC column has a unique (name, domain, axes).
   // Without it every comparison would collapse onto the Max column in the result pool.
   if len(opts) == 1 {
-    specLabel = opts[0].label
+    ll.assert(opts[0].label != undefined, "expected opts.label for per-comparison enrichment export")
     ll.assert(opts[0].comparison != undefined, "expected opts.comparison for per-comparison enrichment export")
+    specLabel = opts[0].label
     comparison = opts[0].comparison
   }
 
