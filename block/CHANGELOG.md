@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment
 
+## 3.0.3
+
+### Patch Changes
+
+- fb62640: Universalize block
+
 ## 3.0.2
 
 ### Patch Changes
