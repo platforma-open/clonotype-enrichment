@@ -73,7 +73,7 @@ const metaColumnPredicate = (spec: PColumnSpec) =>
 
 <template>
   <GraphMaker
-    v-model="app.model.ui.bubbleState"
+    v-model="app.model.data.bubbleState"
     chartType="bubble"
     :p-frame="app.model.outputs.bubblePf"
     :defaultOptions="defaultOptions"

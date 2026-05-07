@@ -1,5 +1,5 @@
-import { model } from '@platforma-open/milaboratories.clonotype-enrichment.model';
-import { defineApp } from '@platforma-sdk/ui-vue';
+import { platforma } from '@platforma-open/milaboratories.clonotype-enrichment.model';
+import { defineAppV3 } from '@platforma-sdk/ui-vue';
 import { watch } from 'vue';
 import BoxPage from './pages/BoxPage.vue';
 import BubblePage from './pages/BubblePage.vue';
@@ -8,7 +8,7 @@ import MainPage from './pages/MainPage.vue';
 import ScatterPage from './pages/ScatterPage.vue';
 import StackedPage from './pages/StackedPage.vue';
 
-export const sdkPlugin = defineApp(model, (app) => {
+export const sdkPlugin = defineAppV3(platforma, (app) => {
   return {
     progress: () => {
       return app.model.outputs.isRunning;
@@ -30,7 +30,7 @@ export const useApp = sdkPlugin.useApp;
 const unwatch = watch(sdkPlugin, ({ loaded }) => {
   if (!loaded) return;
   const app = useApp();
-  app.model.args.customBlockLabel ??= '';
-  app.model.args.defaultBlockLabel ??= 'Select Abundance';
+  app.model.data.customBlockLabel ??= '';
+  app.model.data.defaultBlockLabel ??= 'Select Abundance';
   unwatch();
 });

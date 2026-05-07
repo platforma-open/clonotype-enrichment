@@ -60,7 +60,7 @@ const metaColumnPredicate = (spec: PColumnSpec) =>
 
 <template>
   <GraphMaker
-    v-model="app.model.ui.stackedState"
+    v-model="app.model.data.stackedState"
     chartType="discrete"
     :p-frame="app.model.outputs.stackedPf"
     :default-options="defaultOptions"
