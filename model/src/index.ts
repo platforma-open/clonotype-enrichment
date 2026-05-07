@@ -26,29 +26,35 @@ export type DownsamplingParameters = {
 };
 
 type FilteringConfig = {
+  // Mutually exclusive base filter
   baseFilter: 'none' | 'shared' | 'single-sample';
+
+  // Combinatory filters (apply on top of base)
   minAbundance: {
     enabled: boolean;
     threshold: number;
     metric: 'count' | 'frequency';
   };
+
   presentInRounds: {
     enabled: boolean;
     rounds: string[];
     logic: 'OR' | 'AND';
   };
+
   excludeSequencedLibrary: boolean;
 };
 
 type AntigenControlConfig = {
   antigenEnabled: boolean;
   controlEnabled: boolean;
-  antigenColumnRef?: SUniversalPColumnId;
-  targetAntigen?: string;
-  negativeAntigens: string[];
-  controlThreshold: number;
-  singleControlFrequencyThreshold: number;
-  controlConditionsOrder: string[];
+  antigenColumnRef?: SUniversalPColumnId; // Metadata column for antigen/control
+  targetAntigen?: string; // e.g., "Target-Antigen"
+  negativeAntigens: string[]; // e.g., ["BSA", "Plastic"]
+  controlThreshold: number; // Default: 1.0 log2 FC
+  // singleControlFoldChangeThreshold: number; // Default: 10.0
+  singleControlFrequencyThreshold: number; // Default: 0.01
+  controlConditionsOrder: string[]; // e.g., ["BSA", "Plastic"]
   sequencedLibraryEnabled: boolean;
   sequencedLibraryAntigen?: string;
   hasSingleConditionNegativeControl: boolean;
@@ -77,6 +83,7 @@ type OldUiState = {
   stackedState: GraphMakerState;
   scatterState: GraphMakerState;
   boxState: GraphMakerState;
+  /** When set, the "conditions excluded by target" alert is hidden until the excluded list changes (key = sorted excluded conditions). */
   excludedAlertDismissedKey?: string;
 };
 
@@ -91,8 +98,8 @@ export type BlockData = {
   clonotypeDefinition: SUniversalPColumnId[];
   additionalEnrichmentExports: string[];
   antigenControlConfig: AntigenControlConfig;
-  enrichmentThreshold: number;
-  pseudoCount: number;
+  enrichmentThreshold: number; // Default: 2.0 log2 FC
+  pseudoCount: number; // Default: 1
   tableState: PlDataTableStateV2;
   bubbleState: GraphMakerState;
   lineState: GraphMakerState;
@@ -143,6 +150,7 @@ const dataModel = new DataModelBuilder()
       controlEnabled: false,
       negativeAntigens: [],
       controlThreshold: 1.0,
+      // singleControlFoldChangeThreshold: 10.0,
       singleControlFrequencyThreshold: 0.01,
       controlConditionsOrder: [],
       sequencedLibraryEnabled: false,
@@ -298,6 +306,7 @@ export const platforma = BlockModelV3.create(dataModel)
     const { conditionColumnRef, abundanceRef: anchor, antigenControlConfig: config } = ctx.data;
     if (!conditionColumnRef || !anchor) return undefined;
 
+    // Resolve condition column from anchor + selector
     const conditionCols = ctx.resultPool.getAnchoredPColumns(
       { main: anchor },
       JSON.parse(conditionColumnRef) as AnchoredPColumnSelector,
@@ -306,6 +315,7 @@ export const platforma = BlockModelV3.create(dataModel)
     if (!conditionCol) return undefined;
 
     const columns = [conditionCol];
+    // Add antigen column when target/control selection is enabled
     if (config?.antigenEnabled && config.antigenColumnRef) {
       const antigenCols = ctx.resultPool.getAnchoredPColumns(
         { main: anchor },
@@ -318,6 +328,7 @@ export const platforma = BlockModelV3.create(dataModel)
     return ctx.createPFrame(columns);
   })
 
+  // Returns the IDs for the condition column (conditionColId) and the antigen column (antigenColId) by resolving them from the block arguments.
   .output('metadataColumnIds', (ctx) => {
     const { conditionColumnRef, abundanceRef: anchor, antigenControlConfig: config } = ctx.data;
     if (!conditionColumnRef || !anchor) return undefined;
@@ -340,6 +351,11 @@ export const platforma = BlockModelV3.create(dataModel)
     return { conditionColId, antigenColId };
   })
 
+  // Sample IDs that participate in the abundance column. Read partition keys
+  // from the abundance column data: it is partitioned on `pl7.app/sampleId`
+  // (axis 0), so the partition keys at that index are the sample IDs.
+  // Avoids relying on the upstream dataset's `pl7.app/axisKeys/0` annotation,
+  // which carries `sampleGroupId` (not `sampleId`) for `MultiplexedFastq`.
   .output('sampleIds', (ctx) => {
     const { abundanceRef } = ctx.data;
     if (!abundanceRef) return undefined;
@@ -352,6 +368,7 @@ export const platforma = BlockModelV3.create(dataModel)
     return keysPerAxis[sampleAxisIdx].map((v) => String(v));
   })
 
+  // Get all enrichment statistics
   .output('enrichmentStats', (ctx) => {
     const statsObj = ctx.outputs?.resolve('outStats')?.getDataAsJson();
     if (!statsObj) return undefined;
@@ -365,6 +382,7 @@ export const platforma = BlockModelV3.create(dataModel)
     return result;
   })
 
+  // Returns a map of results for main table
   .outputWithStatus('pt', (ctx) => {
     const pCols = ctx.outputs?.resolve('enrichmentPf')?.getPColumns();
 
@@ -383,13 +401,17 @@ export const platforma = BlockModelV3.create(dataModel)
           ],
           { dontWaitAllData: true },
         ) ?? []).filter((col) =>
+          // Skip if axis doesn't match enrichment (e.g. stale results after switching input)
           col.spec.axesSpec[0]?.name === enrichmentAxisName,
         )
       : [];
 
+    // Assembling feature (or centroid) amino acid sequences — visible by default
     const mainSeqCols = allSeqCols
       .filter((col) => {
         const alphabet = col.spec.domain?.['pl7.app/alphabet'];
+        // !== false (not === true) to also match cluster centroid sequences,
+        // where clonotype-clustering deletes the isAssemblingFeature annotation
         return (alphabet === 'aminoacid')
           && readAnnotationJson(col.spec, Annotation.VDJ.IsAssemblingFeature) !== false;
       })
@@ -401,6 +423,7 @@ export const platforma = BlockModelV3.create(dataModel)
         },
       }));
 
+    // Other region sequences (CDR1, CDR2, FR1, etc.) — not shown by default, available in column picker
     const otherRegionCols = allSeqCols
       .filter((col) =>
         readAnnotationJson(col.spec, Annotation.VDJ.IsAssemblingFeature) === false,
@@ -418,6 +441,8 @@ export const platforma = BlockModelV3.create(dataModel)
       [...pCols, ...mainSeqCols, ...otherRegionCols],
       ctx.data.tableState,
       {
+        // Sequence columns are non-core so they are left-joined: they won't
+        // bring back clonotypes that were filtered out during enrichment
         coreColumnPredicate: ({ spec }) =>
           spec.name !== 'pl7.app/vdj/sequence' && spec.name !== 'pl7.app/sequence',
         coreJoinType: 'inner',
@@ -425,6 +450,7 @@ export const platforma = BlockModelV3.create(dataModel)
     );
   })
 
+  // Returns a map of results for plot
   .outputWithStatus('bubblePf', (ctx): PFrameHandle | undefined => {
     const pCols = ctx.outputs?.resolve('bubblePf')?.getPColumns();
     if (pCols === undefined) {
@@ -434,6 +460,7 @@ export const platforma = BlockModelV3.create(dataModel)
     return createPFrameForGraphs(ctx, pCols);
   })
 
+  // Returns a list pof PCols for plot defaults
   .output('bubblePCols', (ctx) => {
     const pCols = ctx.outputs?.resolve('bubblePf')?.getPColumns();
     if (pCols === undefined) {
@@ -524,11 +551,13 @@ export const platforma = BlockModelV3.create(dataModel)
     for (const ax of spec.axesSpec) {
       if (ax.name === 'pl7.app/variantKey') return 'peptide';
       if (ax.name === 'pl7.app/vdj/clonotypeKey' || ax.name === 'pl7.app/vdj/scClonotypeKey') return 'antibody_tcr';
+      // clustered abundances
       for (const key of Object.keys(ax.domain ?? {})) {
         if (key.startsWith('pl7.app/peptide/')) return 'peptide';
         if (key.startsWith('pl7.app/vdj/')) return 'antibody_tcr';
       }
     }
+    // Fallback when the input is resolved but unrecognized.
     return 'antibody_tcr';
   }, { retentive: true })
 
