@@ -64,7 +64,7 @@ const metaColumnPredicate = (spec: PColumnSpec) =>
 
 <template>
   <GraphMaker
-    v-model="app.model.ui.boxState"
+    v-model="app.model.data.boxState"
     chartType="discrete"
     :p-frame="app.model.outputs.controlScatterPf"
     :default-options="defaultOptions"

@@ -9,7 +9,8 @@ import type {
 } from '@platforma-sdk/model';
 import {
   Annotation,
-  BlockModel,
+  BlockModelV3,
+  DataModelBuilder,
   createPFrameForGraphs,
   createPlDataTableStateV2,
   createPlDataTableV2,
@@ -60,7 +61,22 @@ type AntigenControlConfig = {
   hasMultiConditionNegativeControl: boolean;
 };
 
-export type UiState = {
+type OldArgs = {
+  defaultBlockLabel: string;
+  customBlockLabel: string;
+  abundanceRef?: PlRef;
+  conditionColumnRef?: SUniversalPColumnId;
+  conditionOrder: string[];
+  downsampling: DownsamplingParameters;
+  FilteringConfig: FilteringConfig;
+  clonotypeDefinition: SUniversalPColumnId[];
+  additionalEnrichmentExports: string[];
+  antigenControlConfig: AntigenControlConfig;
+  enrichmentThreshold: number;
+  pseudoCount: number;
+};
+
+type OldUiState = {
   tableState: PlDataTableStateV2;
   bubbleState: GraphMakerState;
   lineState: GraphMakerState;
@@ -71,7 +87,7 @@ export type UiState = {
   excludedAlertDismissedKey?: string;
 };
 
-export type BlockArgs = {
+export type BlockData = {
   defaultBlockLabel: string;
   customBlockLabel: string;
   abundanceRef?: PlRef;
@@ -84,11 +100,28 @@ export type BlockArgs = {
   antigenControlConfig: AntigenControlConfig;
   enrichmentThreshold: number; // Default: 2.0 log2 FC
   pseudoCount: number; // Default: 1
+  tableState: PlDataTableStateV2;
+  bubbleState: GraphMakerState;
+  lineState: GraphMakerState;
+  stackedState: GraphMakerState;
+  scatterState: GraphMakerState;
+  boxState: GraphMakerState;
+  excludedAlertDismissedKey?: string;
 };
 
-export const model = BlockModel.create()
-
-  .withArgs<BlockArgs>({
+const dataModel = new DataModelBuilder()
+  .from<BlockData>('v1')
+  .upgradeLegacy<OldArgs, OldUiState>(({ args, uiState }) => ({
+    ...args,
+    tableState: uiState.tableState,
+    bubbleState: uiState.bubbleState,
+    lineState: uiState.lineState,
+    stackedState: uiState.stackedState,
+    scatterState: uiState.scatterState,
+    boxState: uiState.boxState,
+    excludedAlertDismissedKey: uiState.excludedAlertDismissedKey,
+  }))
+  .init(() => ({
     defaultBlockLabel: '',
     customBlockLabel: '',
     conditionOrder: [],
@@ -127,9 +160,6 @@ export const model = BlockModel.create()
     },
     enrichmentThreshold: 2.0,
     pseudoCount: 1,
-  })
-
-  .withUiState<UiState>({
     tableState: createPlDataTableStateV2(),
     bubbleState: {
       title: 'Enrichment',
@@ -167,41 +197,54 @@ export const model = BlockModel.create()
       currentTab: null,
     },
     excludedAlertDismissedKey: undefined,
-  })
+  }));
 
-  .argsValid((ctx) => {
-    const { abundanceRef, conditionColumnRef, conditionOrder, antigenControlConfig } = ctx.args;
-    const basicValid = abundanceRef !== undefined
-      && conditionColumnRef !== undefined
-      && conditionOrder.length > 0
-      && ctx.args.enrichmentThreshold >= 0.6;
+export const platforma = BlockModelV3.create(dataModel)
 
-    if (!basicValid) return false;
+  .args((data) => {
+    const { abundanceRef, conditionColumnRef, conditionOrder, antigenControlConfig } = data;
+
+    if (!abundanceRef) throw new Error('Abundance is required');
+    if (!conditionColumnRef) throw new Error('Condition column is required');
+    if (!conditionOrder.length) throw new Error('Conditions are required');
+    if (data.enrichmentThreshold < 0.6) throw new Error('Enrichment threshold must be ≥ 0.6');
 
     if (antigenControlConfig.antigenEnabled || antigenControlConfig.controlEnabled) {
-      if (!antigenControlConfig.antigenColumnRef) return false;
+      if (!antigenControlConfig.antigenColumnRef) throw new Error('Antigen column is required');
     }
 
     if (antigenControlConfig.antigenEnabled) {
-      if (!antigenControlConfig.targetAntigen) return false;
+      if (!antigenControlConfig.targetAntigen) throw new Error('Target antigen is required');
     }
 
     if (antigenControlConfig.controlEnabled) {
       if (!antigenControlConfig.antigenEnabled
         || !antigenControlConfig.negativeAntigens.length
         || antigenControlConfig.controlConditionsOrder.length < 1
-        // || antigenControlConfig.singleControlFoldChangeThreshold === undefined
-        || antigenControlConfig.singleControlFrequencyThreshold === undefined) return false;
+        || antigenControlConfig.singleControlFrequencyThreshold === undefined)
+        throw new Error('Control configuration is incomplete');
     }
 
     if (antigenControlConfig.sequencedLibraryEnabled) {
-      if (!antigenControlConfig.sequencedLibraryAntigen) return false;
-      if (conditionOrder.length === 0) return false; // no conditions to compare to
+      if (!antigenControlConfig.sequencedLibraryAntigen) throw new Error('Library antigen is required');
     } else {
-      if (conditionOrder.length <= 1) return false; // no conditions to compare to
+      if (conditionOrder.length <= 1) throw new Error('At least 2 conditions are required');
     }
 
-    return true;
+    return {
+      defaultBlockLabel: data.defaultBlockLabel,
+      customBlockLabel: data.customBlockLabel,
+      abundanceRef: data.abundanceRef,
+      conditionColumnRef: data.conditionColumnRef,
+      conditionOrder: data.conditionOrder,
+      downsampling: data.downsampling,
+      FilteringConfig: data.FilteringConfig,
+      clonotypeDefinition: data.clonotypeDefinition,
+      additionalEnrichmentExports: data.additionalEnrichmentExports,
+      antigenControlConfig: data.antigenControlConfig,
+      enrichmentThreshold: data.enrichmentThreshold,
+      pseudoCount: data.pseudoCount,
+    };
   })
 
   .output('abundanceOptions', (ctx) =>
@@ -220,7 +263,7 @@ export const model = BlockModel.create()
   )
 
   .output('sequenceColumnOptions', (ctx) => {
-    const anchor = ctx.args.abundanceRef;
+    const anchor = ctx.data.abundanceRef;
     if (anchor === undefined) return undefined;
     return ctx.resultPool.getCanonicalOptions({ main: anchor },
       [
@@ -241,7 +284,7 @@ export const model = BlockModel.create()
   })
 
   .output('metadataOptions', (ctx) => {
-    const anchor = ctx.args.abundanceRef;
+    const anchor = ctx.data.abundanceRef;
     if (anchor === undefined) return undefined;
     return ctx.resultPool.getCanonicalOptions({ main: anchor },
       [{
@@ -254,13 +297,13 @@ export const model = BlockModel.create()
   })
 
   .output('datasetSpec', (ctx) => {
-    if (ctx.args.abundanceRef) return ctx.resultPool.getPColumnSpecByRef(ctx.args.abundanceRef);
+    if (ctx.data.abundanceRef) return ctx.resultPool.getPColumnSpecByRef(ctx.data.abundanceRef);
     else return undefined;
   })
 
   /** PFrame with condition column and (when antigen enabled) antigen column for UI to fetch metadata values. */
   .output('metadataColumnsPframe', (ctx) => {
-    const { conditionColumnRef, abundanceRef: anchor, antigenControlConfig: config } = ctx.args;
+    const { conditionColumnRef, abundanceRef: anchor, antigenControlConfig: config } = ctx.data;
     if (!conditionColumnRef || !anchor) return undefined;
 
     // Resolve condition column from anchor + selector
@@ -287,7 +330,7 @@ export const model = BlockModel.create()
 
   // Returns the IDs for the condition column (conditionColId) and the antigen column (antigenColId) by resolving them from the block arguments.
   .output('metadataColumnIds', (ctx) => {
-    const { conditionColumnRef, abundanceRef: anchor, antigenControlConfig: config } = ctx.args;
+    const { conditionColumnRef, abundanceRef: anchor, antigenControlConfig: config } = ctx.data;
     if (!conditionColumnRef || !anchor) return undefined;
 
     const conditionCols = ctx.resultPool.getAnchoredPColumns(
@@ -314,7 +357,7 @@ export const model = BlockModel.create()
   // Avoids relying on the upstream dataset's `pl7.app/axisKeys/0` annotation,
   // which carries `sampleGroupId` (not `sampleId`) for `MultiplexedFastq`.
   .output('sampleIds', (ctx) => {
-    const { abundanceRef } = ctx.args;
+    const { abundanceRef } = ctx.data;
     if (!abundanceRef) return undefined;
     const pCol = ctx.resultPool.getPColumnByRef(abundanceRef);
     if (!pCol) return undefined;
@@ -348,7 +391,7 @@ export const model = BlockModel.create()
     }
 
     // Pull sequence columns from result pool to show in the table
-    const anchor = ctx.args.abundanceRef;
+    const anchor = ctx.data.abundanceRef;
     const enrichmentAxisName = pCols[0]?.spec.axesSpec[0]?.name;
     const allSeqCols = anchor
       ? (ctx.resultPool.getAnchoredPColumns(
@@ -397,7 +440,7 @@ export const model = BlockModel.create()
     return createPlDataTableV2(
       ctx,
       [...pCols, ...mainSeqCols, ...otherRegionCols],
-      ctx.uiState.tableState,
+      ctx.data.tableState,
       {
         // Sequence columns are non-core so they are left-joined: they won't
         // bring back clonotypes that were filtered out during enrichment
@@ -502,8 +545,8 @@ export const model = BlockModel.create()
   })
 
   .output('modality', (ctx) => {
-    const spec = ctx.args.abundanceRef
-      ? ctx.resultPool.getPColumnSpecByRef(ctx.args.abundanceRef)
+    const spec = ctx.data.abundanceRef
+      ? ctx.resultPool.getPColumnSpecByRef(ctx.data.abundanceRef)
       : undefined;
     if (!spec) return undefined;
     for (const ax of spec.axesSpec) {
@@ -521,7 +564,7 @@ export const model = BlockModel.create()
 
   .title(() => 'Enrichment Analysis')
 
-  .subtitle((ctx) => ctx.args.customBlockLabel || ctx.args.defaultBlockLabel)
+  .subtitle((ctx) => ctx.data.customBlockLabel || ctx.data.defaultBlockLabel)
 
   .sections((ctx) => {
     const sections: Array<{ type: 'link'; href: `/${string}`; label: string }> = [
@@ -531,15 +574,15 @@ export const model = BlockModel.create()
       { type: 'link', href: '/stacked', label: 'Frequency Bar Plot' },
     ];
 
-    if (ctx.args.antigenControlConfig.controlEnabled) {
-      if (ctx.args.antigenControlConfig.controlConditionsOrder.length > 1
-        || (ctx.args.antigenControlConfig.sequencedLibraryEnabled === true
-          && ctx.args.antigenControlConfig.controlConditionsOrder.length === 1)
+    if (ctx.data.antigenControlConfig.controlEnabled) {
+      if (ctx.data.antigenControlConfig.controlConditionsOrder.length > 1
+        || (ctx.data.antigenControlConfig.sequencedLibraryEnabled === true
+          && ctx.data.antigenControlConfig.controlConditionsOrder.length === 1)
       ) {
         sections.push({ type: 'link', href: '/scatter', label: 'Control Scatter Plot' });
       }
-      if (ctx.args.antigenControlConfig.sequencedLibraryEnabled === false
-        && ctx.args.antigenControlConfig.controlConditionsOrder.length === 1
+      if (ctx.data.antigenControlConfig.sequencedLibraryEnabled === false
+        && ctx.data.antigenControlConfig.controlConditionsOrder.length === 1
       ) {
         sections.push({ type: 'link', href: '/box', label: 'Control Box Plot' });
       }
@@ -548,4 +591,4 @@ export const model = BlockModel.create()
     return sections;
   })
 
-  .done(2);
+  .done();
