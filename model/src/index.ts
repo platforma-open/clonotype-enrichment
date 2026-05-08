@@ -390,6 +390,7 @@ export const platforma = BlockModelV3.create(dataModel)
       return undefined;
     }
 
+    // Pull sequence columns from result pool to show in the table
     const anchor = ctx.data.abundanceRef;
     const enrichmentAxisName = pCols[0]?.spec.axesSpec[0]?.name;
     const allSeqCols = anchor
