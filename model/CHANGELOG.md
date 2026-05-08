@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.model
 
+## 4.0.2
+
+### Patch Changes
+
+- c7e0c1f: migrate to block model v3
+
 ## 4.0.1
 
 ### Patch Changes
