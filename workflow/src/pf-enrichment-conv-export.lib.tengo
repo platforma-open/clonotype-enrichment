@@ -77,7 +77,7 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percenti
           annotations: {
             "pl7.app/label": "Enrichment Quality",
             "pl7.app/isDiscreteFilter": "true",
-            "pl7.app/discreteValues": "[\"Stable Binder\", \"Rescuer\", \"Parasite\", \"Weak Binder\"]",
+            "pl7.app/discreteValues": "[\"Stable Binder\", \"Rescuer\", \"Parasite\", \"Weak Binder\", \"Non Binder\"]",
             "pl7.app/isScore": "true",
             "pl7.app/score/rankValues": "decreasing",
             "pl7.app/score/defaultCutoff": "[\"Stable Binder\", \"Rescuer\"]",
