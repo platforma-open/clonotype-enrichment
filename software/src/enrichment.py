@@ -813,10 +813,18 @@ def hybrid_enrichment_analysis(
     # Save main enrichment results
     enrichment_results.write_csv(enrichment_csv)
 
+    if has_antigen and current_target:
+        target_universe = aggregated_df.filter(
+            pl.col('antigen') == current_target
+        ).select('elementId').unique()
+    else:
+        target_universe = aggregated_df.select('elementId').unique()
+
     # Process outputs efficiently
     _process_outputs(
         enrichment_results, effective_condition_order, bubble_csv, top_enriched_csv,
-        top_10_csv, highest_enrichment_csv, top_n_bubble, top_n_enriched, min_enrichment
+        top_10_csv, highest_enrichment_csv, top_n_bubble, top_n_enriched, min_enrichment,
+        target_universe, label_mapping
     )
 
 
@@ -893,7 +901,9 @@ def _process_outputs(
     highest_enrichment_csv: Optional[str],
     top_n_bubble: int,
     top_n_enriched: int,
-    min_enrichment: float
+    min_enrichment: float,
+    target_universe: Optional[pl.DataFrame] = None,
+    label_mapping: Optional[pl.DataFrame] = None,
 ) -> None:
     """
     Process and save output files efficiently.
@@ -917,6 +927,40 @@ def _process_outputs(
                 .agg(pl.all().sort_by(['Enrichment', 'elementId'], descending=[True, False]).first())
                 .sort(['Enrichment', 'elementId'], descending=[True, False])
             )
+            # Emit a placeholder row for every cluster missing from the
+            # enrichment results, so downstream consumers can left-join cluster
+            # axes without losing rows. Deliberately not added to the main
+            # `enrichment_results.csv` (would surface as blank-cell rows in the
+            # UI table).
+            if target_universe is not None and label_mapping is not None:
+                missing_ids = target_universe.join(
+                    highest_enrichment.select('elementId'), on='elementId', how='anti'
+                )
+                if missing_ids.height > 0:
+                    missing_with_label = missing_ids.join(
+                        label_mapping, on='elementId', how='left'
+                    )
+                    target_schema = highest_enrichment.collect_schema()
+                    placeholder_exprs = []
+                    for name, dtype in target_schema.items():
+                        if name in ('elementId', 'Label'):
+                            placeholder_exprs.append(pl.col(name).cast(dtype).alias(name))
+                        elif name == 'Enrichment':
+                            placeholder_exprs.append(pl.lit(0.0).cast(dtype).alias(name))
+                        elif name == 'MaxPositiveEnrichment':
+                            placeholder_exprs.append(pl.lit(0.0).cast(dtype).alias(name))
+                        elif name == 'EnrichmentQuality':
+                            placeholder_exprs.append(pl.lit('Non Binder').cast(dtype).alias(name))
+                        elif name == 'Binding Specificity':
+                            placeholder_exprs.append(pl.lit('Not-Enriched').cast(dtype).alias(name))
+                        elif name == 'PresentInNegControl':
+                            placeholder_exprs.append(pl.lit(False).cast(dtype).alias(name))
+                        else:
+                            placeholder_exprs.append(pl.lit(None).cast(dtype).alias(name))
+                    placeholder_highest = missing_with_label.select(placeholder_exprs)
+                    highest_enrichment = pl.concat(
+                        [highest_enrichment, placeholder_highest], how='vertical'
+                    ).sort(['Enrichment', 'elementId'], descending=[True, False])
             highest_enrichment.write_csv(highest_enrichment_csv)
 
         # Process bubble data
