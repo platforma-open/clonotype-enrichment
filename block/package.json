@@ -1,21 +1,26 @@
 {
   "name": "@platforma-open/milaboratories.clonotype-enrichment",
   "version": "3.0.5",
-  "scripts": {
-    "build": "shx rm -rf block-pack/* && block-tools pack",
-    "do-pack": "shx rm -f *.tgz && pnpm pack && shx mv *.tgz package.tgz",
-    "mark-stable": "block-tools mark-stable -r 's3://milab-euce1-prod-pkgs-s3-block-registry/pub/releases/?region=eu-central-1'",
-    "prepublishOnly": "block-tools pack && block-tools publish -r 's3://milab-euce1-prod-pkgs-s3-block-registry/pub/releases/?region=eu-central-1'"
-  },
   "files": [
     "index.d.ts",
     "index.js"
   ],
-  "dependencies": {
-    "@platforma-open/milaboratories.clonotype-enrichment.workflow": "workspace:*",
-    "@platforma-open/milaboratories.clonotype-enrichment.model": "workspace:*",
-    "@platforma-open/milaboratories.clonotype-enrichment.ui": "workspace:*"
+  "scripts": {
+    "build": "shx rm -rf ./block-pack && block-tools pack",
+    "do-pack": "shx rm -f *.tgz && block-tools pack && pnpm pack && shx mv *.tgz package.tgz",
+    "mark-stable": "block-tools mark-stable -r 's3://milab-euce1-prod-pkgs-s3-block-registry/pub/releases/?region=eu-central-1'",
+    "prepublishOnly": "block-tools pack && block-tools publish -r 's3://milab-euce1-prod-pkgs-s3-block-registry/pub/releases/?region=eu-central-1'"
   },
+  "dependencies": {
+    "@platforma-open/milaboratories.clonotype-enrichment.model": "workspace:*",
+    "@platforma-open/milaboratories.clonotype-enrichment.ui": "workspace:*",
+    "@platforma-open/milaboratories.clonotype-enrichment.workflow": "workspace:*"
+  },
+  "devDependencies": {
+    "@platforma-sdk/block-tools": "catalog:",
+    "shx": "catalog:"
+  },
+  "packageManager": "pnpm@9.12.0",
   "block": {
     "components": {
       "workflow": "@platforma-open/milaboratories.clonotype-enrichment.workflow/dist/tengo/tpl/main.plj.gz",
@@ -43,9 +48,5 @@
         "logo": "file:../logos/organization-logo.png"
       }
     }
-  },
-  "devDependencies": {
-    "@platforma-sdk/block-tools": "catalog:"
-  },
-  "packageManager": "pnpm@9.12.0"
+  }
 }

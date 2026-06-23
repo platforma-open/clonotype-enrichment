@@ -11,3 +11,6 @@ software/**/*.sw.json
 software/*.tgz
 .vscode/sftp.json
 .vscode/extensions.json
+software/**/*.tgz
+.DS_Store
+test-dry-run.json

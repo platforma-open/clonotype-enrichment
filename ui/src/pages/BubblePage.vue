@@ -1,49 +1,50 @@
 <script setup lang="ts">
-import type { PredefinedGraphOption } from '@milaboratories/graph-maker';
-import { GraphMaker } from '@milaboratories/graph-maker';
-import type { PColumnSpec } from '@platforma-sdk/model';
-import { computed } from 'vue';
-import { useApp } from '../app';
+import type { PredefinedGraphOption } from "@milaboratories/graph-maker";
+import { GraphMaker } from "@milaboratories/graph-maker";
+import type { PColumnSpec } from "@platforma-sdk/model";
+import { computed } from "vue";
+import { useApp } from "../app";
 
 const app = useApp();
 
-const defaultOptions = computed((): PredefinedGraphOption<'bubble'>[] | null => {
-  if (!app.model.outputs.bubblePCols)
-    return null;
+const defaultOptions = computed((): PredefinedGraphOption<"bubble">[] | null => {
+  if (!app.model.outputs.bubblePCols) return null;
 
   const bubblePCols = app.model.outputs.bubblePCols;
 
   const getColSpec = (name: string) =>
-    bubblePCols[bubblePCols.findIndex((p) => (p.spec.name === name
-      && p.spec.annotations?.['pl7.app/vdj/isScore'] === undefined
-    ))].spec;
+    bubblePCols[
+      bubblePCols.findIndex(
+        (p) => p.spec.name === name && p.spec.annotations?.["pl7.app/vdj/isScore"] === undefined,
+      )
+    ].spec;
 
-  const enrichmentCol = getColSpec('pl7.app/enrichment');
-  const frequencyCol = getColSpec('pl7.app/numerator-frequency');
+  const enrichmentCol = getColSpec("pl7.app/enrichment");
+  const frequencyCol = getColSpec("pl7.app/numerator-frequency");
 
-  const defaults: PredefinedGraphOption<'bubble'>[] = [
+  const defaults: PredefinedGraphOption<"bubble">[] = [
     {
-      inputName: 'x',
+      inputName: "x",
       selectedSource: enrichmentCol.axesSpec[0],
     },
     {
-      inputName: 'y',
+      inputName: "y",
       selectedSource: enrichmentCol.axesSpec[1],
     },
     {
-      inputName: 'tabBy',
+      inputName: "tabBy",
       selectedSource: enrichmentCol.axesSpec[2],
     },
     {
-      inputName: 'valueColor',
+      inputName: "valueColor",
       selectedSource: enrichmentCol,
     },
     {
-      inputName: 'valueSize',
+      inputName: "valueSize",
       selectedSource: frequencyCol,
     },
     {
-      inputName: 'tooltipContent',
+      inputName: "tooltipContent",
       selectedSource: enrichmentCol.axesSpec[0],
     },
   ];
@@ -59,16 +60,15 @@ const inputElementAxis = computed(() => {
 });
 
 const dataColumnPredicate = (spec: PColumnSpec) =>
-  inputElementAxis.value !== undefined
-  && spec.axesSpec.length === 3
-  && spec.axesSpec[2].name === 'pl7.app/Baseline-condition'
-  && !['pl7.app/maxEnrichment', 'pl7.app/maxNegControlEnrichment'].includes(spec.name);
+  inputElementAxis.value !== undefined &&
+  spec.axesSpec.length === 3 &&
+  spec.axesSpec[2].name === "pl7.app/Baseline-condition" &&
+  !["pl7.app/maxEnrichment", "pl7.app/maxNegControlEnrichment"].includes(spec.name);
 
 const metaColumnPredicate = (spec: PColumnSpec) =>
-  inputElementAxis.value !== undefined
-  && spec.axesSpec[0]?.name === inputElementAxis.value
-  && !spec.annotations?.['pl7.app/trace']?.includes('clonotype-enrichment');
-
+  inputElementAxis.value !== undefined &&
+  spec.axesSpec[0]?.name === inputElementAxis.value &&
+  !spec.annotations?.["pl7.app/trace"]?.includes("clonotype-enrichment");
 </script>
 
 <template>

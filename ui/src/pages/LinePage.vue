@@ -1,44 +1,45 @@
 <script setup lang="ts">
-import type { PredefinedGraphOption } from '@milaboratories/graph-maker';
-import { GraphMaker } from '@milaboratories/graph-maker';
-import type { PColumnSpec } from '@platforma-sdk/model';
-import { computed } from 'vue';
-import { useApp } from '../app';
+import type { PredefinedGraphOption } from "@milaboratories/graph-maker";
+import { GraphMaker } from "@milaboratories/graph-maker";
+import type { PColumnSpec } from "@platforma-sdk/model";
+import { computed } from "vue";
+import { useApp } from "../app";
 
 const app = useApp();
 
-const defaultOptions = computed((): PredefinedGraphOption<'scatterplot'>[] | null => {
-  if (!app.model.outputs.stackedPCols)
-    return null;
+const defaultOptions = computed((): PredefinedGraphOption<"scatterplot">[] | null => {
+  if (!app.model.outputs.stackedPCols) return null;
 
   const stackedPCols = app.model.outputs.stackedPCols;
   const getColSpec = (name: string) =>
-    stackedPCols[stackedPCols.findIndex((p) => (p.spec.name === name
-      && p.spec.annotations?.['pl7.app/vdj/isScore'] === undefined
-    ))].spec;
+    stackedPCols[
+      stackedPCols.findIndex(
+        (p) => p.spec.name === name && p.spec.annotations?.["pl7.app/vdj/isScore"] === undefined,
+      )
+    ].spec;
 
-  const frequencyColSpec = getColSpec('pl7.app/frequency');
-  const defaults: PredefinedGraphOption<'scatterplot'>[] = [
+  const frequencyColSpec = getColSpec("pl7.app/frequency");
+  const defaults: PredefinedGraphOption<"scatterplot">[] = [
     {
-      inputName: 'y',
+      inputName: "y",
       selectedSource: frequencyColSpec,
     },
     // pl7.app/condition
     {
-      inputName: 'x',
+      inputName: "x",
       selectedSource: frequencyColSpec.axesSpec[1],
     },
     // input element axis (vdj clonotypeKey / peptide variantKey)
     {
-      inputName: 'grouping',
+      inputName: "grouping",
       selectedSource: frequencyColSpec.axesSpec[0],
     },
     {
-      inputName: 'tooltipContent',
+      inputName: "tooltipContent",
       selectedSource: frequencyColSpec.axesSpec[0],
     },
     {
-      inputName: 'size',
+      inputName: "size",
       selectedSource: frequencyColSpec,
     },
   ];
@@ -54,16 +55,16 @@ const inputElementAxis = computed(() => {
 });
 
 const dataColumnPredicate = (spec: PColumnSpec) =>
-  inputElementAxis.value !== undefined
-  && spec.axesSpec.length === 2
-  && spec.axesSpec[0].name === inputElementAxis.value
-  && spec.axesSpec[1].name === 'pl7.app/condition'
-  && (spec.name === 'pl7.app/frequency' || spec.name === 'pl7.app/enrichmentVsBaseline');
+  inputElementAxis.value !== undefined &&
+  spec.axesSpec.length === 2 &&
+  spec.axesSpec[0].name === inputElementAxis.value &&
+  spec.axesSpec[1].name === "pl7.app/condition" &&
+  (spec.name === "pl7.app/frequency" || spec.name === "pl7.app/enrichmentVsBaseline");
 
 const metaColumnPredicate = (spec: PColumnSpec) =>
-  inputElementAxis.value !== undefined
-  && spec.axesSpec[0]?.name === inputElementAxis.value
-  && !spec.annotations?.['pl7.app/trace']?.includes('clonotype-enrichment');
+  inputElementAxis.value !== undefined &&
+  spec.axesSpec[0]?.name === inputElementAxis.value &&
+  !spec.annotations?.["pl7.app/trace"]?.includes("clonotype-enrichment");
 </script>
 
 <template>

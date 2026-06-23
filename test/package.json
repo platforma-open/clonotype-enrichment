@@ -1,19 +1,26 @@
 {
   "name": "@platforma-open/milaboratories.clonotype-enrichment.test",
-  "private": true,
   "version": "2.0.6",
+  "private": true,
   "description": "Block tests",
-  "scripts": {
-    "test": "vitest --passWithNoTests"
-  },
-  "files": [],
   "keywords": [],
+  "files": [],
+  "type": "module",
+  "scripts": {
+    "test": "vitest run --passWithNoTests",
+    "fmt": "ts-builder format",
+    "check": "ts-builder check --target block-test"
+  },
   "dependencies": {
     "this-block": "workspace:@platforma-open/milaboratories.clonotype-enrichment@*"
   },
   "devDependencies": {
+    "@milaboratories/ts-builder": "catalog:",
+    "@milaboratories/ts-configs": "catalog:",
     "@platforma-sdk/test": "catalog:",
-    "vitest": "catalog:",
-    "typescript": "catalog:"
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "typescript": "*"
   }
 }

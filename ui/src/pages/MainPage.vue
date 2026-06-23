@@ -1,9 +1,7 @@
 <script setup lang="ts">
-import type { PlRef, SUniversalPColumnId } from '@platforma-sdk/model';
-import { getRawPlatformaInstance, getSingleColumnData, type PObjectId } from '@platforma-sdk/model';
-import type {
-  ListOption,
-} from '@platforma-sdk/ui-vue';
+import type { PlRef, SUniversalPColumnId } from "@platforma-sdk/model";
+import { getRawPlatformaInstance, getSingleColumnData, type PObjectId } from "@platforma-sdk/model";
+import type { ListOption } from "@platforma-sdk/ui-vue";
 import {
   PlAccordion,
   PlAccordionSection,
@@ -26,10 +24,10 @@ import {
   PlTooltip,
   usePlDataTableSettingsV2,
   useWatchFetch,
-} from '@platforma-sdk/ui-vue';
-import { asyncComputed } from '@vueuse/core';
-import { computed, ref, watch, watchEffect } from 'vue';
-import { useApp } from '../app';
+} from "@platforma-sdk/ui-vue";
+import { asyncComputed } from "@vueuse/core";
+import { computed, ref, watch, watchEffect } from "vue";
+import { useApp } from "../app";
 
 const app = useApp();
 
@@ -53,7 +51,7 @@ watchEffect(() => {
   const sequenceColumnOptions = app.model.outputs.sequenceColumnOptions;
   const baseFilter = app.model.data.FilteringConfig.baseFilter;
 
-  let label = '';
+  let label = "";
 
   // Add clonotype definition prefix if selected
   if (clonotypeDefinition && clonotypeDefinition.length > 0 && sequenceColumnOptions) {
@@ -65,25 +63,32 @@ watchEffect(() => {
       .filter((label) => label !== undefined);
 
     if (clonotypeLabels.length > 0) {
-      label = clonotypeLabels.join('-');
+      label = clonotypeLabels.join("-");
     }
   }
 
   // Add condition order
   if (conditionOrder && conditionOrder.length > 0) {
-    const conditionLabel = conditionOrder.join('-');
+    const conditionLabel = conditionOrder.join("-");
     label = label ? `${label}, ${conditionLabel}` : conditionLabel;
   }
 
   // Add target antigen if defined
   const antigenControlConfig = app.model.data.antigenControlConfig;
   if (antigenControlConfig.targetAntigen && antigenControlConfig.antigenEnabled) {
-    label = label ? `${label}, ${antigenControlConfig.targetAntigen}` : antigenControlConfig.targetAntigen;
+    label = label
+      ? `${label}, ${antigenControlConfig.targetAntigen}`
+      : antigenControlConfig.targetAntigen;
   }
 
   // Add filtering mode at the end
   if (baseFilter) {
-    const filteringLabel = baseFilter === 'none' ? 'No filtering' : (baseFilter === 'shared' ? 'Shared (all conditions)' : 'Multiple conditions');
+    const filteringLabel =
+      baseFilter === "none"
+        ? "No filtering"
+        : baseFilter === "shared"
+          ? "Shared (all conditions)"
+          : "Multiple conditions";
     label = label ? `${label}, ${filteringLabel}` : filteringLabel;
   }
 
@@ -96,9 +101,9 @@ const tableSettings = usePlDataTableSettingsV2({
 
 const tableLoadingText = computed(() => {
   if (app.model.outputs.isRunning) {
-    return 'Running';
+    return "Running";
   }
-  return 'Loading';
+  return "Loading";
 });
 
 type MetadataFetched = {
@@ -135,7 +140,10 @@ const metadataFetched = useWatchFetch(
     };
 
     // Helper to extract data mapped by sample ID
-    const buildBySample = (colData: { axesData: Record<string, (string | number | null)[]>; data: (string | number | null)[] }) => {
+    const buildBySample = (colData: {
+      axesData: Record<string, (string | number | null)[]>;
+      data: (string | number | null)[];
+    }) => {
       const axisKeys = Object.keys(colData.axesData);
       if (!axisKeys.length) return {};
       const sampleKey = axisKeys[0];
@@ -149,12 +157,18 @@ const metadataFetched = useWatchFetch(
     };
 
     // Always fetch condition column full data (sample id → value) for conditionBySample
-    const conditionColData = await getSingleColumnData(pframeHandle, columnIds.conditionColId as PObjectId);
+    const conditionColData = await getSingleColumnData(
+      pframeHandle,
+      columnIds.conditionColId as PObjectId,
+    );
     let conditionBySample = buildBySample(conditionColData);
 
     let antigenBySample: Record<string, string> | undefined;
     if (columnIds.antigenColId) {
-      const antigenColData = await getSingleColumnData(pframeHandle, columnIds.antigenColId as PObjectId);
+      const antigenColData = await getSingleColumnData(
+        pframeHandle,
+        columnIds.antigenColId as PObjectId,
+      );
       antigenBySample = buildBySample(antigenColData);
     }
 
@@ -174,7 +188,7 @@ const metadataFetched = useWatchFetch(
     // Unique condition values from the (possibly filtered) condition map
     const conditionValues = [...new Set(Object.values(conditionBySample))]
       .filter(Boolean)
-      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
 
     return {
       conditionValues,
@@ -217,13 +231,14 @@ const conditionsExcludedByTarget = computed(() => {
 
 /** Stable key for current excluded conditions (persists across page changes; alert re-shows when key changes). */
 const conditionsExcludedAlertKey = computed(() =>
-  [...conditionsExcludedByTarget.value].sort().join(','));
+  [...conditionsExcludedByTarget.value].sort().join(","),
+);
 
 const conditionsExcludedAlertVisible = computed({
   get: () => {
     const key = conditionsExcludedAlertKey.value;
-    const dismissedKey = app.model.data.excludedAlertDismissedKey ?? '';
-    return key !== '' && key !== dismissedKey;
+    const dismissedKey = app.model.data.excludedAlertDismissedKey ?? "";
+    return key !== "" && key !== dismissedKey;
   },
   set: (visible) => {
     if (!visible && conditionsExcludedAlertKey.value) {
@@ -234,7 +249,7 @@ const conditionsExcludedAlertVisible = computed({
 
 // Clear dismissed state when exclusions go away (e.g. "Multiple target" unchecked) so the alert can show again if the same target is re-selected
 watch(conditionsExcludedAlertKey, (key) => {
-  if (key === '') {
+  if (key === "") {
     app.model.data.excludedAlertDismissedKey = undefined;
   }
 });
@@ -261,12 +276,11 @@ const antigenValuesList = computed(() => {
   const map = antigenConditionsMap.value;
   if (!map) return [];
   const config = app.model.data.antigenControlConfig;
-  const libraryFallback
-    = config.sequencedLibraryEnabled && !!config.sequencedLibraryAntigen;
+  const libraryFallback = config.sequencedLibraryEnabled && !!config.sequencedLibraryAntigen;
   return Object.entries(map)
-    .filter(([antigen, conditions]) =>
-      antigen !== config.sequencedLibraryAntigen
-      && (conditions.size >= 2 || libraryFallback),
+    .filter(
+      ([antigen, conditions]) =>
+        antigen !== config.sequencedLibraryAntigen && (conditions.size >= 2 || libraryFallback),
     )
     .map(([antigen]) => antigen);
 });
@@ -319,13 +333,21 @@ const libraryAntigenValues = computed(() => {
 const hasSingleSampleNegativeControl = computed(() => {
   const map = antigenConditionsMap.value;
   const config = app.model.data.antigenControlConfig;
-  return !!map && config.controlEnabled && config.negativeAntigens.some((a: string) => (map[a]?.size ?? 0) === 1);
+  return (
+    !!map &&
+    config.controlEnabled &&
+    config.negativeAntigens.some((a: string) => (map[a]?.size ?? 0) === 1)
+  );
 });
 
 const hasMultiSampleNegativeControl = computed(() => {
   const map = antigenConditionsMap.value;
   const config = app.model.data.antigenControlConfig;
-  return !!map && config.controlEnabled && config.negativeAntigens.some((a: string) => (map[a]?.size ?? 0) > 1);
+  return (
+    !!map &&
+    config.controlEnabled &&
+    config.negativeAntigens.some((a: string) => (map[a]?.size ?? 0) > 1)
+  );
 });
 
 /** Condition values in samples that have the selected negative control antigens. */
@@ -344,7 +366,9 @@ const negativeControlConditionValues = computed(() => {
   }
   return [...conditions];
 });
-const negativeControlConditionOptions = computed(() => mapToOptions(negativeControlConditionValues.value));
+const negativeControlConditionOptions = computed(() =>
+  mapToOptions(negativeControlConditionValues.value),
+);
 
 /** Antigens whose samples have empty condition values (for error reporting). */
 const antigensWithEmptyConditions = computed(() => {
@@ -374,7 +398,7 @@ const antigensWithEmptyConditions = computed(() => {
 const comparisonOptions = computed(() => {
   let order = [...app.model.data.conditionOrder];
   if (app.model.data.antigenControlConfig.sequencedLibraryEnabled) {
-    order = ['0 - Library', ...order.filter((c) => c !== '0 - Library')];
+    order = ["0 - Library", ...order.filter((c) => c !== "0 - Library")];
   }
   if (order.length < 2) return [];
 
@@ -428,26 +452,32 @@ const comparisonOptions = computed(() => {
 
 // Downsampling options
 const downsamplingOptions: ListOption<string | undefined>[] = [
-  { label: 'None', value: 'none' },
-  { label: 'Random Sampling', value: 'hypergeometric' },
+  { label: "None", value: "none" },
+  { label: "Random Sampling", value: "hypergeometric" },
 ];
 
 // Function to create statistics table HTML
 const createStatsTable = () => {
   const stats = [
-    { label: 'Minimum enrichment', value: app.model.outputs.enrichmentStats?.minValue || '' },
-    { label: 'Maximum enrichment', value: app.model.outputs.enrichmentStats?.maxValue || '' },
-    { label: 'Mean enrichment', value: app.model.outputs.enrichmentStats?.meanValue || '' },
-    { label: 'Median enrichment', value: app.model.outputs.enrichmentStats?.medianValue || '' },
-    { label: 'Enrichment score cutoff', value: app.model.outputs.enrichmentStats?.cutoffValue || '' },
+    { label: "Minimum enrichment", value: app.model.outputs.enrichmentStats?.minValue || "" },
+    { label: "Maximum enrichment", value: app.model.outputs.enrichmentStats?.maxValue || "" },
+    { label: "Mean enrichment", value: app.model.outputs.enrichmentStats?.meanValue || "" },
+    { label: "Median enrichment", value: app.model.outputs.enrichmentStats?.medianValue || "" },
+    {
+      label: "Enrichment score cutoff",
+      value: app.model.outputs.enrichmentStats?.cutoffValue || "",
+    },
   ];
 
-  const rows = stats.map((stat) =>
-    `<tr>
+  const rows = stats
+    .map(
+      (stat) =>
+        `<tr>
       <td style="padding: 8px 12px; border-bottom: 1px solid #e5e7eb; font-weight: 500; color: #111;">${stat.label}</td>
       <td style="padding: 8px 12px; border-bottom: 1px solid #e5e7eb; color: #374151; text-align: right;">${stat.value}</td>
     </tr>`,
-  ).join('');
+    )
+    .join("");
 
   return `
     <table style="width: 100%; border-collapse: collapse; margin: 0;">
@@ -510,11 +540,13 @@ const resetControlConditionOrder = () => {
 
 const isClusterId = computed(() => {
   if (app.model.outputs.datasetSpec === undefined) return false;
-  return app.model.outputs.datasetSpec?.axesSpec.length >= 2
-    && app.model.outputs.datasetSpec?.axesSpec[1]?.name === 'pl7.app/clusterId';
+  return (
+    app.model.outputs.datasetSpec?.axesSpec.length >= 2 &&
+    app.model.outputs.datasetSpec?.axesSpec[1]?.name === "pl7.app/clusterId"
+  );
 });
 
-const isPeptide = computed(() => app.model.outputs.modality === 'peptide');
+const isPeptide = computed(() => app.model.outputs.modality === "peptide");
 
 /**
  * Synchronization logic to initialize and validate condition orders.
@@ -544,7 +576,9 @@ const fetchedForCurrentConditionCol = computed(() => {
 const fetchedForCurrentAntigenCol = computed(() => {
   const fetched = metadataFetched.value;
   if (!fetched) return true;
-  return fetched.fetchedFor.antigenColumnRef === app.model.data.antigenControlConfig.antigenColumnRef;
+  return (
+    fetched.fetchedFor.antigenColumnRef === app.model.data.antigenControlConfig.antigenColumnRef
+  );
 });
 
 const conditionSyncCol = ref<string | undefined>(app.model.data.conditionColumnRef);
@@ -571,7 +605,9 @@ watchEffect(() => {
   }
 });
 
-const controlSyncCol = ref<string | undefined>(app.model.data.antigenControlConfig.antigenColumnRef);
+const controlSyncCol = ref<string | undefined>(
+  app.model.data.antigenControlConfig.antigenColumnRef,
+);
 watchEffect(() => {
   const col = app.model.data.antigenControlConfig.antigenColumnRef;
   const vals = negativeControlConditionValues.value;
@@ -599,11 +635,13 @@ watchEffect(() => {
 });
 
 // Track datasets and spec to prevent unwanted updates of values
-const syncAbundanceRef = ref(app.model.data.abundanceRef ? JSON.stringify(app.model.data.abundanceRef) : undefined);
+const syncAbundanceRef = ref(
+  app.model.data.abundanceRef ? JSON.stringify(app.model.data.abundanceRef) : undefined,
+);
 const syncIsClustered = ref<boolean | undefined>(
-  app.model.outputs.datasetSpec?.axesSpec !== undefined
-  && app.model.outputs.datasetSpec.axesSpec.length >= 2
-  && app.model.outputs.datasetSpec.axesSpec[1].name === 'pl7.app/clusterId',
+  app.model.outputs.datasetSpec?.axesSpec !== undefined &&
+    app.model.outputs.datasetSpec.axesSpec.length >= 2 &&
+    app.model.outputs.datasetSpec.axesSpec[1].name === "pl7.app/clusterId",
 );
 
 // Watch for changes in the dataset spec to initialize defaults
@@ -613,18 +651,17 @@ watchEffect(() => {
 
   if (abundanceRef && spec?.axesSpec) {
     const abundanceRefStr = JSON.stringify(abundanceRef);
-    const isClustered = spec.axesSpec.length >= 2
-      && spec.axesSpec[1]?.name === 'pl7.app/clusterId';
+    const isClustered = spec.axesSpec.length >= 2 && spec.axesSpec[1]?.name === "pl7.app/clusterId";
 
     // Reset to default if:
     // 1. The user switched to a DIFFERENT dataset.
     // 2. The dataset type (clustered vs regular) has changed (self-correction for lag).
     if (abundanceRefStr !== syncAbundanceRef.value || isClustered !== syncIsClustered.value) {
       if (isClustered) {
-        app.model.data.FilteringConfig.baseFilter = 'single-sample';
+        app.model.data.FilteringConfig.baseFilter = "single-sample";
         app.model.data.FilteringConfig.minAbundance.enabled = false;
       } else {
-        app.model.data.FilteringConfig.baseFilter = 'none';
+        app.model.data.FilteringConfig.baseFilter = "none";
         app.model.data.FilteringConfig.minAbundance.enabled = true;
       }
       syncAbundanceRef.value = abundanceRefStr;
@@ -634,17 +671,22 @@ watchEffect(() => {
 });
 
 // Enforce dependency: Enable target selection if negative controls are enabled
-watch(() => app.model.data.antigenControlConfig.controlEnabled, (enabled) => {
-  if (enabled) {
-    app.model.data.antigenControlConfig.antigenEnabled = true;
-  }
-});
+watch(
+  () => app.model.data.antigenControlConfig.controlEnabled,
+  (enabled) => {
+    if (enabled) {
+      app.model.data.antigenControlConfig.antigenEnabled = true;
+    }
+  },
+);
 
 // Sync control flags to model
 watchEffect(() => {
   if (app.model.data.antigenControlConfig) {
-    app.model.data.antigenControlConfig.hasSingleConditionNegativeControl = hasSingleSampleNegativeControl.value;
-    app.model.data.antigenControlConfig.hasMultiConditionNegativeControl = hasMultiSampleNegativeControl.value;
+    app.model.data.antigenControlConfig.hasSingleConditionNegativeControl =
+      hasSingleSampleNegativeControl.value;
+    app.model.data.antigenControlConfig.hasMultiConditionNegativeControl =
+      hasMultiSampleNegativeControl.value;
   }
 });
 
@@ -654,13 +696,13 @@ const librarySyncKey = ref(
   [
     app.model.data.antigenControlConfig.targetAntigen,
     ...app.model.data.antigenControlConfig.negativeAntigens,
-  ].join(','),
+  ].join(","),
 );
 watchEffect(() => {
   const key = [
     app.model.data.antigenControlConfig.targetAntigen,
     ...app.model.data.antigenControlConfig.negativeAntigens,
-  ].join(',');
+  ].join(",");
   const current = app.model.data.antigenControlConfig.sequencedLibraryAntigen;
 
   if (key !== librarySyncKey.value) {
@@ -676,19 +718,20 @@ watchEffect(() => {
 // These hold string values from the selected column, so a different column
 // invalidates them outright. Plain `watch` doesn't fire on mount, so persisted
 // selections survive component remount.
-watch(() => app.model.data.antigenControlConfig.antigenColumnRef, () => {
-  const config = app.model.data.antigenControlConfig;
-  config.targetAntigen = undefined;
-  config.negativeAntigens = [];
-  config.sequencedLibraryAntigen = undefined;
-});
+watch(
+  () => app.model.data.antigenControlConfig.antigenColumnRef,
+  () => {
+    const config = app.model.data.antigenControlConfig;
+    config.targetAntigen = undefined;
+    config.negativeAntigens = [];
+    config.sequencedLibraryAntigen = undefined;
+  },
+);
 
 // Drop stale comparison-export selections when the valid comparison set changes
 // (condition column change, condition reorder, target-antigen filter, sequenced
 // library toggle). Keyed on the option list so reorders are caught too.
-const validComparisonsKey = computed(() =>
-  comparisonOptions.value.map((o) => o.value).join(','),
-);
+const validComparisonsKey = computed(() => comparisonOptions.value.map((o) => o.value).join(","));
 watch(validComparisonsKey, () => {
   const validSet = new Set(comparisonOptions.value.map((o) => o.value));
   const current = app.model.data.additionalEnrichmentExports;
@@ -699,7 +742,7 @@ watch(validComparisonsKey, () => {
 });
 
 // Drop stale "present in rounds" selections when the condition order changes.
-const conditionOrderKey = computed(() => app.model.data.conditionOrder.join(','));
+const conditionOrderKey = computed(() => app.model.data.conditionOrder.join(","));
 watch(conditionOrderKey, () => {
   const validSet = new Set(app.model.data.conditionOrder);
   const current = app.model.data.FilteringConfig.presentInRounds.rounds;
@@ -711,9 +754,9 @@ watch(conditionOrderKey, () => {
 
 // Filtering options
 const filteringOptions = [
-  { value: 'none', label: 'No filtering' },
-  { value: 'shared', label: 'Shared (all conditions)' },
-  { value: 'single-sample', label: 'Multiple conditions' },
+  { value: "none", label: "No filtering" },
+  { value: "shared", label: "Shared (all conditions)" },
+  { value: "single-sample", label: "Multiple conditions" },
 ];
 
 const isConditionOrderOpen = ref(true); // Open by default
@@ -742,8 +785,8 @@ const isControlOrderOpen = ref(true); // Open by default
     </template>
     <PlAlert v-if="isEmpty === true && filteredTooMuch !== true" type="warn" icon>
       <template #title>Empty dataset selection</template>
-      The input dataset you have selected is empty or has too few sequences.
-      Please choose a different dataset.
+      The input dataset you have selected is empty or has too few sequences. Please choose a
+      different dataset.
     </PlAlert>
     <PlAlert v-if="filteredTooMuch === true" type="warn" icon>
       <template #title>Too few sequences</template>
@@ -761,31 +804,38 @@ const isControlOrderOpen = ref(true); // Open by default
   <PlSlideModal v-model="settingsAreShown">
     <template #title>Settings</template>
     <PlDropdownRef
-      v-model="app.model.data.abundanceRef" :options="app.model.outputs.abundanceOptions"
-      label="Select abundance" clearable required
+      v-model="app.model.data.abundanceRef"
+      :options="app.model.outputs.abundanceOptions"
+      label="Select abundance"
+      clearable
+      required
       @update:model-value="setInput"
     />
-    <PlDropdown v-model="app.model.data.conditionColumnRef" :options="app.model.outputs.metadataOptions" label="Condition column" required />
+    <PlDropdown
+      v-model="app.model.data.conditionColumnRef"
+      :options="app.model.outputs.metadataOptions"
+      label="Condition column"
+      required
+    />
 
-    <PlAlert
-      v-if="antigensWithEmptyConditions.length > 0"
-      type="error"
-    >
-      Some samples matching the <b>{{ antigensWithEmptyConditions.join(', ') }}</b> antigen have empty values in the condition column.
-      Please provide valid condition names in your metadata to include these samples in the analysis.
+    <PlAlert v-if="antigensWithEmptyConditions.length > 0" type="error">
+      Some samples matching the <b>{{ antigensWithEmptyConditions.join(", ") }}</b> antigen have
+      empty values in the condition column. Please provide valid condition names in your metadata to
+      include these samples in the analysis.
     </PlAlert>
 
     <PlAccordion multiple>
       <PlAccordionSection v-model="isConditionOrderOpen" label="Condition Order">
-        <div style="display: flex; margin-bottom: -15px;">
+        <div style="display: flex; margin-bottom: -15px">
           Define condition order
           <PlTooltip class="info">
             <template #label>Define condition order</template>
             <template #tooltip>
               <div>
-                <strong>Order aware selection:</strong> Calculates contrast between an element (numerator) and each of its preceding elements (denominators).
-                <br/><br/>
-                <strong>Example:</strong> If you select "Cond 1", "Cond 2" and "Cond 3", the contrasts will be:
+                <strong>Order aware selection:</strong> Calculates contrast between an element
+                (numerator) and each of its preceding elements (denominators). <br /><br />
+                <strong>Example:</strong> If you select "Cond 1", "Cond 2" and "Cond 3", the
+                contrasts will be:
                 <ul>
                   <li>Cond 2 vs Cond 1</li>
                   <li>Cond 3 vs Cond 1</li>
@@ -796,17 +846,12 @@ const isControlOrderOpen = ref(true); // Open by default
             </template>
           </PlTooltip>
         </div>
-        <PlElementList
-          v-model:items="app.model.data.conditionOrder"
-        >
+        <PlElementList v-model:items="app.model.data.conditionOrder">
           <template #item-title="{ item }">
             {{ item }}
           </template>
         </PlElementList>
-        <PlBtnGhost
-          v-if="availableToAdd.length > 0"
-          @click="resetConditionOrder"
-        >
+        <PlBtnGhost v-if="availableToAdd.length > 0" @click="resetConditionOrder">
           Reset to default
           <template #append>
             <PlMaskIcon24 name="reverse" />
@@ -818,7 +863,8 @@ const isControlOrderOpen = ref(true); // Open by default
           type="warn"
           closeable
         >
-          When <strong>Target</strong> is defined, only target-specific conditions are allowed. Removed: {{ conditionsExcludedByTarget.join(', ') }}.
+          When <strong>Target</strong> is defined, only target-specific conditions are allowed.
+          Removed: {{ conditionsExcludedByTarget.join(", ") }}.
         </PlAlert>
       </PlAccordionSection>
     </PlAccordion>
@@ -829,17 +875,31 @@ const isControlOrderOpen = ref(true); // Open by default
       :minValue="0.6"
       :step="0.1"
       placeholder="2.0"
-      :error-message="app.model.data.enrichmentThreshold === undefined ? 'Value must be higher than 0.6' : undefined"
+      :error-message="
+        app.model.data.enrichmentThreshold === undefined
+          ? 'Value must be higher than 0.6'
+          : undefined
+      "
     >
       <template #tooltip>
         <p><strong>Enrichment threshold (E<sub>thres</sub>)</strong></p>
-        <p>Log2 Fold Change (Log2FC) used to define enriched sequences. A sequence is considered enriched when its Log2FC between conditions is ≥ this value.</p>
-        <p>This value is used to define <strong>Enrichment quality</strong> categories in combination to data-derived percentiles (q):</p>
         <p>
-          - High threshold: Max Log2FC greater than maximum between enrichment q75 and E<sub>thres</sub><br/>
-          - Stable threshold: Overall Log2FC greater than maximum between enrichment q50 and E<sub>thres</sub><br/>
-          - Low threshold: Max Log2FC greater than enrichment q25<br/>
-          - Frequency threshold: Frequency greater than frequency q75<br/>
+          Log2 Fold Change (Log2FC) used to define enriched sequences. A sequence is considered
+          enriched when its Log2FC between conditions is ≥ this value.
+        </p>
+        <p>
+          This value is used to define <strong>Enrichment quality</strong> categories in combination
+          to data-derived percentiles (q):
+        </p>
+        <p>
+          - High threshold: Max Log2FC greater than maximum between enrichment q75 and E<sub
+            >thres</sub
+          ><br />
+          - Stable threshold: Overall Log2FC greater than maximum between enrichment q50 and E<sub
+            >thres</sub
+          ><br />
+          - Low threshold: Max Log2FC greater than enrichment q25<br />
+          - Frequency threshold: Frequency greater than frequency q75<br />
         </p>
         <ul>
           <li><strong>Stable Binder</strong> — high threshold &amp; stable threshold.</li>
@@ -851,7 +911,7 @@ const isControlOrderOpen = ref(true); // Open by default
     </PlNumberField>
 
     <PlRow>
-      <div style="display: flex; align-items: center; gap: 4px;">
+      <div style="display: flex; align-items: center; gap: 4px">
         <PlCheckbox
           v-model="app.model.data.antigenControlConfig.antigenEnabled"
           :disabled="app.model.data.antigenControlConfig.controlEnabled"
@@ -860,22 +920,24 @@ const isControlOrderOpen = ref(true); // Open by default
         </PlCheckbox>
         <PlTooltip class="info">
           <template #tooltip>
-            <div>
-              Enable specific target selection for dedicated enrichment analysis.
-            </div>
+            <div>Enable specific target selection for dedicated enrichment analysis.</div>
           </template>
         </PlTooltip>
       </div>
 
-      <div style="display: flex; align-items: center; gap: 4px;">
+      <div style="display: flex; align-items: center; gap: 4px">
         <PlCheckbox v-model="app.model.data.antigenControlConfig.controlEnabled">
           Use negative controls
         </PlCheckbox>
         <PlTooltip class="info">
           <template #tooltip>
             <div>
-              Enables specificity analysis by comparing your target against control samples.<br/><br/>
-              You can select multiple negative controls (e.g., irrelevant antigens). The analysis calculates enrichment for each one independently and uses the <strong>maximum value</strong> found across all controls as a baseline for background binding. This helps filter out "sticky" or non-specific sequences that appear in your control samples.
+              Enables specificity analysis by comparing your target against control samples.<br /><br />
+              You can select multiple negative controls (e.g., irrelevant antigens). The analysis
+              calculates enrichment for each one independently and uses the
+              <strong>maximum value</strong> found across all controls as a baseline for background
+              binding. This helps filter out "sticky" or non-specific sequences that appear in your
+              control samples.
             </div>
           </template>
         </PlTooltip>
@@ -885,11 +947,14 @@ const isControlOrderOpen = ref(true); // Open by default
       v-if="app.model.data.antigenControlConfig.antigenEnabled"
       v-model="app.model.data.antigenControlConfig.antigenColumnRef"
       :options="app.model.outputs.metadataOptions"
-      label="Antigen column" required
+      label="Antigen column"
+      required
     />
     <PlDropdown
-      v-if="app.model.data.antigenControlConfig.antigenEnabled
-        && !app.model.data.antigenControlConfig.controlEnabled"
+      v-if="
+        app.model.data.antigenControlConfig.antigenEnabled &&
+        !app.model.data.antigenControlConfig.controlEnabled
+      "
       v-model="app.model.data.antigenControlConfig.targetAntigen"
       :options="antigenValues"
       label="Target"
@@ -902,12 +967,12 @@ const isControlOrderOpen = ref(true); // Open by default
       />
       <PlDropdownMulti
         v-model="app.model.data.antigenControlConfig.negativeAntigens"
-        :style="{minWidth: '148px'}"
+        :style="{ minWidth: '148px' }"
         :options="negativeAntigenValues"
         label="Negative control(s)"
       />
     </PlRow>
-    <div style="display: flex; align-items: center; gap: 4px;">
+    <div style="display: flex; align-items: center; gap: 4px">
       <PlCheckbox
         v-if="app.model.data.antigenControlConfig.antigenEnabled"
         v-model="app.model.data.antigenControlConfig.sequencedLibraryEnabled"
@@ -917,43 +982,52 @@ const isControlOrderOpen = ref(true); // Open by default
       <PlTooltip v-if="app.model.data.antigenControlConfig.antigenEnabled" class="info">
         <template #tooltip>
           <div>
-            When enabled, you can select the library from the antigen column values. The samples associated with this library will be used as the reference (baseline) for enrichment fold-change calculations, for both the target antigen and negative controls.
+            When enabled, you can select the library from the antigen column values. The samples
+            associated with this library will be used as the reference (baseline) for enrichment
+            fold-change calculations, for both the target antigen and negative controls.
           </div>
         </template>
       </PlTooltip>
     </div>
     <PlDropdown
-      v-if="app.model.data.antigenControlConfig.antigenEnabled
-        && app.model.data.antigenControlConfig.sequencedLibraryEnabled
-        && (libraryAntigenValues.length > 0 || !metadataFetched.value)"
+      v-if="
+        app.model.data.antigenControlConfig.antigenEnabled &&
+        app.model.data.antigenControlConfig.sequencedLibraryEnabled &&
+        (libraryAntigenValues.length > 0 || !metadataFetched.value)
+      "
       v-model="app.model.data.antigenControlConfig.sequencedLibraryAntigen"
       :options="libraryAntigenValues"
       label="Library"
     />
     <PlAlert
-      v-if="app.model.data.antigenControlConfig.antigenEnabled
-        && app.model.data.antigenControlConfig.sequencedLibraryEnabled
-        && libraryAntigenValues.length === 0
-        && metadataFetched.value"
+      v-if="
+        app.model.data.antigenControlConfig.antigenEnabled &&
+        app.model.data.antigenControlConfig.sequencedLibraryEnabled &&
+        libraryAntigenValues.length === 0 &&
+        metadataFetched.value
+      "
       type="error"
       icon
     >
-      No options available. Only antigen column values not used as target or negative controls are shown.
+      No options available. Only antigen column values not used as target or negative controls are
+      shown.
     </PlAlert>
     <PlAccordion multiple>
       <PlAccordionSection
         v-if="app.model.data.antigenControlConfig.controlEnabled && hasMultiSampleNegativeControl"
-        v-model="isControlOrderOpen" label="Negative Condition Order"
+        v-model="isControlOrderOpen"
+        label="Negative Condition Order"
       >
-        <div style="display: flex; margin-bottom: -15px;">
+        <div style="display: flex; margin-bottom: -15px">
           Define negative condition order
           <PlTooltip class="info">
             <template #label>Define condition order</template>
             <template #tooltip>
               <div>
-                <strong>Order aware selection:</strong> Calculates contrast between an element (numerator) and each of its preceding elements (denominators).
-                <br/><br/>
-                <strong>Example:</strong> If you select "Cond 1", "Cond 2" and "Cond 3", the contrasts will be:
+                <strong>Order aware selection:</strong> Calculates contrast between an element
+                (numerator) and each of its preceding elements (denominators). <br /><br />
+                <strong>Example:</strong> If you select "Cond 1", "Cond 2" and "Cond 3", the
+                contrasts will be:
                 <ul>
                   <li>Cond 2 vs Cond 1</li>
                   <li>Cond 3 vs Cond 1</li>
@@ -963,17 +1037,12 @@ const isControlOrderOpen = ref(true); // Open by default
             </template>
           </PlTooltip>
         </div>
-        <PlElementList
-          v-model:items="app.model.data.antigenControlConfig.controlConditionsOrder"
-        >
+        <PlElementList v-model:items="app.model.data.antigenControlConfig.controlConditionsOrder">
           <template #item-title="{ item }">
             {{ item }}
           </template>
         </PlElementList>
-        <PlBtnGhost
-          v-if="availableToAddToControl.length > 0"
-          @click="resetControlConditionOrder"
-        >
+        <PlBtnGhost v-if="availableToAddToControl.length > 0" @click="resetControlConditionOrder">
           Reset to default
           <template #append>
             <PlMaskIcon24 name="reverse" />
@@ -982,10 +1051,14 @@ const isControlOrderOpen = ref(true); // Open by default
       </PlAccordionSection>
     </PlAccordion>
     <PlRow
-      v-if="app.model.data.antigenControlConfig.controlEnabled
-        && hasMultiSampleNegativeControl
-        && !(app.model.data.antigenControlConfig.sequencedLibraryEnabled === false &&
-          app.model.data.antigenControlConfig.controlConditionsOrder.length === 1)"
+      v-if="
+        app.model.data.antigenControlConfig.controlEnabled &&
+        hasMultiSampleNegativeControl &&
+        !(
+          app.model.data.antigenControlConfig.sequencedLibraryEnabled === false &&
+          app.model.data.antigenControlConfig.controlConditionsOrder.length === 1
+        )
+      "
     >
       <PlNumberField
         v-model="app.model.data.antigenControlConfig.controlThreshold"
@@ -996,17 +1069,23 @@ const isControlOrderOpen = ref(true); // Open by default
       >
         <template #tooltip>
           <div>
-            Log2 Fold Change (Log2FC) thresholds used to define <strong>Enriched negative control sequences</strong>.<br/>
-            A sequence is considered enriched if its Log2FC value between conditions is equal or greater than the threshold. This threshold in combination with <strong>Enrichment threshold</strong> is used to define <strong>Binding Specificity</strong> categories:
-            <br/><br/>
-            Target<sub>Max</sub> and Control<sub>Max</sub> are the maximum Log2FC values for the target and control conditions, respectively:
-            <br/><br/>
-            - <strong>Antigen-Specific:</strong> Target<sub>Max</sub> ≥ Enrichment Threshold and Control<sub>Max</sub> &lt; Control Threshold.
-            <br/>
-            - <strong>Non-Specific:</strong> Target<sub>Max</sub> ≥ Enrichment Threshold and Control<sub>Max</sub> ≥ Control Threshold (indicates "sticky" binders).
-            <br/>
-            - <strong>Negative-Control:</strong> Target<sub>Max</sub> &lt; Enrichment Threshold and Control<sub>Max</sub> ≥ Control Threshold.
-            <br/>
+            Log2 Fold Change (Log2FC) thresholds used to define
+            <strong>Enriched negative control sequences</strong>.<br />
+            A sequence is considered enriched if its Log2FC value between conditions is equal or
+            greater than the threshold. This threshold in combination with
+            <strong>Enrichment threshold</strong> is used to define
+            <strong>Binding Specificity</strong> categories: <br /><br />
+            Target<sub>Max</sub> and Control<sub>Max</sub> are the maximum Log2FC values for the
+            target and control conditions, respectively: <br /><br />
+            - <strong>Antigen-Specific:</strong> Target<sub>Max</sub> ≥ Enrichment Threshold and
+            Control<sub>Max</sub> &lt; Control Threshold.
+            <br />
+            - <strong>Non-Specific:</strong> Target<sub>Max</sub> ≥ Enrichment Threshold and
+            Control<sub>Max</sub> ≥ Control Threshold (indicates "sticky" binders).
+            <br />
+            - <strong>Negative-Control:</strong> Target<sub>Max</sub> &lt; Enrichment Threshold and
+            Control<sub>Max</sub> ≥ Control Threshold.
+            <br />
             - <strong>Not-Enriched:</strong> Both below thresholds.
           </div>
         </template>
@@ -1015,16 +1094,23 @@ const isControlOrderOpen = ref(true); // Open by default
 
     <PlAccordionSection label="Downsampling">
       <PlBtnGroup
-        v-model="app.model.data.downsampling.type" :options="downsamplingOptions"
-        label="Downsampling options" :compact="true"
+        v-model="app.model.data.downsampling.type"
+        :options="downsamplingOptions"
+        label="Downsampling options"
+        :compact="true"
       >
         <template #tooltip>
           <div>
-            <strong>Downsampling Strategy:</strong><br/>
-            Normalizes sequencing depth across samples to ensure fair comparison of diversity and abundance.
-            <br/><br/>
-            <strong>None:</strong> Use raw abundance values. Recommended only if sequencing depth is already uniform.<br/><br/>
-            <strong>Random Sampling:</strong> Resamples all samples to a target read depth (total number of reads) while maintaining relative sequence proportions. Choose <strong>Fixed</strong> (manual), <strong>Min</strong> (smallest sample), or <strong>Auto</strong> to set the target depth.
+            <strong>Downsampling Strategy:</strong><br />
+            Normalizes sequencing depth across samples to ensure fair comparison of diversity and
+            abundance.
+            <br /><br />
+            <strong>None:</strong> Use raw abundance values. Recommended only if sequencing depth is
+            already uniform.<br /><br />
+            <strong>Random Sampling:</strong> Resamples all samples to a target read depth (total
+            number of reads) while maintaining relative sequence proportions. Choose
+            <strong>Fixed</strong> (manual), <strong>Min</strong> (smallest sample), or
+            <strong>Auto</strong> to set the target depth.
           </div>
         </template>
       </PlBtnGroup>
@@ -1034,14 +1120,16 @@ const isControlOrderOpen = ref(true); // Open by default
         style="margin-top: -18px"
         :options="[
           { value: 'fixed', label: 'Fixed' },
-          { value: 'min', label: 'Min', },
-          { value: 'auto', label: 'Auto', },
+          { value: 'min', label: 'Min' },
+          { value: 'auto', label: 'Auto' },
         ]"
       />
 
       <PlNumberField
-        v-if="app.model.data.downsampling.type === 'hypergeometric'
-          && app.model.data.downsampling.valueChooser === 'fixed'"
+        v-if="
+          app.model.data.downsampling.type === 'hypergeometric' &&
+          app.model.data.downsampling.valueChooser === 'fixed'
+        "
         v-model="app.model.data.downsampling.n"
         label="Select N"
         :minValue="0"
@@ -1050,34 +1138,39 @@ const isControlOrderOpen = ref(true); // Open by default
     </PlAccordionSection>
 
     <PlAccordionSection label="Sequence Filtering">
-      <PlRadioGroup
-        v-model="app.model.data.FilteringConfig.baseFilter"
-        :options="filteringOptions"
-      >
+      <PlRadioGroup v-model="app.model.data.FilteringConfig.baseFilter" :options="filteringOptions">
         <template #label>
           Based on condition overlap
-          <PlTooltip class="info" :style="{display: 'inline-block'}">
+          <PlTooltip class="info" :style="{ display: 'inline-block' }">
             <template #tooltip>
-              <strong>Condition-based filtering strategy:</strong><br/>
-              <strong>No filtering:</strong> Analyze all sequences, including those specific to individual conditions (may include rare or condition-specific responses)<br/><br/>
-              <strong>Shared (all conditions):</strong> Focus only on sequences present in all conditions (Library excluded)<br/><br/>
-              <strong>Multiple conditions:</strong> Focus on sequences present in more than one condition (excludes condition-specific sequences that may represent noise or rare events)
+              <strong>Condition-based filtering strategy:</strong><br />
+              <strong>No filtering:</strong> Analyze all sequences, including those specific to
+              individual conditions (may include rare or condition-specific responses)<br /><br />
+              <strong>Shared (all conditions):</strong> Focus only on sequences present in all
+              conditions (Library excluded)<br /><br />
+              <strong>Multiple conditions:</strong> Focus on sequences present in more than one
+              condition (excludes condition-specific sequences that may represent noise or rare
+              events)
             </template>
           </PlTooltip>
         </template>
       </PlRadioGroup>
       <PlCheckbox
-        v-if="app.model.data.FilteringConfig.baseFilter === 'shared' &&
+        v-if="
+          app.model.data.FilteringConfig.baseFilter === 'shared' &&
           app.model.data.antigenControlConfig.sequencedLibraryEnabled &&
-          app.model.data.antigenControlConfig.sequencedLibraryAntigen !== undefined"
+          app.model.data.antigenControlConfig.sequencedLibraryAntigen !== undefined
+        "
         v-model="app.model.data.FilteringConfig.excludeSequencedLibrary"
       >
         Exclude Sequenced Library
         <PlTooltip class="info">
           <template #tooltip>
             <div>
-              <strong>Exclude Library from Shared Filter</strong><br/><br/>
-              Libraries are often too diverse to be fully captured by sequencing. This option ensures enriched binders are not discarded just because they were stochastically missed in the Library sequencing.
+              <strong>Exclude Library from Shared Filter</strong><br /><br />
+              Libraries are often too diverse to be fully captured by sequencing. This option
+              ensures enriched binders are not discarded just because they were stochastically
+              missed in the Library sequencing.
             </div>
           </template>
         </PlTooltip>
@@ -1087,10 +1180,13 @@ const isControlOrderOpen = ref(true); // Open by default
         <PlTooltip class="info">
           <template #tooltip>
             <div>
-              Remove sequences below a specific threshold based on their maximum abundance across all conditions. Filters sampling noise in display campaigns<br/><br/>
-              <strong>Counts:</strong> Filter by raw/downsampled number of reads (e.g., 100).<br/>
-              <strong>Frequency:</strong> Filter by fraction of reads aggregated across same condition samples (0 to 1.0).<br/><br/>
-              For <em>in vivo</em> studies with lower sequencing depth, consider lower values (10-50 counts).
+              Remove sequences below a specific threshold based on their maximum abundance across
+              all conditions. Filters sampling noise in display campaigns<br /><br />
+              <strong>Counts:</strong> Filter by raw/downsampled number of reads (e.g., 100).<br />
+              <strong>Frequency:</strong> Filter by fraction of reads aggregated across same
+              condition samples (0 to 1.0).<br /><br />
+              For <em>in vivo</em> studies with lower sequencing depth, consider lower values (10-50
+              counts).
             </div>
           </template>
         </PlTooltip>
@@ -1115,8 +1211,10 @@ const isControlOrderOpen = ref(true); // Open by default
         />
         <PlDropdown
           v-model="app.model.data.FilteringConfig.minAbundance.metric"
-          :options="[{ value: 'count', label: 'Counts' },
-                     { value: 'frequency', label: 'Frequency' }]"
+          :options="[
+            { value: 'count', label: 'Counts' },
+            { value: 'frequency', label: 'Frequency' },
+          ]"
           label="Metric"
         />
       </PlRow>
@@ -1125,10 +1223,13 @@ const isControlOrderOpen = ref(true); // Open by default
         <PlTooltip class="info">
           <template #tooltip>
             <div>
-              Filter sequences based on their occurrence across conditions.<br/><br/>
-              <strong>Present in any (OR):</strong> Keeps sequences detected in at least one of the selected conditions.<br/>
-              <strong>Present in all (AND):</strong> Only keeps sequences detected in every one of the selected conditions.<br/><br/>
-              Useful to focus on persistent sequences or those appearing in later selection conditions.
+              Filter sequences based on their occurrence across conditions.<br /><br />
+              <strong>Present in any (OR):</strong> Keeps sequences detected in at least one of the
+              selected conditions.<br />
+              <strong>Present in all (AND):</strong> Only keeps sequences detected in every one of
+              the selected conditions.<br /><br />
+              Useful to focus on persistent sequences or those appearing in later selection
+              conditions.
             </div>
           </template>
         </PlTooltip>
@@ -1141,8 +1242,10 @@ const isControlOrderOpen = ref(true); // Open by default
         />
         <PlDropdown
           v-model="app.model.data.FilteringConfig.presentInRounds.logic"
-          :options="[{ value: 'OR', label: 'Present in any (OR)' },
-                     { value: 'AND', label: 'Present in all (AND)' }]"
+          :options="[
+            { value: 'OR', label: 'Present in any (OR)' },
+            { value: 'AND', label: 'Present in all (AND)' },
+          ]"
           label="Logic"
         />
       </PlRow>
@@ -1158,14 +1261,24 @@ const isControlOrderOpen = ref(true); // Open by default
       >
         <template #tooltip>
           <p><strong>Pseudo-count (Default: 1)</strong></p>
-          <p>A value added to all sequence counts to stabilize fold-change estimates and avoid division by zero.</p>
-          <p>Increasing the pseudo-count reduces the impact of sampling noise and moderates extreme enrichment values. This is particularly useful for highly enriched sequences that are absent in the reference sample (e.g., in <strong>display campaigns</strong>).</p>
+          <p>
+            A value added to all sequence counts to stabilize fold-change estimates and avoid
+            division by zero.
+          </p>
+          <p>
+            Increasing the pseudo-count reduces the impact of sampling noise and moderates extreme
+            enrichment values. This is particularly useful for highly enriched sequences that are
+            absent in the reference sample (e.g., in <strong>display campaigns</strong>).
+          </p>
         </template>
       </PlNumberField>
       <PlNumberField
-        v-if="app.model.data.antigenControlConfig.controlEnabled && (hasSingleSampleNegativeControl ||
-          (app.model.data.antigenControlConfig.sequencedLibraryEnabled === false &&
-            app.model.data.antigenControlConfig.controlConditionsOrder.length === 1))"
+        v-if="
+          app.model.data.antigenControlConfig.controlEnabled &&
+          (hasSingleSampleNegativeControl ||
+            (app.model.data.antigenControlConfig.sequencedLibraryEnabled === false &&
+              app.model.data.antigenControlConfig.controlConditionsOrder.length === 1))
+        "
         v-model="app.model.data.antigenControlConfig.singleControlFrequencyThreshold"
         label="Control Frequency Threshold"
         :minValue="0"
@@ -1175,9 +1288,12 @@ const isControlOrderOpen = ref(true); // Open by default
       >
         <template #tooltip>
           <div>
-            <strong>Control Frequency Threshold</strong> (Default: 0.01)<br/><br/>
-            Minimum frequency required to consider a sequence "present" in the control sample during <strong>specificity classification</strong>.<br/><br/>
-            Sequences are only considered present in the control if their frequency is <strong>greater than or equal to</strong> this value. This prevents low-abundance noise in the control from affecting specificity classification.
+            <strong>Control Frequency Threshold</strong> (Default: 0.01)<br /><br />
+            Minimum frequency required to consider a sequence "present" in the control sample during
+            <strong>specificity classification</strong>.<br /><br />
+            Sequences are only considered present in the control if their frequency is
+            <strong>greater than or equal to</strong> this value. This prevents low-abundance noise
+            in the control from affecting specificity classification.
           </div>
         </template>
       </PlNumberField>
@@ -1188,8 +1304,9 @@ const isControlOrderOpen = ref(true); // Open by default
         label="Clonotype definition"
       >
         <template #tooltip>
-          Select columns that define a clonotype. By default, it's a nucleotide sequence of the clonotype.
-          Here you can override this behavior and calculate enrichment score based on e.g. amino acid sequence of CDR3.
+          Select columns that define a clonotype. By default, it's a nucleotide sequence of the
+          clonotype. Here you can override this behavior and calculate enrichment score based on
+          e.g. amino acid sequence of CDR3.
         </template>
       </PlDropdownMulti>
 
@@ -1200,10 +1317,12 @@ const isControlOrderOpen = ref(true); // Open by default
       >
         <template #tooltip>
           <div>
-            <strong>Export Specific Enrichment Comparisons</strong><br/><br/>
+            <strong>Export Specific Enrichment Comparisons</strong><br /><br />
             By default, the highest enrichment value across all comparisons is exported.
-            <br/><br/>
-            This option allows you to select additional comparisons (e.g., "Treatment vs. Control") to be exported as separate columns. This is useful for downstream analysis where scores from specific comparisons are needed.
+            <br /><br />
+            This option allows you to select additional comparisons (e.g., "Treatment vs. Control")
+            to be exported as separate columns. This is useful for downstream analysis where scores
+            from specific comparisons are needed.
           </div>
         </template>
       </PlDropdownMulti>
@@ -1219,11 +1338,19 @@ const isControlOrderOpen = ref(true); // Open by default
     <template #title>
       <div>
         <div>Enrichment statistics</div>
-        <div style="color: #6b7280; font-size: 14px; margin-top: 4px; line-height: 1.2; margin-bottom: 0;">
+        <div
+          style="
+            color: #6b7280;
+            font-size: 14px;
+            margin-top: 4px;
+            line-height: 1.2;
+            margin-bottom: 0;
+          "
+        >
           Derived from each sequence's highest enrichment value among all comparisons
         </div>
       </div>
     </template>
-    <div style="margin-top: 0px;" v-html="createStatsTable()"/>
+    <div style="margin-top: 0px" v-html="createStatsTable()" />
   </PlDialogModal>
 </template>
