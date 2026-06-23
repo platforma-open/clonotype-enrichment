@@ -1,49 +1,48 @@
 <script setup lang="ts">
-import type { PredefinedGraphOption } from '@milaboratories/graph-maker';
-import { GraphMaker } from '@milaboratories/graph-maker';
-import type { PColumnSpec } from '@platforma-sdk/model';
-import { computed } from 'vue';
-import { useApp } from '../app';
+import type { PredefinedGraphOption } from "@milaboratories/graph-maker";
+import { GraphMaker } from "@milaboratories/graph-maker";
+import type { PColumnSpec } from "@platforma-sdk/model";
+import { computed } from "vue";
+import { useApp } from "../app";
 
 const app = useApp();
 
-const defaultOptions = computed((): PredefinedGraphOption<'scatterplot'>[] | null => {
-  if (!app.model.outputs.controlScatterPCols)
-    return null;
+const defaultOptions = computed((): PredefinedGraphOption<"scatterplot">[] | null => {
+  if (!app.model.outputs.controlScatterPCols) return null;
 
   const controlScatterPCols = app.model.outputs.controlScatterPCols;
   const getColSpec = (name: string) => {
-    const idx = controlScatterPCols.findIndex((p) => (p.spec.name === name));
+    const idx = controlScatterPCols.findIndex((p) => p.spec.name === name);
     return idx !== -1 ? controlScatterPCols[idx].spec : undefined;
   };
 
-  const maxEnrichmentSpec = getColSpec('pl7.app/maxEnrichment');
-  const negSignalSpec = getColSpec('pl7.app/maxNegControlEnrichment');
-  const bindingSpecificitySpec = getColSpec('pl7.app/vdj/bindingSpecificity');
-  const frequencySpec = getColSpec('pl7.app/frequency');
+  const maxEnrichmentSpec = getColSpec("pl7.app/maxEnrichment");
+  const negSignalSpec = getColSpec("pl7.app/maxNegControlEnrichment");
+  const bindingSpecificitySpec = getColSpec("pl7.app/vdj/bindingSpecificity");
+  const frequencySpec = getColSpec("pl7.app/frequency");
 
   if (!maxEnrichmentSpec || !negSignalSpec || !bindingSpecificitySpec || !frequencySpec)
     return null;
 
-  const defaults: PredefinedGraphOption<'scatterplot'>[] = [
+  const defaults: PredefinedGraphOption<"scatterplot">[] = [
     {
-      inputName: 'x',
+      inputName: "x",
       selectedSource: negSignalSpec,
     },
     {
-      inputName: 'y',
+      inputName: "y",
       selectedSource: maxEnrichmentSpec,
     },
     {
-      inputName: 'grouping',
+      inputName: "grouping",
       selectedSource: bindingSpecificitySpec,
     },
     {
-      inputName: 'size',
+      inputName: "size",
       selectedSource: frequencySpec,
     },
     {
-      inputName: 'tooltipContent',
+      inputName: "tooltipContent",
       selectedSource: frequencySpec.axesSpec[0],
     },
   ];
@@ -59,15 +58,15 @@ const inputElementAxis = computed(() => {
 });
 
 const dataColumnPredicate = (spec: PColumnSpec) =>
-  inputElementAxis.value !== undefined
-  && spec.axesSpec.length === 1
-  && spec.axesSpec[0].name === inputElementAxis.value
-  && spec.annotations?.['pl7.app/toPlot'] === 'true';
+  inputElementAxis.value !== undefined &&
+  spec.axesSpec.length === 1 &&
+  spec.axesSpec[0].name === inputElementAxis.value &&
+  spec.annotations?.["pl7.app/toPlot"] === "true";
 
 const metaColumnPredicate = (spec: PColumnSpec) =>
-  inputElementAxis.value !== undefined
-  && spec.axesSpec[0]?.name === inputElementAxis.value
-  && !spec.annotations?.['pl7.app/trace']?.includes('clonotype-enrichment');
+  inputElementAxis.value !== undefined &&
+  spec.axesSpec[0]?.name === inputElementAxis.value &&
+  !spec.annotations?.["pl7.app/trace"]?.includes("clonotype-enrichment");
 </script>
 
 <template>

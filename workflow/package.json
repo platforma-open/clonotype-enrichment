@@ -1,12 +1,13 @@
 {
   "name": "@platforma-open/milaboratories.clonotype-enrichment.workflow",
   "version": "4.0.1",
-  "type": "module",
   "description": "Tengo-based template",
+  "type": "module",
   "scripts": {
-    "build": "shx rm -rf dist && pl-tengo check && pl-tengo build",
-    "format": "/usr/bin/env emacs --script ./format.el",
-    "do-pack": "shx rm -f *.tgz && pnpm pack && shx mv *.tgz package.tgz"
+    "build": "shx rm -rf dist && pl-tengo build",
+    "format": "/usr/bin/env emacs --script ./format.el || echo 'No emacs.'",
+    "do-pack": "shx rm -f *.tgz && pnpm pack && shx mv *.tgz package.tgz",
+    "check": "pl-tengo check"
   },
   "dependencies": {
     "@platforma-open/milaboratories.clonotype-enrichment.software": "workspace:*",
@@ -14,6 +15,8 @@
   },
   "devDependencies": {
     "@platforma-open/milaboratories.software-ptransform": "catalog:",
-    "@platforma-sdk/tengo-builder": "catalog:"
+    "@platforma-sdk/tengo-builder": "catalog:",
+    "@platforma-sdk/test": "catalog:",
+    "shx": "catalog:"
   }
 }
