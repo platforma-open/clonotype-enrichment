@@ -1,5 +1,13 @@
 # @platforma-open/milaboratories.clonotype-enrichment.workflow
 
+## 4.0.2
+
+### Patch Changes
+
+- 91a001a: Migrate block onto the structurer (block-tools 2.11.1) — full SDK upgrade through workflow-tengo 6, tengo-builder 4, model/ui-vue 1.79.15. Tooling/layout only; no behavior change.
+- Updated dependencies [91a001a]
+  - @platforma-open/milaboratories.clonotype-enrichment.software@3.2.1
+
 ## 4.0.1
 
 ### Patch Changes
