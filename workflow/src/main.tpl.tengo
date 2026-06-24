@@ -434,7 +434,6 @@ wf.body(func(args) {
 			addFile("inputFile.csv", clonoDownsampling.getFile("result.csv")).
 			arg("--input_data").arg("inputFile.csv").
 			arg("--conditions").arg(string(conditionOrder)).
-			arg("--pseudo_count").arg(string(args.pseudoCount)).
 			arg("--output").arg("clonotype_max_frequency.csv")
 		if antigenControlConfig.antigenEnabled {
 			clonoMaxFreq = clonoMaxFreq.arg("--current_target").arg(string(antigenControlConfig.targetAntigen))

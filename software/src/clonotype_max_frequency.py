@@ -5,17 +5,15 @@ Used when the enrichment block input is *cluster* abundance: the enrichment
 analysis runs at cluster resolution, but Lead Selection ranks individual
 clonotypes, so we surface each clonotype's own max frequency as a score.
 
-Frequency is computed with the SAME definition the main enrichment script uses
-for its per-condition frequencies (downsampled abundance + pseudo-count
-normalization), so the two are comparable:
+Frequency is the plain observed fraction (downsampled abundance over the round
+total), with no pseudo-count:
 
-    freq_c = (abundance_c + p) / (total_c + N * p)
+    freq_c = abundance_c / total_c       (absent round -> 0)
+    MaxFrequency = max over target rounds
 
-where, for the target track:
+Where:
   - abundance_c : the clonotype's summed (downsampled) abundance in condition c
-  - total_c     : total reads in condition c
-  - N           : number of clonotypes in the track
-  - p           : pseudo-count
+  - total_c     : total reads in condition c (target track)
 
 The "target track" excludes the library round and negative controls: when an
 antigen column is present we keep only rows of the current target antigen
@@ -40,7 +38,6 @@ def main():
                         help="Downsampling output CSV (clonotype resolution).")
     parser.add_argument("--conditions", type=str, required=True,
                         help="JSON list of target conditions (rounds), ordered.")
-    parser.add_argument("--pseudo_count", type=int, default=1)
     parser.add_argument("--current_target", type=str, default=None,
                         help="Target antigen value; when set, only its rows are "
                              "used (excludes library and negative controls).")
@@ -48,7 +45,6 @@ def main():
     args = parser.parse_args()
 
     condition_order = [str(c) for c in json.loads(args.conditions)]
-    pseudo = args.pseudo_count
 
     empty = pl.DataFrame(schema={"elementId": pl.Utf8, "MaxFrequency": pl.Float64})
 
@@ -86,10 +82,9 @@ def main():
         .agg(pl.col("abundance").sum().alias("abundance"))
     )
 
-    # Track-level totals and clonotype count for the normalization denominator.
+    # Total reads per target condition (denominator for the observed fraction).
     totals_df = agg.group_by("condition").agg(pl.col("abundance").sum().alias("total"))
     totals = dict(zip(totals_df["condition"].to_list(), totals_df["total"].to_list()))
-    n_clonotypes = agg.select("elementId").n_unique()
 
     pivot = (
         agg.pivot(values="abundance", index="elementId", on="condition",
@@ -97,19 +92,18 @@ def main():
         .fill_null(0)
     )
 
-    # Per-condition frequency, then max across the target rounds only.
+    # Observed per-condition frequency (reads / round total), then max across the
+    # target rounds.
     freq_cols = []
     for c in condition_order:
         if c not in pivot.columns:
             pivot = pivot.with_columns(pl.lit(0).alias(c))
-        total = totals.get(c, 1)
-        denom = total + (n_clonotypes * pseudo)
-        if denom <= 0:
-            denom = 1
+        total = totals.get(c, 0)
         freq_name = f"freq_{c}"
-        pivot = pivot.with_columns(
-            ((pl.col(c) + pseudo) / denom).alias(freq_name)
-        )
+        if total > 0:
+            pivot = pivot.with_columns((pl.col(c) / total).alias(freq_name))
+        else:
+            pivot = pivot.with_columns(pl.lit(0.0).alias(freq_name))
         freq_cols.append(freq_name)
 
     out = (
