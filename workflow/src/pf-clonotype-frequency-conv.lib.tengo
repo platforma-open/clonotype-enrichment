@@ -1,12 +1,14 @@
 ll := import("@platforma-sdk/workflow-tengo:ll")
 canonical := import("@platforma-sdk/workflow-tengo:canonical")
+text := import("text")
 
-// Conversion params for the per-clonotype Max Frequency column. Produced only
+// Conversion params for the per-element Max Frequency column. Produced only
 // in cluster mode.
 //
-// clonoAbundanceSpec : spec of the discovered clonotype primary abundance
-//                      (axesSpec = [sampleId, clonotypeKey]).
-getColumns := func(clonoAbundanceSpec, downsampling, conditionOrder, blockId) {
+// clonoAbundanceSpec : spec of the discovered per-element primary abundance
+//                      (axesSpec = [sampleId, <element axis>]).
+// elementLabel       : "Clonotype" or "Peptide", used to label the column.
+getColumns := func(clonoAbundanceSpec, downsampling, conditionOrder, blockId, elementLabel) {
 	return {
 		axes: [
 			{
@@ -27,8 +29,8 @@ getColumns := func(clonoAbundanceSpec, downsampling, conditionOrder, blockId) {
 					"pl7.app/blockId": blockId
 				},
 				annotations: {
-					"pl7.app/label": "Max Frequency",
-					"pl7.app/description": "Highest frequency the clonotype reaches across target selection rounds (library round and negative controls excluded).",
+					"pl7.app/label": elementLabel + " Max Frequency",
+					"pl7.app/description": "Highest frequency the " + text.to_lower(elementLabel) + " reaches across target selection rounds (library round and negative controls excluded).",
 					"pl7.app/table/visibility": "optional",
 					"pl7.app/table/orderPriority": "85",
 					"pl7.app/isScore": "true",

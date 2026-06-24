@@ -97,8 +97,9 @@ export type BlockData = {
   FilteringConfig: FilteringConfig;
   clonotypeDefinition: SUniversalPColumnId[];
   /**
-   * Cluster-mode only: PlRef of the upstream per-clonotype primary abundance the
-   * input cluster abundance was built from.
+   * Cluster-mode only: PlRef of the upstream per-element primary abundance the
+   * input cluster abundance was built from (per clonotype for VDJ clusters, per
+   * variant for peptide clusters).
    */
   clonotypeAbundanceRef?: PlRef;
   additionalEnrichmentExports: string[];
@@ -304,9 +305,10 @@ export const platforma = BlockModelV3.create(dataModel)
   })
 
   /**
-   * Cluster-mode only: identify the upstream per-clonotype primary abundance that
-   * the input cluster abundance was built from. Returns undefined for
-   * clonotype/peptide input or when no unique match exists.
+   * Cluster-mode only: identify the upstream per-element primary abundance (per
+   * clonotype for VDJ clusters, per variant for peptide clusters) that the input
+   * cluster abundance was built from. Returns undefined for clonotype/peptide
+   * input or when no unique match exists.
    */
   .output("discoveredClonotypeAbundance", (ctx) => {
     const anchor = ctx.data.abundanceRef;
@@ -325,8 +327,12 @@ export const platforma = BlockModelV3.create(dataModel)
         .sort(([a], [b]) => a.localeCompare(b)),
     );
 
-    const isClonotypeAxis = (name: string) =>
-      name === "pl7.app/vdj/clonotypeKey" || name === "pl7.app/vdj/scClonotypeKey";
+    // The per-element row axis can be a clonotype key (VDJ clusters) or a
+    // variant key (peptide clusters).
+    const isElementAxis = (name: string) =>
+      name === "pl7.app/vdj/clonotypeKey" ||
+      name === "pl7.app/vdj/scClonotypeKey" ||
+      name === "pl7.app/variantKey";
 
     // Candidate primary, raw-count abundances keyed by sampleId × <row axis>.
     const candidates = ctx.resultPool.getOptions([
@@ -344,7 +350,7 @@ export const platforma = BlockModelV3.create(dataModel)
     const matches = candidates.filter((opt) => {
       const spec = ctx.resultPool.getPColumnSpecByRef(opt.ref);
       const rowAxis = spec?.axesSpec?.[1];
-      if (!rowAxis || !isClonotypeAxis(rowAxis.name)) return false;
+      if (!rowAxis || !isElementAxis(rowAxis.name)) return false;
       const candidateKey = JSON.stringify(
         Object.entries(rowAxis.domain ?? {}).sort(([a], [b]) => a.localeCompare(b)),
       );

@@ -397,13 +397,17 @@ wf.body(func(args) {
 	exports := buildExports.output("exports")
 	outStats := buildExports.output("outStats")
 
-	//////////// Per-clonotype Max Frequency (cluster input only) ////////////
-	// Compute each clonotype's max frequency across target rounds (same
+	//////////// Per-element Max Frequency (cluster input only) ////////////
+	// Compute each element's max frequency across target rounds (same
 	// downsampling + frequency definition as the cluster-level frequencies) and
-	// export it on the clonotypeKey axis.
+	// export it on the per-element axis. The underlying element is a clonotype
+	// for VDJ clusters and a variant for peptide clusters.
 	clonotypeFrequencyExport := undefined
 	if inputType == "Cluster" && args.clonotypeAbundanceRef != undefined {
 		clonoAbundanceSpec := columns.getSpec(args.clonotypeAbundanceRef)
+
+		// Label the exported column after the underlying element type.
+		elementLabel := clonoAbundanceSpec.axesSpec[1].name == "pl7.app/variantKey" ? "Peptide" : "Clonotype"
 
 		clonoCloneTable := pframes.csvFileBuilder()
 		clonoCloneTable.add(columns.getColumn(args.clonotypeAbundanceRef), {header: "abundance"})
@@ -444,7 +448,7 @@ wf.body(func(args) {
 			saveStdoutContent().
 			run()
 
-		clonoFreqImportParams := pfClonotypeFrequencyConv.getColumns(clonoAbundanceSpec, downsampling, conditionOrder, blockId)
+		clonoFreqImportParams := pfClonotypeFrequencyConv.getColumns(clonoAbundanceSpec, downsampling, conditionOrder, blockId, elementLabel)
 		clonoFreqPf := xsv.importFile(clonoMaxFreq.getFile("clonotype_max_frequency.csv"), "csv", clonoFreqImportParams,
 			{ cpu: 1, mem: "16GiB" })
 
@@ -457,7 +461,7 @@ wf.body(func(args) {
 
 		clonoFreqExports := pframes.pFrameBuilder()
 		clonoFreqExports.add(
-			"Clonotype Max Frequency",
+			elementLabel + " Max Frequency",
 			clonoTrace.inject(clonoFreqPf["maxfrequency.spec"]),
 			clonoFreqPf["maxfrequency.data"]
 		)
