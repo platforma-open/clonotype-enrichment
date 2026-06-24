@@ -97,7 +97,7 @@ def main():
     freq_cols = []
     for c in condition_order:
         if c not in pivot.columns:
-            pivot = pivot.with_columns(pl.lit(0).alias(c))
+            pivot = pivot.with_columns(pl.lit(0.0).alias(c))
         total = totals.get(c, 0)
         freq_name = f"freq_{c}"
         if total > 0:

@@ -96,14 +96,12 @@ watchEffect(() => {
 });
 
 // Persist the auto-discovered per-clonotype abundance so the workflow can
-// compute the clonotype Max Frequency score. Only relevant for cluster input.
+// compute the clonotype Max Frequency score (cluster input only).
 watchEffect(() => {
   const datasetSpec = app.model.outputs.datasetSpec;
   const isCluster = datasetSpec?.axesSpec?.[1]?.name === "pl7.app/clusterId";
-  const current = app.model.data.clonotypeAbundanceRef;
   const next = isCluster ? app.model.outputs.discoveredClonotypeAbundance : undefined;
-  // In cluster mode keep a previously persisted ref while discovery recomputes.
-  if (isCluster && next === undefined) return;
+  const current = app.model.data.clonotypeAbundanceRef;
   if (JSON.stringify(current ?? null) !== JSON.stringify(next ?? null)) {
     app.model.data.clonotypeAbundanceRef = next;
   }
