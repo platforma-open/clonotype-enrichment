@@ -1,0 +1,48 @@
+ll := import("@platforma-sdk/workflow-tengo:ll")
+canonical := import("@platforma-sdk/workflow-tengo:canonical")
+
+// Conversion params for the per-clonotype Max Frequency column. Produced only
+// in cluster mode.
+//
+// clonoAbundanceSpec : spec of the discovered clonotype primary abundance
+//                      (axesSpec = [sampleId, clonotypeKey]).
+getColumns := func(clonoAbundanceSpec, downsampling, conditionOrder, blockId) {
+	return {
+		axes: [
+			{
+				column: "elementId",
+				spec: clonoAbundanceSpec.axesSpec[1]
+			}
+		],
+		columns: [{
+			column: "MaxFrequency",
+			id: "maxfrequency",
+			allowNA: true,
+			spec: {
+				name: "pl7.app/maxFrequency",
+				valueType: "Double",
+				domain: {
+					"pl7.app/downsampling": canonical.encode(downsampling),
+					"pl7.app/enrichment/conditionsOrder": canonical.encode(conditionOrder),
+					"pl7.app/blockId": blockId
+				},
+				annotations: {
+					"pl7.app/label": "Max Frequency",
+					"pl7.app/description": "Highest frequency the clonotype reaches across target selection rounds (library round and negative controls excluded).",
+					"pl7.app/table/visibility": "optional",
+					"pl7.app/table/orderPriority": "85",
+					"pl7.app/isScore": "true",
+					"pl7.app/score/rankingOrder": "decreasing",
+					"pl7.app/score/rankValues": "decreasing",
+					"pl7.app/format": ".2e"
+				}
+			}
+		}],
+		storageFormat: "Parquet",
+		partitionKeyLength: 0
+	}
+}
+
+export ll.toStrict({
+	getColumns: getColumns
+})

@@ -96,6 +96,11 @@ export type BlockData = {
   downsampling: DownsamplingParameters;
   FilteringConfig: FilteringConfig;
   clonotypeDefinition: SUniversalPColumnId[];
+  /**
+   * Cluster-mode only: PlRef of the upstream per-clonotype primary abundance the
+   * input cluster abundance was built from.
+   */
+  clonotypeAbundanceRef?: PlRef;
   additionalEnrichmentExports: string[];
   antigenControlConfig: AntigenControlConfig;
   enrichmentThreshold: number; // Default: 2.0 log2 FC
@@ -243,6 +248,7 @@ export const platforma = BlockModelV3.create(dataModel)
       downsampling: data.downsampling,
       FilteringConfig: data.FilteringConfig,
       clonotypeDefinition: data.clonotypeDefinition,
+      clonotypeAbundanceRef: data.clonotypeAbundanceRef,
       additionalEnrichmentExports: data.additionalEnrichmentExports,
       antigenControlConfig: data.antigenControlConfig,
       enrichmentThreshold: data.enrichmentThreshold,
@@ -295,6 +301,58 @@ export const platforma = BlockModelV3.create(dataModel)
   .output("datasetSpec", (ctx) => {
     if (ctx.data.abundanceRef) return ctx.resultPool.getPColumnSpecByRef(ctx.data.abundanceRef);
     else return undefined;
+  })
+
+  /**
+   * Cluster-mode only: identify the upstream per-clonotype primary abundance that
+   * the input cluster abundance was built from. Returns undefined for
+   * clonotype/peptide input or when no unique match exists.
+   */
+  .output("discoveredClonotypeAbundance", (ctx) => {
+    const anchor = ctx.data.abundanceRef;
+    if (!anchor) return undefined;
+    const anchorSpec = ctx.resultPool.getPColumnSpecByRef(anchor);
+    if (!anchorSpec) return undefined;
+
+    // Only when the input is cluster abundance (row axis = clusterId).
+    const clusterAxis = anchorSpec.axesSpec[1];
+    if (clusterAxis?.name !== "pl7.app/clusterId") return undefined;
+
+    // Clonotype identity = clusterId axis domain minus clustering-specific keys.
+    const identityKey = JSON.stringify(
+      Object.entries(clusterAxis.domain ?? {})
+        .filter(([k]) => !k.startsWith("pl7.app/clustering/"))
+        .sort(([a], [b]) => a.localeCompare(b)),
+    );
+
+    const isClonotypeAxis = (name: string) =>
+      name === "pl7.app/vdj/clonotypeKey" || name === "pl7.app/vdj/scClonotypeKey";
+
+    // Candidate primary, raw-count abundances keyed by sampleId × <row axis>.
+    const candidates = ctx.resultPool.getOptions([
+      {
+        axes: [{ name: "pl7.app/sampleId" }, {}],
+        annotations: {
+          "pl7.app/isAbundance": "true",
+          "pl7.app/abundance/isPrimary": "true",
+          "pl7.app/abundance/normalized": "false",
+        },
+      },
+    ]);
+
+    // Keep those whose row axis is a clonotype key carrying the matching identity.
+    const matches = candidates.filter((opt) => {
+      const spec = ctx.resultPool.getPColumnSpecByRef(opt.ref);
+      const rowAxis = spec?.axesSpec?.[1];
+      if (!rowAxis || !isClonotypeAxis(rowAxis.name)) return false;
+      const candidateKey = JSON.stringify(
+        Object.entries(rowAxis.domain ?? {}).sort(([a], [b]) => a.localeCompare(b)),
+      );
+      return candidateKey === identityKey;
+    });
+
+    // Exactly one is expected; anything else → no column (don't guess).
+    return matches.length === 1 ? matches[0].ref : undefined;
   })
 
   /** PFrame with condition column and (when antigen enabled) antigen column for UI to fetch metadata values. */
