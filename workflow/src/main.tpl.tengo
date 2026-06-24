@@ -13,12 +13,14 @@ text := import("text")
 buildMainExportTpl := assets.importTemplate(":build-main-export")
 enrichmentColumnTpl := assets.importTemplate(":enrichment-column")
 downsamplingSw := assets.importSoftware("@platforma-open/milaboratories.clonotype-enrichment.software:downsampling")
+clonotypeMaxFreqSw := assets.importSoftware("@platforma-open/milaboratories.clonotype-enrichment.software:clonotype-max-frequency")
 
 pfEnrichmentConv := import(":pf-enrichment-conv")
 pfFrequencyConv := import(":pf-frequency-conv")
 pfBubbleConv := import(":pf-bubble-conv")
 pfStackedConv := import(":pf-stacked-conv")
 pfControlScatterConv := import(":pf-control-scatter-conv")
+pfClonotypeFrequencyConv := import(":pf-clonotype-frequency-conv")
 
 // Helper function to calculate annotation values for enrichment data
 calculateAnnotationValues := func(inputFile, enrichmentColumn) {
@@ -29,7 +31,7 @@ calculateAnnotationValues := func(inputFile, enrichmentColumn) {
 		addFile("inputFile.csv", inputFile).
 		arg("inputFile.csv").
 		arg("--enrichment-column").arg(enrichmentColumn).
-		saveFileContent("enrichment_min.txt"). 
+		saveFileContent("enrichment_min.txt").
 		saveFileContent("enrichment_max.txt").
 		saveFileContent("enrichment_median.txt").
 		saveFileContent("enrichment_mean.txt").
@@ -52,7 +54,7 @@ calculateAnnotationValues := func(inputFile, enrichmentColumn) {
 wf.prepare(func(args){
 
 	bundleBuilder := wf.createPBundleBuilder()
-	bundleBuilder.addAnchor("main", args.abundanceRef) 
+	bundleBuilder.addAnchor("main", args.abundanceRef)
 	bundleBuilder.addSingle(args.conditionColumnRef)
 
 	if args.antigenControlConfig.antigenEnabled && args.antigenControlConfig.antigenColumnRef != undefined {
@@ -60,10 +62,17 @@ wf.prepare(func(args){
 	}
 
 	if args.clonotypeDefinition != undefined {
-        for columnRef in args.clonotypeDefinition {
-            bundleBuilder.addSingle(columnRef)
-        }
-    }
+		for columnRef in args.clonotypeDefinition {
+			bundleBuilder.addSingle(columnRef)
+		}
+	}
+
+	// Cluster mode: the per-clonotype primary abundance (a plain PlRef) the model
+	// matched to the input cluster abundance, used to compute the clonotype Max
+	// Frequency score.
+	if args.clonotypeAbundanceRef != undefined {
+		bundleBuilder.addRef(args.clonotypeAbundanceRef)
+	}
 
 	return {
 		columns: bundleBuilder.build()
@@ -100,7 +109,7 @@ wf.body(func(args) {
 	} else {
 		label = "Downsampling: " + downsampling.type
 	}
-	
+
 	// Add filtering mode to ensure cache differentiation
 	FilteringConfig := args.FilteringConfig
 	label = label + " - Filtering: " + FilteringConfig.baseFilter
@@ -110,7 +119,7 @@ wf.body(func(args) {
 	}
 
 	// Get abundance table
-	cloneTable := pframes.csvFileBuilder() 
+	cloneTable := pframes.csvFileBuilder()
 	cloneTable.add(columns.getColumn(args.abundanceRef), {header: "abundance"})
 	cloneTable.add(columns.getColumn(args.conditionColumnRef), {header: "condition"})
 	if antigenControlConfig.antigenEnabled {
@@ -123,16 +132,16 @@ wf.body(func(args) {
 	cloneTable = cloneTable.build()
 
 	clonotypeDefinitionFile := undefined
-    if args.clonotypeDefinition != undefined && len(args.clonotypeDefinition) > 0 {
-        clonotypeDefinitionTable := pframes.csvFileBuilder()
-        for i, columnRef in args.clonotypeDefinition {
-            clonotypeDefinitionTable.add(columns.getColumn(columnRef), {header: "clonotypeDefinition_" + i})
-        }
-        clonotypeDefinitionTable.setAxisHeader(abundanceSpec.axesSpec[1].name, "elementId")
-        clonotypeDefinitionTable.mem("16GiB")
-        clonotypeDefinitionTable.cpu(1)
-        clonotypeDefinitionFile = clonotypeDefinitionTable.build()
-    }
+	if args.clonotypeDefinition != undefined && len(args.clonotypeDefinition) > 0 {
+		clonotypeDefinitionTable := pframes.csvFileBuilder()
+		for i, columnRef in args.clonotypeDefinition {
+			clonotypeDefinitionTable.add(columns.getColumn(columnRef), {header: "clonotypeDefinition_" + i})
+		}
+		clonotypeDefinitionTable.setAxisHeader(abundanceSpec.axesSpec[1].name, "elementId")
+		clonotypeDefinitionTable.mem("16GiB")
+		clonotypeDefinitionTable.cpu(1)
+		clonotypeDefinitionFile = clonotypeDefinitionTable.build()
+	}
 
 	runDownsampling := exec.builder().
 		software(downsamplingSw).
@@ -143,18 +152,18 @@ wf.body(func(args) {
 		saveFile("result.csv").
 		run()
 	downsamplingFile := runDownsampling.getFile("result.csv")
-	
+
 	// Check if inputs are individual clonotypes or clusters
 	inputType := "Unknown"
 	if abundanceSpec.axesSpec[1].name == "pl7.app/clusterId" {
 		inputType = "Cluster"
 	} else if abundanceSpec.axesSpec[1].name == "pl7.app/vdj/clonotypeKey" ||
-				abundanceSpec.axesSpec[1].name == "pl7.app/vdj/scClonotypeKey" {
+	abundanceSpec.axesSpec[1].name == "pl7.app/vdj/scClonotypeKey" {
 		inputType = "Clonotype"
 	} else if abundanceSpec.axesSpec[1].name == "pl7.app/variantKey" {
 		inputType = "Peptide"
 	}
-	
+
 	//////////// Enrichment analysis ////////////
 	// Run enrichment script with boolean filtering flags for reliable cache differentiation
 	calculateEnrichment := exec.builder().
@@ -175,9 +184,9 @@ wf.body(func(args) {
 		arg("--filtered_too_much").arg("filtered_too_much.txt")
 
 	if clonotypeDefinitionFile != undefined {
-        calculateEnrichment = calculateEnrichment.addFile("clonotypeDefinition.csv", clonotypeDefinitionFile).
-		    arg("--clonotype-definition").arg("clonotypeDefinition.csv")
-    }
+		calculateEnrichment = calculateEnrichment.addFile("clonotypeDefinition.csv", clonotypeDefinitionFile).
+			arg("--clonotype-definition").arg("clonotypeDefinition.csv")
+	}
 
 	if antigenControlConfig.antigenEnabled || antigenControlConfig.controlEnabled {
 		calculateEnrichment = calculateEnrichment.
@@ -188,7 +197,7 @@ wf.body(func(args) {
 				arg("--sequenced_library_enabled").
 				arg("--sequenced_library_antigen").arg(string(antigenControlConfig.sequencedLibraryAntigen))
 		}
-		
+
 		if antigenControlConfig.controlEnabled {
 			calculateEnrichment = calculateEnrichment.
 				arg("--control_enabled").
@@ -203,7 +212,7 @@ wf.body(func(args) {
 	// Add filtering flags based on user selection
 	if FilteringConfig.baseFilter != "none" {
 		calculateEnrichment = calculateEnrichment.arg("--filter_clonotypes")
-		
+
 		if FilteringConfig.baseFilter == "single-sample" {
 			calculateEnrichment = calculateEnrichment.arg("--filter_single_sample")
 		} else if FilteringConfig.baseFilter == "shared" {
@@ -229,7 +238,7 @@ wf.body(func(args) {
 	// Apply in-round presence filters based on selection
 	if FilteringConfig.presentInRounds.enabled {
 		label = label + " - (" + FilteringConfig.presentInRounds.logic + ", " + string(FilteringConfig.presentInRounds.rounds) + ")"
-		
+
 		calculateEnrichment = calculateEnrichment.arg("--filter_clonotypes")
 		calculateEnrichment = calculateEnrichment.arg("--present_in_rounds").arg(string(FilteringConfig.presentInRounds.rounds))
 		calculateEnrichment = calculateEnrichment.arg("--present_in_rounds_logic").arg(FilteringConfig.presentInRounds.logic)
@@ -249,27 +258,27 @@ wf.body(func(args) {
 	// Convert script outputs to Pframes
 	enrichCsv := calculateEnrichment.getFile("enrichment_results.csv")
 
-    // Determine if we should add MaxNegControlEnrichment column
-    // It should be added only if there are multiple control conditions (either >1 conditions or >0 conditions + sequenced library)
+	// Determine if we should add MaxNegControlEnrichment column
+	// It should be added only if there are multiple control conditions (either >1 conditions or >0 conditions + sequenced library)
 	addMaxNegControlEnrichment := false
 	addPresentInNegControl := false
 	if antigenControlConfig.controlEnabled {
 		addMaxNegControlEnrichment = len(antigenControlConfig.controlConditionsOrder) > 1 ||
-			(len(antigenControlConfig.controlConditionsOrder) == 1  &&
-				antigenControlConfig.sequencedLibraryEnabled == true)
-			
+		(len(antigenControlConfig.controlConditionsOrder) == 1  &&
+			antigenControlConfig.sequencedLibraryEnabled == true)
+
 		addPresentInNegControl = antigenControlConfig.sequencedLibraryEnabled == false &&
-			(len(antigenControlConfig.controlConditionsOrder) == 1)
+		(len(antigenControlConfig.controlConditionsOrder) == 1)
 	}
 
-	enrichmentImportParams := pfEnrichmentConv.getColumns(abundanceSpec, conditionOrder, 
-		antigenControlConfig.controlEnabled, addPresentInNegControl, 
+	enrichmentImportParams := pfEnrichmentConv.getColumns(abundanceSpec, conditionOrder,
+		antigenControlConfig.controlEnabled, addPresentInNegControl,
 		addMaxNegControlEnrichment, antigenControlConfig.sequencedLibraryEnabled)
 	enrichmentPf := xsv.importFile(enrichCsv, "csv", enrichmentImportParams,
-									{ cpu: 1, mem: "32GiB" })
+		{ cpu: 1, mem: "32GiB" })
 	controlScatterPf := undefined
 	if antigenControlConfig.controlEnabled {
-		controlScatterImportParams := pfControlScatterConv.getColumns(abundanceSpec, 
+		controlScatterImportParams := pfControlScatterConv.getColumns(abundanceSpec,
 			conditionOrder, addPresentInNegControl, addMaxNegControlEnrichment)
 		controlScatterPf = xsv.importFile(enrichCsv, "csv", controlScatterImportParams,
 			{ cpu: 1, mem: "32GiB" })
@@ -278,41 +287,41 @@ wf.body(func(args) {
 	bubbleImportParams := pfBubbleConv.getColumns(abundanceSpec, addPresentInNegControl,
 		addMaxNegControlEnrichment)
 	bubblePf := xsv.importFile(calculateEnrichment.getFile("bubble_data.csv"), "csv", bubbleImportParams,
-							{ cpu: 1, mem: "32GiB" })
+		{ cpu: 1, mem: "32GiB" })
 
 	lineImportParams := pfStackedConv.getColumns(abundanceSpec, addPresentInNegControl, addMaxNegControlEnrichment)
 	linePf := xsv.importFile(calculateEnrichment.getFile("top_10.csv"), "csv", lineImportParams,
-							{ cpu: 1, mem: "32GiB" })
+		{ cpu: 1, mem: "32GiB" })
 
 	stackedImportParams := pfStackedConv.getColumns(abundanceSpec, addPresentInNegControl, addMaxNegControlEnrichment)
 	stackedPf := xsv.importFile(calculateEnrichment.getFile("top_enriched.csv"), "csv", stackedImportParams,
-								{ cpu: 1, mem: "32GiB" })
+		{ cpu: 1, mem: "32GiB" })
 
 	topEnrichedColCsv := calculateEnrichment.getFile("highest_enrichment_clonotype.csv")
 
 	// Export frequency
 	frequencyImportParams := pfFrequencyConv.getColumns(abundanceSpec, conditionOrder,
-														inputType, downsampling,
-														blockId, addPresentInNegControl,
-														addMaxNegControlEnrichment,
-														antigenControlConfig.sequencedLibraryEnabled)
+		inputType, downsampling,
+		blockId, addPresentInNegControl,
+		addMaxNegControlEnrichment,
+		antigenControlConfig.sequencedLibraryEnabled)
 	frequencyPf := xsv.importFile(enrichCsv, "csv", frequencyImportParams,
-								{ cpu: 1, mem: "32GiB" })
+		{ cpu: 1, mem: "32GiB" })
 
 	// Prepare pFrame to be exported
 	trace := pSpec.makeTrace(abundanceSpec,
-        {
-            type: "milaboratories.clonotype-enrichment",
-            importance: 30,
-            label: label
-        })
+		{
+			type: "milaboratories.clonotype-enrichment",
+			importance: 30,
+			label: label
+	})
 
-    exportsFreq := pframes.pFrameBuilder()
+	exportsFreq := pframes.pFrameBuilder()
 	for condition in conditionOrder {
 		colId := strings.substituteSpecialCharacters("frequency_" + condition)
 		exportsFreq.add(
-			"Frequency " + condition, 
-			trace.inject(frequencyPf[colId + ".spec"]), 
+			"Frequency " + condition,
+			trace.inject(frequencyPf[colId + ".spec"]),
 			frequencyPf[colId + ".data"]
 		)
 	}
@@ -388,25 +397,101 @@ wf.body(func(args) {
 	exports := buildExports.output("exports")
 	outStats := buildExports.output("outStats")
 
+	//////////// Per-element Max Frequency (cluster input only) ////////////
+	// Compute each element's max frequency across target rounds (same
+	// downsampling + frequency definition as the cluster-level frequencies) and
+	// export it on the per-element axis. The underlying element is a clonotype
+	// for VDJ clusters and a variant for peptide clusters.
+	clonotypeFrequencyExport := undefined
+	if inputType == "Cluster" && args.clonotypeAbundanceRef != undefined {
+		clonoAbundanceSpec := columns.getSpec(args.clonotypeAbundanceRef)
+
+		// Label the exported column after the underlying element type.
+		elementLabel := clonoAbundanceSpec.axesSpec[1].name == "pl7.app/variantKey" ? "Peptide" : "Clonotype"
+
+		clonoCloneTable := pframes.csvFileBuilder()
+		clonoCloneTable.add(columns.getColumn(args.clonotypeAbundanceRef), {header: "abundance"})
+		clonoCloneTable.add(columns.getColumn(args.conditionColumnRef), {header: "condition"})
+		if antigenControlConfig.antigenEnabled {
+			clonoCloneTable.add(columns.getColumn(antigenControlConfig.antigenColumnRef), {header: "antigen"})
+		}
+		clonoCloneTable.setAxisHeader(clonoAbundanceSpec.axesSpec[0].name, "sampleId")
+		clonoCloneTable.setAxisHeader(clonoAbundanceSpec.axesSpec[1].name, "elementId")
+		clonoCloneTable.mem("32GiB")
+		clonoCloneTable.cpu(1)
+		clonoCloneTable = clonoCloneTable.build()
+
+		// Same downsampling pipeline as the cluster-level frequencies.
+		clonoDownsampling := exec.builder().
+			software(downsamplingSw).
+			mem("32GiB").
+			cpu(8).
+			writeFile("downsampling.json", json.encode(downsampling)).
+			addFile("input.csv", clonoCloneTable).
+			saveFile("result.csv").
+			run()
+
+		clonoMaxFreq := exec.builder().
+			software(clonotypeMaxFreqSw).
+			mem("32GiB").
+			cpu(1).
+			addFile("inputFile.csv", clonoDownsampling.getFile("result.csv")).
+			arg("--input_data").arg("inputFile.csv").
+			arg("--conditions").arg(string(conditionOrder)).
+			arg("--output").arg("clonotype_max_frequency.csv")
+		if antigenControlConfig.antigenEnabled {
+			clonoMaxFreq = clonoMaxFreq.arg("--current_target").arg(string(antigenControlConfig.targetAntigen))
+		}
+		clonoMaxFreq = clonoMaxFreq.
+			saveFile("clonotype_max_frequency.csv").
+			printErrStreamToStdout().
+			saveStdoutContent().
+			run()
+
+		clonoFreqImportParams := pfClonotypeFrequencyConv.getColumns(clonoAbundanceSpec, downsampling, conditionOrder, blockId, elementLabel)
+		clonoFreqPf := xsv.importFile(clonoMaxFreq.getFile("clonotype_max_frequency.csv"), "csv", clonoFreqImportParams,
+			{ cpu: 1, mem: "16GiB" })
+
+		clonoTrace := pSpec.makeTrace(clonoAbundanceSpec,
+			{
+				type: "milaboratories.clonotype-enrichment",
+				importance: 30,
+				label: label
+		})
+
+		clonoFreqExports := pframes.pFrameBuilder()
+		clonoFreqExports.add(
+			elementLabel + " Max Frequency",
+			clonoTrace.inject(clonoFreqPf["maxfrequency.spec"]),
+			clonoFreqPf["maxfrequency.data"]
+		)
+		clonotypeFrequencyExport = clonoFreqExports.build()
+	}
+
 	// Define outputs
 	outputs := {
-			outStats: outStats,
-			enrichmentPf: pframes.exportFrame(enrichmentPf),
-			bubblePf: pframes.exportFrame(bubblePf),
-			stackedPf: pframes.exportFrame(stackedPf),
-			linePf: pframes.exportFrame(linePf),
-			filteredTooMuch: buildExports.output("filteredTooMuch")
-		}
+		outStats: outStats,
+		enrichmentPf: pframes.exportFrame(enrichmentPf),
+		bubblePf: pframes.exportFrame(bubblePf),
+		stackedPf: pframes.exportFrame(stackedPf),
+		linePf: pframes.exportFrame(linePf),
+		filteredTooMuch: buildExports.output("filteredTooMuch")
+	}
 	if antigenControlConfig.controlEnabled {
 		outputs.controlScatterPf = pframes.exportFrame(controlScatterPf)
 	}
 
+	exportsMap := {
+		pf: exports,
+		frequency: exportsFreq.build(),
+		additionalEnrichments: exportsAdditionalEnrichments.build()
+	}
+	if clonotypeFrequencyExport != undefined {
+		exportsMap.clonotypeFrequency = clonotypeFrequencyExport
+	}
+
 	return {
 		outputs: outputs,
-		exports: {
-			pf: exports,
-			frequency: exportsFreq.build(),
-			additionalEnrichments: exportsAdditionalEnrichments.build()
-		}
-	}	
+		exports: exportsMap
+	}
 })

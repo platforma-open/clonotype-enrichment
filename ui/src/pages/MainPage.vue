@@ -95,6 +95,18 @@ watchEffect(() => {
   app.model.data.defaultBlockLabel = label;
 });
 
+// Persist the auto-discovered per-clonotype abundance so the workflow can
+// compute the clonotype Max Frequency score (cluster input only).
+watchEffect(() => {
+  const datasetSpec = app.model.outputs.datasetSpec;
+  const isCluster = datasetSpec?.axesSpec?.[1]?.name === "pl7.app/clusterId";
+  const next = isCluster ? app.model.outputs.discoveredClonotypeAbundance : undefined;
+  const current = app.model.data.clonotypeAbundanceRef;
+  if (JSON.stringify(current ?? null) !== JSON.stringify(next ?? null)) {
+    app.model.data.clonotypeAbundanceRef = next;
+  }
+});
+
 const tableSettings = usePlDataTableSettingsV2({
   model: () => app.model.outputs.pt,
 });
