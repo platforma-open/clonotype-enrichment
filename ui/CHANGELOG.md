@@ -1,5 +1,13 @@
 # @platforma-open/milaboratories.clonotype-enrichment.ui
 
+## 4.1.1
+
+### Patch Changes
+
+- bbd32b9: Adapt block to DMS datasets, SDK update
+- Updated dependencies [bbd32b9]
+  - @platforma-open/milaboratories.clonotype-enrichment.model@4.1.1
+
 ## 4.1.0
 
 ### Minor Changes

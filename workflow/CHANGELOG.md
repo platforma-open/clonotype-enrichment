@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.workflow
 
+## 4.1.1
+
+### Patch Changes
+
+- bbd32b9: Adapt block to DMS datasets, SDK update
+
 ## 4.1.0
 
 ### Minor Changes
