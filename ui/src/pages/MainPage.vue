@@ -558,7 +558,13 @@ const isClusterId = computed(() => {
   );
 });
 
-const isPeptide = computed(() => app.model.outputs.modality === "peptide");
+// Whole-sequence inputs (peptide-discovery peptides and
+// synthetic-repertoire-profiler amplicon variants) have no VDJ clonotype
+// definition, so the "Clonotype definition" picker is hidden for both.
+const isWholeSequenceInput = computed(() => {
+  const modality = app.model.outputs.modality;
+  return modality === "peptide" || modality === "amplicon";
+});
 
 /**
  * Synchronization logic to initialize and validate condition orders.
@@ -1310,7 +1316,7 @@ const isControlOrderOpen = ref(true); // Open by default
         </template>
       </PlNumberField>
       <PlDropdownMulti
-        v-if="!isClusterId && !isPeptide"
+        v-if="!isClusterId && !isWholeSequenceInput"
         v-model="app.model.data.clonotypeDefinition"
         :options="app.model.outputs.sequenceColumnOptions"
         label="Clonotype definition"

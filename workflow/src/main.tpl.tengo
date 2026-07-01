@@ -22,6 +22,19 @@ pfStackedConv := import(":pf-stacked-conv")
 pfControlScatterConv := import(":pf-control-scatter-conv")
 pfClonotypeFrequencyConv := import(":pf-clonotype-frequency-conv")
 
+// Label for a per-element entity carried on the pl7.app/variantKey axis.
+// Distinguishes synthetic-repertoire-profiler amplicon variants (which stamp
+// pl7.app/repertoire/extractionRunId on the axis) from peptide-discovery
+// peptides (pl7.app/peptide/extractionRunId). Both share the variantKey axis;
+// the axis domain tells them apart. Used only for user-facing column labels.
+variantElementLabel := func(axisSpec) {
+	dom := axisSpec.domain
+	if !is_undefined(dom) && !is_undefined(dom["pl7.app/repertoire/extractionRunId"]) {
+		return "Variant"
+	}
+	return "Peptide"
+}
+
 // Helper function to calculate annotation values for enrichment data
 calculateAnnotationValues := func(inputFile, enrichmentColumn) {
 	annotationValues := exec.builder().
@@ -161,7 +174,7 @@ wf.body(func(args) {
 	abundanceSpec.axesSpec[1].name == "pl7.app/vdj/scClonotypeKey" {
 		inputType = "Clonotype"
 	} else if abundanceSpec.axesSpec[1].name == "pl7.app/variantKey" {
-		inputType = "Peptide"
+		inputType = variantElementLabel(abundanceSpec.axesSpec[1])
 	}
 
 	//////////// Enrichment analysis ////////////
@@ -407,7 +420,7 @@ wf.body(func(args) {
 		clonoAbundanceSpec := columns.getSpec(args.clonotypeAbundanceRef)
 
 		// Label the exported column after the underlying element type.
-		elementLabel := clonoAbundanceSpec.axesSpec[1].name == "pl7.app/variantKey" ? "Peptide" : "Clonotype"
+		elementLabel := clonoAbundanceSpec.axesSpec[1].name == "pl7.app/variantKey" ? variantElementLabel(clonoAbundanceSpec.axesSpec[1]) : "Clonotype"
 
 		clonoCloneTable := pframes.csvFileBuilder()
 		clonoCloneTable.add(columns.getColumn(args.clonotypeAbundanceRef), {header: "abundance"})

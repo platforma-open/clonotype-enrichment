@@ -623,11 +623,20 @@ export const platforma = BlockModelV3.create(dataModel)
         : undefined;
       if (!spec) return undefined;
       for (const ax of spec.axesSpec) {
-        if (ax.name === "pl7.app/variantKey") return "peptide";
+        if (ax.name === "pl7.app/variantKey") {
+          // synthetic-repertoire-profiler amplicon variants stamp
+          // pl7.app/repertoire/extractionRunId on the axis; peptide-discovery
+          // peptides stamp pl7.app/peptide/extractionRunId. Both share the
+          // variantKey axis, so the domain is what tells them apart.
+          return ax.domain?.["pl7.app/repertoire/extractionRunId"] !== undefined
+            ? "amplicon"
+            : "peptide";
+        }
         if (ax.name === "pl7.app/vdj/clonotypeKey" || ax.name === "pl7.app/vdj/scClonotypeKey")
           return "antibody_tcr";
         // clustered abundances
         for (const key of Object.keys(ax.domain ?? {})) {
+          if (key.startsWith("pl7.app/repertoire/")) return "amplicon";
           if (key.startsWith("pl7.app/peptide/")) return "peptide";
           if (key.startsWith("pl7.app/vdj/")) return "antibody_tcr";
         }
