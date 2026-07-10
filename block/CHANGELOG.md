@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment
 
+## 3.1.3
+
+### Patch Changes
+
+- eb76053: MILAB-6564: use the `bright` default palette on the Lines page. Also update graph-maker to 1.6.1 and refresh SDK dependencies via `upgrade-sdk` (includes the block structurer migration). The block is named explicitly so it gets a version bump and releases — the automatic cascade from sub-packages is no longer reliable.
+
 ## 3.1.2
 
 ### Patch Changes
