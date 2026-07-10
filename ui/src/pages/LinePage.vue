@@ -73,6 +73,7 @@ const metaColumnPredicate = (spec: PColumnSpec) =>
     chartType="scatterplot"
     :p-frame="app.model.outputs.linePf"
     :default-options="defaultOptions"
+    default-palette="bright"
     :dataColumnPredicate="dataColumnPredicate"
     :meta-column-predicate="metaColumnPredicate"
   />
