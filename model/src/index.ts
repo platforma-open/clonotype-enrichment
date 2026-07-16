@@ -10,10 +10,12 @@ import type {
 import {
   Annotation,
   BlockModelV3,
+  ColumnLazy,
+  ColumnsCollection,
   DataModelBuilder,
   createPFrameForGraphs,
   createPlDataTableStateV2,
-  createPlDataTableV2,
+  createPlDataTableV3,
   getUniquePartitionKeys,
   readAnnotationJson,
 } from "@platforma-sdk/model";
@@ -446,7 +448,7 @@ export const platforma = BlockModelV3.create(dataModel)
   .outputWithStatus("pt", (ctx) => {
     const pCols = ctx.outputs?.resolve("enrichmentPf")?.getPColumns();
 
-    if (pCols === undefined) {
+    if (!pCols?.length) {
       return undefined;
     }
 
@@ -454,68 +456,62 @@ export const platforma = BlockModelV3.create(dataModel)
     const anchor = ctx.data.abundanceRef;
     const enrichmentAxisName = pCols[0]?.spec.axesSpec[0]?.name;
     const allSeqCols = anchor
-      ? (
-          ctx.resultPool.getAnchoredPColumns(
-            { main: anchor },
-            [
-              { axes: [{ anchor: "main", idx: 1 }], name: "pl7.app/vdj/sequence" },
-              { axes: [{ anchor: "main", idx: 1 }], name: "pl7.app/sequence" },
+      ? ColumnsCollection(["result_pool"], { ctx: ctx.ctx })
+          .discover({
+            anchors: { main: anchor },
+            include: [
+              { name: [{ type: "exact", value: "pl7.app/vdj/sequence" }] },
+              { name: [{ type: "exact", value: "pl7.app/sequence" }] },
             ],
-            { dontWaitAllData: true },
-          ) ?? []
-        ).filter(
-          (col) =>
+            mode: "enrichment",
+          })
+          .getColumns()
+          .filter(
             // Skip if axis doesn't match enrichment (e.g. stale results after switching input)
-            col.spec.axesSpec[0]?.name === enrichmentAxisName,
-        )
+            (col) => col.getSpec().axesSpec[0]?.name === enrichmentAxisName,
+          )
       : [];
 
     // Assembling feature (or centroid) amino acid sequences — visible by default
     const mainSeqCols = allSeqCols
       .filter((col) => {
-        const alphabet = col.spec.domain?.["pl7.app/alphabet"];
+        const spec = col.getSpec();
+        const alphabet = spec.domain?.["pl7.app/alphabet"];
         // !== false (not === true) to also match cluster centroid sequences,
         // where clonotype-clustering deletes the isAssemblingFeature annotation
         return (
           alphabet === "aminoacid" &&
-          readAnnotationJson(col.spec, Annotation.VDJ.IsAssemblingFeature) !== false
+          readAnnotationJson(spec, Annotation.VDJ.IsAssemblingFeature) !== false
         );
       })
-      .map((col) => ({
-        ...col,
-        spec: {
-          ...col.spec,
+      .map((col) =>
+        col.withSpecs({
           annotations: {
-            ...col.spec.annotations,
             "pl7.app/table/visibility": "default",
             "pl7.app/table/orderPriority": "1",
           },
-        },
-      }));
+        }),
+      );
 
     // Other region sequences (CDR1, CDR2, FR1, etc.) — not shown by default, available in column picker
     const otherRegionCols = allSeqCols
-      .filter((col) => readAnnotationJson(col.spec, Annotation.VDJ.IsAssemblingFeature) === false)
-      .map((col) => ({
-        ...col,
-        spec: {
-          ...col.spec,
-          annotations: { ...col.spec.annotations, "pl7.app/table/visibility": "optional" },
-        },
-      }));
+      .filter(
+        (col) => readAnnotationJson(col.getSpec(), Annotation.VDJ.IsAssemblingFeature) === false,
+      )
+      .map((col) => col.withSpecs({ annotations: { "pl7.app/table/visibility": "optional" } }));
 
-    return createPlDataTableV2(
-      ctx,
-      [...pCols, ...mainSeqCols, ...otherRegionCols],
-      ctx.data.tableState,
-      {
-        // Sequence columns are non-core so they are left-joined: they won't
-        // bring back clonotypes that were filtered out during enrichment
-        coreColumnPredicate: ({ spec }) =>
-          spec.name !== "pl7.app/vdj/sequence" && spec.name !== "pl7.app/sequence",
-        coreJoinType: "inner",
-      },
-    );
+    return createPlDataTableV3(ctx, {
+      // Single primary: V3 anchors label discovery per primary column, and several
+      // same-axis enrichment columns collide. They share one PFrame, so joining
+      // the rest as secondary is equivalent to the old inner join among core columns.
+      primaryColumns: [ColumnLazy.fromColumn(pCols[0])],
+      columns: [
+        ...pCols.slice(1).map((c) => ColumnLazy.fromColumn(c)),
+        ...mainSeqCols,
+        ...otherRegionCols,
+      ],
+      tableState: ctx.data.tableState,
+    });
   })
 
   // Returns a map of results for plot
