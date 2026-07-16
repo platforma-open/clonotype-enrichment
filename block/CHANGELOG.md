@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment
 
+## 3.1.4
+
+### Patch Changes
+
+- 7b129c4: SDK Update
+
 ## 3.1.3
 
 ### Patch Changes
