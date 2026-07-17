@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment
 
+## 3.1.5
+
+### Patch Changes
+
+- f5e4a8f: Release software
+
 ## 3.1.4
 
 ### Patch Changes

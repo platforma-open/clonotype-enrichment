@@ -1,5 +1,13 @@
 # @platforma-open/milaboratories.clonotype-enrichment.workflow
 
+## 4.1.4
+
+### Patch Changes
+
+- f5e4a8f: Release software
+- Updated dependencies [f5e4a8f]
+  - @platforma-open/milaboratories.clonotype-enrichment.software@3.3.2
+
 ## 4.1.3
 
 ### Patch Changes
