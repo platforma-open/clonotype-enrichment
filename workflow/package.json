@@ -1,6 +1,6 @@
 {
   "name": "@platforma-open/milaboratories.clonotype-enrichment.workflow",
-  "version": "4.1.4",
+  "version": "4.1.5",
   "private": true,
   "description": "Tengo-based template",
   "type": "module",
