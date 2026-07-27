@@ -322,9 +322,16 @@ wf.body(func(args) {
 		{ cpu: 1, mem: "32GiB" })
 
 	// Prepare pFrame to be exported
+	// Two traces: condition order (block label) and downsampling
+	conditionOrderLabel := args.customBlockLabel || args.defaultBlockLabel
 	trace := pSpec.makeTrace(abundanceSpec,
 		{
-			type: "milaboratories.clonotype-enrichment",
+			type: "milaboratories.clonotype-enrichment.condition-order",
+			importance: 35,
+			label: conditionOrderLabel
+		},
+		{
+			type: "milaboratories.clonotype-enrichment.downsampling",
 			importance: 30,
 			label: label
 	})
@@ -465,9 +472,15 @@ wf.body(func(args) {
 		clonoFreqPf := xsv.importFile(clonoMaxFreq.getFile("clonotype_max_frequency.csv"), "csv", clonoFreqImportParams,
 			{ cpu: 1, mem: "16GiB" })
 
+		// Two traces: condition order (block label) and downsampling
 		clonoTrace := pSpec.makeTrace(clonoAbundanceSpec,
 			{
-				type: "milaboratories.clonotype-enrichment",
+				type: "milaboratories.clonotype-enrichment.condition-order",
+				importance: 35,
+				label: conditionOrderLabel
+			},
+			{
+				type: "milaboratories.clonotype-enrichment.downsampling",
 				importance: 30,
 				label: label
 		})
