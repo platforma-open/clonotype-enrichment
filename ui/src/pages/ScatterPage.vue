@@ -7,7 +7,7 @@ import { useApp } from "../app";
 
 const app = useApp();
 
-const defaultOptions = computed((): PredefinedGraphOption<"scatterplot">[] | null => {
+const defaultOptions = computed((): PredefinedGraphOption<"scatterplot-umap">[] | null => {
   if (!app.model.outputs.controlScatterPCols) return null;
 
   const controlScatterPCols = app.model.outputs.controlScatterPCols;
@@ -24,7 +24,7 @@ const defaultOptions = computed((): PredefinedGraphOption<"scatterplot">[] | nul
   if (!maxEnrichmentSpec || !negSignalSpec || !bindingSpecificitySpec || !frequencySpec)
     return null;
 
-  const defaults: PredefinedGraphOption<"scatterplot">[] = [
+  const defaults: PredefinedGraphOption<"scatterplot-umap">[] = [
     {
       inputName: "x",
       selectedSource: negSignalSpec,
@@ -72,10 +72,10 @@ const metaColumnPredicate = (spec: PColumnSpec) =>
 <template>
   <GraphMaker
     v-model="app.model.data.scatterState"
-    chartType="scatterplot"
+    chartType="scatterplot-umap"
     :p-frame="app.model.outputs.controlScatterPf"
     :default-options="defaultOptions"
-    :dataColumnPredicate="dataColumnPredicate"
+    :data-column-predicate="dataColumnPredicate"
     :meta-column-predicate="metaColumnPredicate"
   />
 </template>
