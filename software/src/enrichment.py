@@ -295,6 +295,23 @@ def hybrid_enrichment_analysis(
     # Read data with polars lazy evaluation
     # Force condition to be string to avoid type errors during comparison
     input_df = pl.scan_csv(input_data_csv, schema_overrides={"condition": pl.Utf8})
+
+    # Antigen values always arrive as strings from the command line, but a numeric
+    # antigen column is inferred as Int/Float by scan_csv, and polars refuses to
+    # compare the two. Normalize the column to Utf8, rendering integral floats
+    # without the ".0" so they still match the string form of the arguments.
+    if "antigen" in input_df.collect_schema().names():
+        antigen_dtype = input_df.collect_schema()["antigen"]
+        if antigen_dtype.is_float():
+            input_df = input_df.with_columns(
+                pl.when(pl.col("antigen") == pl.col("antigen").round(0))
+                .then(pl.col("antigen").cast(pl.Int64).cast(pl.Utf8))
+                .otherwise(pl.col("antigen").cast(pl.Utf8))
+                .alias("antigen")
+            )
+        elif antigen_dtype != pl.Utf8:
+            input_df = input_df.with_columns(pl.col("antigen").cast(pl.Utf8))
+
     schema = input_df.collect_schema()
 
     # Normalize condition order and resolve sequenced library as base condition
@@ -722,6 +739,34 @@ def hybrid_enrichment_analysis(
             pl.lit(0.0).alias('MaxNegControlEnrichment'),
             pl.lit(False).alias('PresentInNegControl'),
         )
+
+    # Guarantee the negative-control columns the workflow expects.
+    #
+    # The workflow predicts the schema from the config alone (main.tpl.tengo:
+    # addMaxNegControlEnrichment / addPresentInNegControl) and declares those columns in the
+    # ptabler import, while the per-antigen branches above pick a column from the conditions
+    # actually present in the data. The two disagree whenever a configured control condition
+    # carries no rows for a negative antigen - e.g. two conditions selected but only one
+    # surviving abundance filtering - and the import then dies with
+    # ColumnNotFoundError: unable to find column "MaxNegControlEnrichment".
+    if control_enabled:
+        n_control_conditions = len(control_conditions_order) if control_conditions_order else 0
+        expected_neg_columns: List[str] = []
+        if n_control_conditions > 1 or (n_control_conditions == 1 and sequenced_library_enabled):
+            expected_neg_columns.append('MaxNegControlEnrichment')
+        if n_control_conditions == 1 and not sequenced_library_enabled:
+            expected_neg_columns.append('PresentInNegControl')
+
+        neg_column_defaults = {
+            'MaxNegControlEnrichment': pl.lit(0.0),
+            'PresentInNegControl': pl.lit(False),
+        }
+        existing_columns = enrichment_results.collect_schema().names()
+        missing_neg_columns = [c for c in expected_neg_columns if c not in existing_columns]
+        if missing_neg_columns:
+            enrichment_results = enrichment_results.with_columns(
+                [neg_column_defaults[c].alias(c) for c in missing_neg_columns]
+            )
 
     # Join with Overall Log2FC if it was calculated
     if 'Overall Log2FC' in pivot_df.collect_schema().names():
