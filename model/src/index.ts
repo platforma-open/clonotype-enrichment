@@ -117,6 +117,22 @@ export type BlockData = {
   excludedAlertDismissedKey?: string;
 };
 
+function migrateScatterStateToUmap(state: GraphMakerState): GraphMakerState {
+  const optionsState = state?.optionsState;
+  if (optionsState?.type !== "scatterplot" || optionsState.components === undefined) return state;
+
+  // "scatterplot-umap" has no shape input, this is the only difference from "scatterplot"
+  const { shape: _shape, ...components } = optionsState.components;
+  return {
+    ...state,
+    optionsState: {
+      ...optionsState,
+      type: "scatterplot-umap",
+      components,
+    },
+  };
+}
+
 const dataModel = new DataModelBuilder()
   .from<BlockData>("v1")
   .upgradeLegacy<OldArgs, OldUiState>(({ args, uiState }) => ({
@@ -128,6 +144,10 @@ const dataModel = new DataModelBuilder()
     scatterState: uiState.scatterState,
     boxState: uiState.boxState,
     excludedAlertDismissedKey: uiState.excludedAlertDismissedKey,
+  }))
+  .migrate<BlockData>("v2", (data) => ({
+    ...data,
+    scatterState: migrateScatterStateToUmap(data.scatterState),
   }))
   .init(() => ({
     defaultBlockLabel: "",
