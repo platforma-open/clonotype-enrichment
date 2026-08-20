@@ -1,5 +1,10 @@
 import type { GraphMakerState } from "@milaboratories/graph-maker";
 import type {
+  AntigenControlConfig,
+  DownsamplingParameters,
+  FilteringConfig,
+} from "@platforma-open/milaboratories.clonotype-enrichment.kind";
+import type {
   AnchoredPColumnSelector,
   PColumnIdAndSpec,
   PFrameHandle,
@@ -7,10 +12,11 @@ import type {
   PlRef,
   SUniversalPColumnId,
 } from "@platforma-sdk/model";
+import { kind } from "@platforma-open/milaboratories.clonotype-enrichment.kind";
 import {
   Annotation,
   BlockModelV3,
-  ColumnLazy,
+  DataColumn,
   ColumnsCollection,
   DataModelBuilder,
   createPFrameForGraphs,
@@ -21,47 +27,15 @@ import {
 } from "@platforma-sdk/model";
 export type * from "@milaboratories/helpers";
 
-export type DownsamplingParameters = {
-  type?: "none" | "hypergeometric";
-  valueChooser?: "min" | "fixed" | "auto";
-  n?: number;
-};
-
-type FilteringConfig = {
-  // Mutually exclusive base filter
-  baseFilter: "none" | "shared" | "single-sample";
-
-  // Combinatory filters (apply on top of base)
-  minAbundance: {
-    enabled: boolean;
-    threshold: number;
-    metric: "count" | "frequency";
-  };
-
-  presentInRounds: {
-    enabled: boolean;
-    rounds: string[];
-    logic: "OR" | "AND";
-  };
-
-  excludeSequencedLibrary: boolean;
-};
-
-type AntigenControlConfig = {
-  antigenEnabled: boolean;
-  controlEnabled: boolean;
-  antigenColumnRef?: SUniversalPColumnId; // Metadata column for antigen/control
-  targetAntigen?: string; // e.g., "Target-Antigen"
-  negativeAntigens: string[]; // e.g., ["BSA", "Plastic"]
-  controlThreshold: number; // Default: 1.0 log2 FC
-  // singleControlFoldChangeThreshold: number; // Default: 10.0
-  singleControlFrequencyThreshold: number; // Default: 0.01
-  controlConditionsOrder: string[]; // e.g., ["BSA", "Plastic"]
-  sequencedLibraryEnabled: boolean;
-  sequencedLibraryAntigen?: string;
-  hasSingleConditionNegativeControl: boolean;
-  hasMultiConditionNegativeControl: boolean;
-};
+// The analysis-configuration shapes are the block's init-params contract, so
+// they are declared by the kind and re-exported here: the model depends on the
+// kind, never the other way round, and every existing `from "...model"` import
+// keeps resolving.
+export type {
+  AntigenControlConfig,
+  DownsamplingParameters,
+  FilteringConfig,
+} from "@platforma-open/milaboratories.clonotype-enrichment.kind";
 
 type OldArgs = {
   defaultBlockLabel: string;
@@ -133,7 +107,7 @@ function migrateScatterStateToUmap(state: GraphMakerState): GraphMakerState {
   };
 }
 
-const dataModel = new DataModelBuilder()
+const dataModel = new DataModelBuilder({ kind })
   .from<BlockData>("v1")
   .upgradeLegacy<OldArgs, OldUiState>(({ args, uiState }) => ({
     ...args,
@@ -149,16 +123,19 @@ const dataModel = new DataModelBuilder()
     ...data,
     scatterState: migrateScatterStateToUmap(data.scatterState),
   }))
-  .init(() => ({
-    defaultBlockLabel: "",
-    customBlockLabel: "",
-    conditionOrder: [],
-    downsampling: {
+  // `params` is absent when a block is created by hand rather than from a
+  // template, so every field the contract carries keeps its own default.
+  .init(({ params }) => ({
+    ...params,
+    defaultBlockLabel: params?.defaultBlockLabel ?? "",
+    customBlockLabel: params?.customBlockLabel ?? "",
+    conditionOrder: params?.conditionOrder ?? [],
+    downsampling: params?.downsampling ?? {
       type: "none",
       valueChooser: "auto",
     },
-    clonotypeDefinition: [],
-    FilteringConfig: {
+    clonotypeDefinition: params?.clonotypeDefinition ?? [],
+    FilteringConfig: params?.FilteringConfig ?? {
       baseFilter: "single-sample",
       minAbundance: {
         enabled: false,
@@ -172,8 +149,8 @@ const dataModel = new DataModelBuilder()
       },
       excludeSequencedLibrary: true,
     },
-    additionalEnrichmentExports: [],
-    antigenControlConfig: {
+    additionalEnrichmentExports: params?.additionalEnrichmentExports ?? [],
+    antigenControlConfig: params?.antigenControlConfig ?? {
       antigenEnabled: false,
       controlEnabled: false,
       negativeAntigens: [],
@@ -186,8 +163,8 @@ const dataModel = new DataModelBuilder()
       hasSingleConditionNegativeControl: false,
       hasMultiConditionNegativeControl: false,
     },
-    enrichmentThreshold: 2.0,
-    pseudoCount: 1,
+    enrichmentThreshold: params?.enrichmentThreshold ?? 2.0,
+    pseudoCount: params?.pseudoCount ?? 1,
     tableState: createPlDataTableStateV2(),
     bubbleState: {
       title: "Enrichment",
@@ -227,7 +204,7 @@ const dataModel = new DataModelBuilder()
     excludedAlertDismissedKey: undefined,
   }));
 
-export const platforma = BlockModelV3.create(dataModel)
+export const platforma = BlockModelV3.create({ dataModel, kind })
 
   .args((data) => {
     const { abundanceRef, conditionColumnRef, conditionOrder, antigenControlConfig } = data;
@@ -278,6 +255,28 @@ export const platforma = BlockModelV3.create(dataModel)
       pseudoCount: data.pseudoCount,
     };
   })
+
+  // Inverse of `init` — the same fields, projected back out for template export.
+  // Table state, the five graph states and the dismissed-alert key are view
+  // state and never cross the boundary. `clonotypeAbundanceRef` is left out too:
+  // it is not picked by the user but written from the `discoveredClonotypeAbundance`
+  // output, and the UI re-derives it against whatever input the template lands on.
+  .templateParams((data) => ({
+    abundanceRef: data.abundanceRef,
+
+    conditionColumnRef: data.conditionColumnRef,
+    conditionOrder: data.conditionOrder,
+    clonotypeDefinition: data.clonotypeDefinition,
+    downsampling: data.downsampling,
+    FilteringConfig: data.FilteringConfig,
+    antigenControlConfig: data.antigenControlConfig,
+    enrichmentThreshold: data.enrichmentThreshold,
+    pseudoCount: data.pseudoCount,
+    additionalEnrichmentExports: data.additionalEnrichmentExports,
+
+    defaultBlockLabel: data.defaultBlockLabel,
+    customBlockLabel: data.customBlockLabel,
+  }))
 
   .output("abundanceOptions", (ctx) =>
     ctx.resultPool.getOptions(
@@ -524,9 +523,9 @@ export const platforma = BlockModelV3.create(dataModel)
       // Single primary: V3 anchors label discovery per primary column, and several
       // same-axis enrichment columns collide. They share one PFrame, so joining
       // the rest as secondary is equivalent to the old inner join among core columns.
-      primaryColumns: [ColumnLazy.fromColumn(pCols[0])],
+      primaryColumns: [DataColumn.fromColumn(pCols[0])],
       columns: [
-        ...pCols.slice(1).map((c) => ColumnLazy.fromColumn(c)),
+        ...pCols.slice(1).map((c) => DataColumn.fromColumn(c)),
         ...mainSeqCols,
         ...otherRegionCols,
       ],
