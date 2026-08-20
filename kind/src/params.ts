@@ -7,6 +7,7 @@ import {
   type SUniversalPColumnId,
 } from "@platforma-sdk/model";
 import { isBoolean, isPlainObject, isString } from "es-toolkit";
+import { isArray, isNumber } from "es-toolkit/compat";
 import type {
   AntigenControlConfig,
   BlockParams,
@@ -51,15 +52,12 @@ function check<T>(is: Guard<T>, must: string): Check<T> {
   return { is, must };
 }
 
-/** `Number.isFinite` already rejects non-numbers; this only adds the narrowing. */
-const isNumber: Guard<number> = (v): v is number => Number.isFinite(v);
-
 function oneOf<T extends string>(...allowed: readonly T[]): Guard<T> {
   return (v): v is T => allowed.includes(v as T);
 }
 
 function arrayOf<T>(item: Guard<T>): Guard<T[]> {
-  return (v): v is T[] => Array.isArray(v) && v.every((e) => item(e));
+  return (v): v is T[] => isArray(v) && v.every((e) => item(e));
 }
 
 /** Lifts a guard over a field the type declares optional. */
