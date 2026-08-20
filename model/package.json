@@ -1,6 +1,6 @@
 {
   "name": "@platforma-open/milaboratories.clonotype-enrichment.model",
-  "version": "4.1.3",
+  "version": "4.2.0",
   "private": true,
   "description": "Block model",
   "type": "module",
