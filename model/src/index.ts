@@ -4,6 +4,7 @@ import type {
   DownsamplingParameters,
   FilteringConfig,
 } from "@platforma-open/milaboratories.clonotype-enrichment.kind";
+import { kind } from "@platforma-open/milaboratories.clonotype-enrichment.kind";
 import type {
   AnchoredPColumnSelector,
   PColumnIdAndSpec,
@@ -12,12 +13,11 @@ import type {
   PlRef,
   SUniversalPColumnId,
 } from "@platforma-sdk/model";
-import { kind } from "@platforma-open/milaboratories.clonotype-enrichment.kind";
 import {
   Annotation,
   BlockModelV3,
-  DataColumn,
   ColumnsCollection,
+  DataColumn,
   DataModelBuilder,
   createPFrameForGraphs,
   createPlDataTableStateV2,
@@ -34,7 +34,7 @@ export type * from "@milaboratories/helpers";
 export type {
   AntigenControlConfig,
   DownsamplingParameters,
-  FilteringConfig,
+  FilteringConfig
 } from "@platforma-open/milaboratories.clonotype-enrichment.kind";
 
 type OldArgs = {
@@ -472,7 +472,7 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
     }
 
     // Pull sequence columns from result pool to show in the table
-    const anchor = ctx.data.abundanceRef;
+    const anchor = ctx.activeArgs?.abundanceRef;
     const enrichmentAxisName = pCols[0]?.spec.axesSpec[0]?.name;
     const allSeqCols = anchor
       ? ColumnsCollection(["result_pool"], { ctx: ctx.ctx })
