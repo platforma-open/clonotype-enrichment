@@ -34,7 +34,7 @@ export type * from "@milaboratories/helpers";
 export type {
   AntigenControlConfig,
   DownsamplingParameters,
-  FilteringConfig
+  FilteringConfig,
 } from "@platforma-open/milaboratories.clonotype-enrichment.kind";
 
 type OldArgs = {
