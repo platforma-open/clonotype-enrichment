@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment
 
+## 3.2.2
+
+### Patch Changes
+
+- 05d1812: Update SDK: PlAgDataTable no longer recreates its grid in an endless loop
+
 ## 3.2.1
 
 ### Patch Changes
