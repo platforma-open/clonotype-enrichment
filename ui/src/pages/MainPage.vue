@@ -519,6 +519,55 @@ const filteredTooMuch = asyncComputed(async () => {
   if (app.model.outputs.filteredTooMuch === true) return true;
 });
 
+const PARENT_COLUMN_LABELS: Record<string, string> = {
+  "pl7.app/repertoire/mutationCount": "mutation count",
+  "pl7.app/repertoire/parentLink": "parent link",
+};
+const UNIDENTIFIABLE_REASONS: Record<string, string> = {
+  "no-unmutated-variant": "no variant has zero mutations",
+  "several-unmutated-variants": "several variants have zero mutations",
+};
+
+const parentNormalization = computed(() => app.model.outputs.parentNormalization);
+
+const parentPartialMessage = computed(() => {
+  const state = parentNormalization.value;
+  if (state?.state !== "partial") return undefined;
+  const found = PARENT_COLUMN_LABELS[state.resolved];
+  const missing = Object.entries(PARENT_COLUMN_LABELS).find(
+    ([name]) => name !== state.resolved,
+  )?.[1];
+  return `The ${found} column was found, but the ${missing} column was not. Values are not normalized to the parent.`;
+});
+
+const parentRunNotes = computed(() => {
+  const state = parentNormalization.value;
+  if (state?.state !== "on") return [];
+  const notes: string[] = [];
+  const grains = [
+    { name: "variant", summary: state.summary },
+    { name: "protein", summary: state.proteinSummary },
+  ];
+  for (const { name, summary } of grains) {
+    for (const parent of summary?.unidentifiable ?? []) {
+      notes.push(
+        `Parent ${parent.parentId} (${name} level): ${UNIDENTIFIABLE_REASONS[parent.reason]}.`,
+      );
+    }
+    if (summary?.mode === "cancelled") {
+      notes.push(
+        `At ${name} level no parent term is subtracted: the values equal the variants' own Log2FC.`,
+      );
+    }
+    if (summary?.multiParentVariants) {
+      notes.push(
+        `${summary.multiParentVariants} variants (${name} level) belong to more than one parent and are not normalized.`,
+      );
+    }
+  }
+  return notes;
+});
+
 const availableToAdd = computed(() => {
   const current = new Set(app.model.data.conditionOrder);
   return effectiveConditionOptions.value.filter((opt) => !current.has(opt.value));
@@ -809,6 +858,15 @@ const isControlOrderOpen = ref(true); // Open by default
     <PlAlert v-if="filteredTooMuch === true" type="warn" icon>
       <template #title>Too few sequences</template>
       Current filters removed all sequences. Consider relaxing filter criteria.
+    </PlAlert>
+    <PlAlert v-if="parentNormalization?.state === 'on'" type="info" icon>
+      <template #title>Parent normalization is on</template>
+      Parent-normalized values are relative to each variant's own parent.
+      <div v-for="note in parentRunNotes" :key="note">{{ note }}</div>
+    </PlAlert>
+    <PlAlert v-if="parentPartialMessage" type="warn" icon>
+      <template #title>Parent normalization is off</template>
+      {{ parentPartialMessage }}
     </PlAlert>
     <PlAgDataTableV2
       v-model="app.model.data.tableState"

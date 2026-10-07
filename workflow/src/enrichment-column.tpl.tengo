@@ -1,9 +1,7 @@
 self := import("@platforma-sdk/workflow-tengo:tpl")
-ll := import("@platforma-sdk/workflow-tengo:ll")
 xsv := import("@platforma-sdk/workflow-tengo:pframes.xsv")
 pSpec := import("@platforma-sdk/workflow-tengo:pframes.spec")
 pframes := import("@platforma-sdk/workflow-tengo:pframes")
-text := import("text")
 
 pfEnrichmentConvExport := import(":pf-enrichment-conv-export")
 
