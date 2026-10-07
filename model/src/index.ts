@@ -25,7 +25,10 @@ import {
   getUniquePartitionKeys,
   readAnnotationJson,
 } from "@platforma-sdk/model";
+import type { ParentNormalization, ParentRunSummary } from "./parentNormalization";
+import { parentInputsState } from "./parentNormalization";
 export type * from "@milaboratories/helpers";
+export type { ParentNormalization, ParentRunSummary } from "./parentNormalization";
 
 // The analysis-configuration shapes are the block's init-params contract, so
 // they are declared by the kind and re-exported here: the model depends on the
@@ -519,6 +522,11 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
       )
       .map((col) => col.withSpecs({ annotations: { "pl7.app/table/visibility": "optional" } }));
 
+    const parentCols =
+      ctx.outputs
+        ?.resolve({ field: "parentTablePf", allowPermanentAbsence: true })
+        ?.getPColumns() ?? [];
+
     return createPlDataTableV3(ctx, {
       // Single primary: V3 anchors label discovery per primary column, and several
       // same-axis enrichment columns collide. They share one PFrame, so joining
@@ -526,6 +534,7 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
       primaryColumns: [DataColumn.fromColumn(pCols[0])],
       columns: [
         ...pCols.slice(1).map((c) => DataColumn.fromColumn(c)),
+        ...parentCols.map((c) => DataColumn.fromColumn(c)),
         ...mainSeqCols,
         ...otherRegionCols,
       ],
@@ -661,6 +670,30 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
     },
     { retentive: true },
   )
+
+  .output("parentNormalization", (ctx): ParentNormalization | undefined => {
+    const anchor = ctx.data.abundanceRef;
+    if (!anchor) return undefined;
+    const variantAxis = ctx.resultPool.getPColumnSpecByRef(anchor)?.axesSpec[1];
+    if (!variantAxis) return undefined;
+    const state = parentInputsState(
+      ctx.resultPool.getSpecs().entries.map((e) => e.obj),
+      variantAxis,
+    );
+    if (state.state !== "on") return state;
+
+    // A summary from a run on another dataset says nothing about this one.
+    if (JSON.stringify(ctx.activeArgs?.abundanceRef) !== JSON.stringify(anchor)) return state;
+    const summary = (field: string) =>
+      ctx.outputs
+        ?.resolve({ field, allowPermanentAbsence: true })
+        ?.getDataAsJson<ParentRunSummary>();
+    return {
+      state: "on",
+      summary: summary("parentSummary"),
+      proteinSummary: summary("proteinSummary"),
+    };
+  })
 
   .title(() => "Enrichment Analysis")
 

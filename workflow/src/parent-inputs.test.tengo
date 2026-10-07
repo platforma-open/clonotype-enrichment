@@ -1,0 +1,74 @@
+test := import("@platforma-sdk/workflow-tengo:test")
+parentInputs := import(":parent-inputs")
+
+variantAxis := func(alphabet, run) {
+	return {
+		name: "pl7.app/variantKey",
+		type: "String",
+		domain: {"pl7.app/repertoire/extractionRunId": run, "pl7.app/alphabet": alphabet},
+		annotations: {"pl7.app/label": alphabet}
+	}
+}
+
+parentAxis := {name: "pl7.app/repertoire/parentId", type: "String"}
+
+col := func(...axes) {
+	return {spec: {axesSpec: axes}}
+}
+
+nt := variantAxis("nucleotide", "run1")
+aa := variantAxis("aminoacid", "run1")
+otherAa := variantAxis("aminoacid", "run2")
+
+full := {
+	mutationCount: [col(nt)],
+	parentLink: [col(parentAxis, nt)],
+	aaToNt: [col(aa, nt)],
+	aaMutationCounts: [col(aa), col(otherAa)],
+	parentLinks: [col(parentAxis, nt), col(parentAxis, aa), col(parentAxis, otherAa)]
+}
+
+Test_sameAxis_ignores_annotations_not_domain := func() {
+	relabelled := variantAxis("nucleotide", "run1")
+	relabelled.annotations = {"pl7.app/label": "other"}
+	test.isTrue(parentInputs.sameAxis(nt, relabelled), "annotations must not matter")
+	test.isFalse(parentInputs.sameAxis(nt, aa), "alphabet domain must matter")
+	test.isFalse(parentInputs.sameAxis(parentAxis, nt), "names must matter")
+}
+
+Test_resolve_nucleotide_dataset_finds_both_grains := func() {
+	res := parentInputs.resolve(full, nt)
+	test.isTrue(res.parentMode, "parent mode on at the selected grain")
+	test.isEqual(parentAxis, res.parentAxis, "parent axis from the linker")
+	test.isTrue(res.pooling, "pooling on through the linker")
+	test.isTrue(parentInputs.sameAxis(aa, res.proteinAxis), "protein axis is the linker's other axis")
+	test.isTrue(res.aaParentMode, "aa parent found on the protein axis only")
+	test.isTrue(parentInputs.sameAxis(aa, res.aaMutationCount.spec.axesSpec[0]), "aa mutation count of this run")
+}
+
+Test_resolve_one_column_missing_turns_the_mode_off := func() {
+	res := parentInputs.resolve({mutationCount: [col(nt)], parentLink: []}, nt)
+	test.isFalse(res.parentMode, "parent link missing")
+	test.isTrue(!is_undefined(res.mutationCount), "the resolved column is still reported")
+	test.isFalse(res.pooling, "no linker, no pooling")
+}
+
+Test_resolve_several_matches_count_as_none := func() {
+	res := parentInputs.resolve({
+		mutationCount: [col(nt)],
+		parentLink: [col(parentAxis, nt), col(parentAxis, nt)],
+		aaToNt: [col(aa, nt), col(otherAa, nt)]
+	}, nt)
+	test.isFalse(res.parentMode, "two parent links")
+	test.isFalse(res.pooling, "two protein linkers")
+}
+
+Test_resolve_amino_acid_dataset_never_pools := func() {
+	res := parentInputs.resolve({
+		mutationCount: [col(aa)],
+		parentLink: [col(parentAxis, aa)],
+		aaToNt: [col(aa, nt)]
+	}, aa)
+	test.isTrue(res.parentMode, "parent mode on at amino-acid grain")
+	test.isFalse(res.pooling, "nothing beneath an amino-acid dataset")
+}

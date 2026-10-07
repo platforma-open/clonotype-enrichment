@@ -159,6 +159,61 @@ def filter_clonotypes_by_criteria(
         return aggregated_df
 
 
+CONTROL_PAIRS_SCHEMA = {
+    'elementId': pl.Utf8, 'antigen': pl.Utf8, 'numerator': pl.Utf8, 'denominator': pl.Utf8,
+    'enrichment': pl.Float64, 'numReads': pl.Float64, 'denReads': pl.Float64,
+}
+
+
+def write_counts(track_df: pl.DataFrame, condition_order: List[str], counts_csv: str) -> None:
+    """Each element's reads per condition, one column per condition, zero where unseen."""
+    if track_df.height == 0:
+        schema = {'elementId': pl.Utf8, **{c: pl.Float64 for c in condition_order}}
+        pl.DataFrame(schema=schema).write_csv(counts_csv)
+        return
+    counts = (
+        track_df
+        .group_by(['elementId', 'condition'])
+        .agg(pl.col('abundance').sum())
+        .pivot(values='abundance', index='elementId', on='condition', aggregate_function='sum')
+        .fill_null(0)
+    )
+    for condition in condition_order:
+        if condition not in counts.columns:
+            counts = counts.with_columns(pl.lit(0).alias(condition))
+    counts.select(['elementId'] + condition_order).sort('elementId').write_csv(counts_csv)
+
+
+def control_pair_rows(
+    antigen: str, antigen_pivot: pl.DataFrame, antigen_enrichment: pl.DataFrame, conditions: List[str]
+) -> List[pl.DataFrame]:
+    """One long frame per control-arm pair: the log2FC with the two read counts behind it."""
+    rows = []
+    for num_i in range(1, len(conditions)):
+        for den_j in range(num_i):
+            numerator, denominator = conditions[num_i], conditions[den_j]
+            rows.append(
+                antigen_pivot.select(
+                    'elementId',
+                    pl.col(numerator).cast(pl.Float64).alias('numReads'),
+                    pl.col(denominator).cast(pl.Float64).alias('denReads'),
+                )
+                .join(
+                    antigen_enrichment.select(
+                        'elementId', pl.col(f'Enrichment {numerator} vs {denominator}').alias('enrichment')
+                    ),
+                    on='elementId',
+                )
+                .with_columns(
+                    pl.lit(antigen).alias('antigen'),
+                    pl.lit(numerator).alias('numerator'),
+                    pl.lit(denominator).alias('denominator'),
+                )
+                .select(list(CONTROL_PAIRS_SCHEMA))
+            )
+    return rows
+
+
 def create_empty_outputs(
     condition_order: List[str],
     enrichment_csv: str,
@@ -271,6 +326,9 @@ def hybrid_enrichment_analysis(
     sequenced_library_enabled: bool = False,
     sequenced_library_antigen: Optional[str] = None,
     exclude_sequenced_library: bool = False,
+    element_map_csv: Optional[str] = None,
+    counts_csv: Optional[str] = None,
+    control_pairs_csv: Optional[str] = None,
 ) -> None:
     """
     Optimized hybrid enrichment analysis using polars for better performance and memory efficiency.
@@ -296,6 +354,18 @@ def hybrid_enrichment_analysis(
     # Force condition to be string to avoid type errors during comparison
     input_df = pl.scan_csv(input_data_csv, schema_overrides={"condition": pl.Utf8})
     schema = input_df.collect_schema()
+
+    # Before any aggregation: ratios must come from pooled reads, never from averaged ratios.
+    if element_map_csv:
+        element_map = pl.scan_csv(
+            element_map_csv, schema_overrides={"elementId": pl.Utf8, "mappedId": pl.Utf8}
+        ).select('elementId', 'mappedId').unique()
+        input_df = (
+            input_df.with_columns(pl.col('elementId').cast(pl.Utf8))
+            .join(element_map, on='elementId', how='inner')
+            .drop('elementId')
+            .rename({'mappedId': 'elementId'})
+        )
 
     # Normalize condition order and resolve sequenced library as base condition
     condition_order = [str(cond) for cond in condition_order]
@@ -338,6 +408,10 @@ def hybrid_enrichment_analysis(
         create_empty_outputs(effective_condition_order, enrichment_csv, bubble_csv,
                                 top_enriched_csv, top_10_csv, highest_enrichment_csv,
                                 filtered_too_much_txt)
+        if counts_csv:
+            write_counts(pl.DataFrame(), effective_condition_order, counts_csv)
+        if control_pairs_csv:
+            pl.DataFrame(schema=CONTROL_PAIRS_SCHEMA).write_csv(control_pairs_csv)
         return
 
     if clonotype_definition_csv:
@@ -448,6 +522,10 @@ def hybrid_enrichment_analysis(
         target_total_reads_dict = dict(zip(global_reads['condition'], global_reads['total_reads']))
         target_track_df = aggregated_df
 
+    # Before the filters: a parent the filters remove still has its reads reported.
+    if counts_csv:
+        write_counts(target_track_df, effective_condition_order, counts_csv)
+
     # Calculate track-specific n_clonotypes for normalization
     target_n_clonotypes = target_track_df.select('elementId').n_unique()
 
@@ -534,6 +612,7 @@ def hybrid_enrichment_analysis(
     # --- Negative Control Track Processing ---
     neg_control_columns: List[str] = []
     max_neg_enrichment_df = None
+    control_pairs: List[pl.DataFrame] = []
     if has_antigen and control_enabled and negative_antigens:
         neg_track_filter = pl.col('antigen').is_in(negative_antigens)
         if sequenced_library_enabled and sequenced_library_antigen is not None:
@@ -610,6 +689,10 @@ def hybrid_enrichment_analysis(
                     antigen_enrichment = _calculate_enrichments_vectorized(
                         antigen_pivot, available_conditions
                     )
+                    if control_pairs_csv:
+                        control_pairs.extend(control_pair_rows(
+                            neg_antigen, antigen_pivot, antigen_enrichment, available_conditions
+                        ))
                     # If no pairwise comparisons were possible, create a 0-filled max column
                     if 'MaxPositiveEnrichment' not in antigen_enrichment.collect_schema().names():
                         antigen_enrichment = antigen_enrichment.with_columns(
@@ -702,6 +785,12 @@ def hybrid_enrichment_analysis(
                 else:
                     max_neg_enrichment_df = present_df
                 neg_control_columns.append('PresentInNegControl')
+
+    if control_pairs_csv:
+        if control_pairs:
+            pl.concat(control_pairs).sort(['elementId', 'antigen', 'numerator', 'denominator']).write_csv(control_pairs_csv)
+        else:
+            pl.DataFrame(schema=CONTROL_PAIRS_SCHEMA).write_csv(control_pairs_csv)
 
     # Join negative control columns if calculated (right after control processing)
     if max_neg_enrichment_df is not None:
@@ -1277,6 +1366,12 @@ if __name__ == "__main__":
                         help="Antigen column value identifying library samples (used as base condition when enabled)")
     parser.add_argument("--exclude_sequenced_library", action="store_true",
                         help="Exclude library from the Shared (all conditions) filter requirement")
+    parser.add_argument("--element_map", required=False,
+                        help="CSV [elementId, mappedId]: pool reads under mappedId before any calculation")
+    parser.add_argument("--counts_out", required=False,
+                        help="Output CSV: reads per element per condition, target track, before filters")
+    parser.add_argument("--control_pairs_out", required=False,
+                        help="Output CSV: log2FC per control-arm pair with its read counts")
 
     args = parser.parse_args()
 
@@ -1311,5 +1406,8 @@ if __name__ == "__main__":
         current_target=args.current_target,
         sequenced_library_enabled=args.sequenced_library_enabled,
         sequenced_library_antigen=args.sequenced_library_antigen,
-        exclude_sequenced_library=args.exclude_sequenced_library
+        exclude_sequenced_library=args.exclude_sequenced_library,
+        element_map_csv=args.element_map,
+        counts_csv=args.counts_out,
+        control_pairs_csv=args.control_pairs_out,
     )

@@ -1,6 +1,37 @@
 ll := import("@platforma-sdk/workflow-tengo:ll")
 canonical := import("@platforma-sdk/workflow-tengo:canonical")
 
+baseDomain := func(conditionOrder, enrichmentThreshold, antigenControlConfig, filteringConfig, blockId) {
+  domain := {
+    "pl7.app/enrichment/filteringConfig": canonical.encode(filteringConfig),
+    "pl7.app/enrichment/conditionsOrder": canonical.encode(conditionOrder),
+    "pl7.app/enrichment/enrichmentThreshold": string(enrichmentThreshold),
+    "pl7.app/blockId": blockId
+  }
+  if antigenControlConfig.antigenEnabled {
+    domain["pl7.app/enrichment/antigenType"] = antigenControlConfig.targetAntigen
+    if antigenControlConfig.controlEnabled {
+      domain["pl7.app/enrichment/controlEnabled"] = "true"
+    }
+  }
+  return domain
+}
+
+// The domain of one enrichment value: `kind` is "max", "overall" or "comparison" (which takes the
+// "X vs Y" comparison as its extra argument).
+valueDomain := func(base, kind, conditionOrder, ...comparison) {
+  domain := copy(base)
+  domain["pl7.app/enrichment/type"] = kind
+  if kind == "overall" {
+    domain["pl7.app/enrichment/comparison"] = conditionOrder[len(conditionOrder) - 1] + " vs " + conditionOrder[0]
+    domain["pl7.app/comparison"] = "Overall Enrichment"
+  } else if kind == "comparison" {
+    ll.assert(len(comparison) == 1, "a comparison domain needs the comparison")
+    domain["pl7.app/enrichment/comparison"] = comparison[0]
+  }
+  return domain
+}
+
 getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percentile, downsampling, conditionOrder, enrichmentThreshold, antigenControlConfig, filteringConfig, blockId, ...opts) {
   ll.assert(len(opts) <= 1, "expected at most one options map")
 
@@ -17,33 +48,15 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percenti
     comparison = opts[0].comparison
   }
 
-  // Extract control info
-  enrichmentThresholdStr := string(enrichmentThreshold)
+  base := baseDomain(conditionOrder, enrichmentThreshold, antigenControlConfig, filteringConfig, blockId)
   controlThreshold := undefined
-  baseDomain := {
-    "pl7.app/enrichment/filteringConfig": canonical.encode(filteringConfig),
-    "pl7.app/enrichment/conditionsOrder": canonical.encode(conditionOrder),
-    "pl7.app/enrichment/enrichmentThreshold": enrichmentThresholdStr,
-    "pl7.app/blockId": blockId
-  }
-  if antigenControlConfig.antigenEnabled {
-    baseDomain["pl7.app/enrichment/antigenType"] = antigenControlConfig.targetAntigen
-    if antigenControlConfig.controlEnabled {
-      baseDomain["pl7.app/enrichment/controlEnabled"] = "true"
-      controlThreshold = string(antigenControlConfig.controlThreshold)
-    }
+  if antigenControlConfig.antigenEnabled && antigenControlConfig.controlEnabled {
+    controlThreshold = string(antigenControlConfig.controlThreshold)
   }
 
-  // Define columns for exports.
   // Main path: type=max (Max Log2FC). Per-comparison path: type=comparison plus
   // comparison=<X vs Y>, mirroring the Overall Log2FC disambiguation below.
-  enrichmentDomain := copy(baseDomain)
-  if comparison != undefined {
-    enrichmentDomain["pl7.app/enrichment/type"] = "comparison"
-    enrichmentDomain["pl7.app/enrichment/comparison"] = comparison
-  } else {
-    enrichmentDomain["pl7.app/enrichment/type"] = "max"
-  }
+  enrichmentDomain := comparison != undefined ? valueDomain(base, "comparison", conditionOrder, comparison) : valueDomain(base, "max", conditionOrder)
   columns := [{
         column: "Enrichment",
         id: "enrichment",
@@ -73,7 +86,7 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percenti
         spec: {
           name: "pl7.app/enrichmentQuality",
           valueType: "String",
-          domain: baseDomain,
+          domain: base,
           annotations: {
             "pl7.app/label": "Enrichment Quality",
             "pl7.app/isDiscreteFilter": "true",
@@ -87,11 +100,7 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percenti
         }
       }
 
-  // Prepare a domain map for overall Log2FC column
-  overallDomain := copy(baseDomain)
-  overallDomain["pl7.app/enrichment/type"] = "overall"
-  overallDomain["pl7.app/enrichment/comparison"] = conditionOrder[len(conditionOrder) - 1] + " vs " + conditionOrder[0]
-  overallDomain["pl7.app/comparison"] = "Overall Enrichment"
+  overallDomain := valueDomain(base, "overall", conditionOrder)
 
   // Overall Log2FC columns will have additional specs if target was selected
   overallColumn := {
@@ -116,7 +125,7 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percenti
 
   if antigenControlConfig.controlEnabled && len(opts) == 0 {
     // Prepare a domain map for binding specificity column
-    bindingDomain := copy(baseDomain)
+    bindingDomain := copy(base)
     bindingDomain["pl7.app/enrichment/controlThreshold"] = controlThreshold
 
     columns = columns + [{
@@ -159,5 +168,7 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percenti
 }
 
 export ll.toStrict({
+	baseDomain: baseDomain,
+	valueDomain: valueDomain,
 	getColumns: getColumns
 })

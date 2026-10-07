@@ -1,0 +1,136 @@
+// Finds the columns parent normalization and protein-grain pooling read, among the bundle's candidates.
+// Every input must resolve to exactly one column; several matches count as no match.
+
+ll := import("@platforma-sdk/workflow-tengo:ll")
+
+PARENT_ID_AXIS := "pl7.app/repertoire/parentId"
+ALPHABET := "pl7.app/alphabet"
+
+domainOf := func(axis) {
+	return is_undefined(axis.domain) ? {} : axis.domain
+}
+
+sameAxis := func(a, b) {
+	if a.name != b.name || a.type != b.type {
+		return false
+	}
+	da := domainOf(a)
+	db := domainOf(b)
+	if len(da) != len(db) {
+		return false
+	}
+	for k, v in da {
+		if db[k] != v {
+			return false
+		}
+	}
+	return true
+}
+
+single := func(cols, pred) {
+	if is_undefined(cols) {
+		return undefined
+	}
+	found := []
+	for col in cols {
+		if pred(col) {
+			found = append(found, col)
+		}
+	}
+	return len(found) == 1 ? found[0] : undefined
+}
+
+otherAxis := func(col, axis) {
+	for a in col.spec.axesSpec {
+		if !sameAxis(a, axis) {
+			return a
+		}
+	}
+	return undefined
+}
+
+parentAxisOf := func(linker) {
+	for a in linker.spec.axesSpec {
+		if a.name == PARENT_ID_AXIS {
+			return a
+		}
+	}
+	return undefined
+}
+
+isOnlyOn := func(axis) {
+	return func(col) {
+		return len(col.spec.axesSpec) == 1 && sameAxis(col.spec.axesSpec[0], axis)
+	}
+}
+
+isParentLinkOn := func(axis) {
+	return func(col) {
+		axes := col.spec.axesSpec
+		if len(axes) != 2 {
+			return false
+		}
+		return (sameAxis(axes[0], axis) && axes[1].name == PARENT_ID_AXIS) ||
+			(sameAxis(axes[1], axis) && axes[0].name == PARENT_ID_AXIS)
+	}
+}
+
+isProteinLinkOf := func(ntAxis) {
+	return func(col) {
+		axes := col.spec.axesSpec
+		if len(axes) != 2 {
+			return false
+		}
+		if !sameAxis(axes[0], ntAxis) && !sameAxis(axes[1], ntAxis) {
+			return false
+		}
+		other := otherAxis(col, ntAxis)
+		return !is_undefined(other) && other.name == ntAxis.name && domainOf(other)[ALPHABET] == "aminoacid"
+	}
+}
+
+/**
+ * @param candidates: {mutationCount, parentLink, aaToNt, aaMutationCounts, parentLinks}, each an array of
+ *   bundle columns ({spec, data}) or undefined
+ * @param variantAxis: the anchor's variant axis spec
+ * @return {parentMode, mutationCount, parentLink, parentAxis,
+ *          pooling, proteinLinker, proteinAxis,
+ *          aaParentMode, aaMutationCount, aaParentLink, aaParentAxis}
+ */
+resolve := func(candidates, variantAxis) {
+	res := {
+		parentMode: false,
+		pooling: false,
+		aaParentMode: false
+	}
+
+	res.mutationCount = single(candidates.mutationCount, isOnlyOn(variantAxis))
+	res.parentLink = single(candidates.parentLink, isParentLinkOn(variantAxis))
+	res.parentMode = !is_undefined(res.mutationCount) && !is_undefined(res.parentLink)
+	if res.parentMode {
+		res.parentAxis = parentAxisOf(res.parentLink)
+	}
+
+	if domainOf(variantAxis)[ALPHABET] != "nucleotide" {
+		return res
+	}
+	res.proteinLinker = single(candidates.aaToNt, isProteinLinkOf(variantAxis))
+	if is_undefined(res.proteinLinker) {
+		return res
+	}
+	res.pooling = true
+	res.proteinAxis = otherAxis(res.proteinLinker, variantAxis)
+
+	res.aaMutationCount = single(candidates.aaMutationCounts, isOnlyOn(res.proteinAxis))
+	res.aaParentLink = single(candidates.parentLinks, isParentLinkOn(res.proteinAxis))
+	res.aaParentMode = !is_undefined(res.aaMutationCount) && !is_undefined(res.aaParentLink)
+	if res.aaParentMode {
+		res.aaParentAxis = parentAxisOf(res.aaParentLink)
+	}
+	return res
+}
+
+export ll.toStrict({
+	sameAxis: sameAxis,
+	resolve: resolve
+})
