@@ -2,7 +2,14 @@
   "$schema": "https://unpkg.com/@changesets/config@3.0.5/schema.json",
   "changelog": "@changesets/cli/changelog",
   "commit": false,
-  "fixed": [],
+  "fixed": [
+    [
+      "@platforma-open/milaboratories.clonotype-enrichment",
+      "@platforma-open/milaboratories.clonotype-enrichment.model",
+      "@platforma-open/milaboratories.clonotype-enrichment.ui",
+      "@platforma-open/milaboratories.clonotype-enrichment.workflow"
+    ]
+  ],
   "linked": [],
   "access": "restricted",
   "baseBranch": "main",
