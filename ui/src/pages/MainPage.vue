@@ -1,6 +1,13 @@
 <script setup lang="ts">
-import type { PlRef, SUniversalPColumnId } from "@platforma-sdk/model";
-import { getRawPlatformaInstance, getSingleColumnData, type PObjectId } from "@platforma-sdk/model";
+import type { DatasetSelection, PlRef, SUniversalPColumnId } from "@platforma-sdk/model";
+import {
+  createDatasetSelection,
+  createPrimaryRef,
+  getRawPlatformaInstance,
+  getSingleColumnData,
+  plRefsEqual,
+  type PObjectId,
+} from "@platforma-sdk/model";
 import type { ListOption } from "@platforma-sdk/ui-vue";
 import {
   PlAccordion,
@@ -11,10 +18,10 @@ import {
   PlBtnGhost,
   PlBtnGroup,
   PlCheckbox,
+  PlDatasetSelector,
   PlDialogModal,
   PlDropdown,
   PlDropdownMulti,
-  PlDropdownRef,
   PlElementList,
   PlMaskIcon24,
   PlNumberField,
@@ -39,10 +46,19 @@ const statsOpen = ref(false);
 
 const mapToOptions = (values?: string[]) => values?.map((v) => ({ value: v, label: v })) ?? [];
 
-// Update page title by dataset
-function setInput(inputRef?: PlRef) {
-  app.model.data.abundanceRef = inputRef;
-}
+// The selector picks an abundance, or an abundance narrowed by one of its subset columns.
+// Stored as two refs so blocks saved before filters existed keep their `abundanceRef`.
+const abundanceSelection = computed<DatasetSelection | undefined>({
+  get: () => {
+    const { abundanceRef, filterRef } = app.model.data;
+    if (abundanceRef === undefined) return undefined;
+    return createDatasetSelection(createPrimaryRef(abundanceRef, filterRef));
+  },
+  set: (selection) => {
+    app.model.data.abundanceRef = selection?.primary.column;
+    app.model.data.filterRef = selection?.primary.filter;
+  },
+});
 
 // updating defaultBlockLabel
 watchEffect(() => {
@@ -653,9 +669,9 @@ watchEffect(() => {
 });
 
 // Track datasets and spec to prevent unwanted updates of values
-const syncAbundanceRef = ref(
-  app.model.data.abundanceRef ? JSON.stringify(app.model.data.abundanceRef) : undefined,
-);
+// Compared with plRefsEqual: the selector writes `abundanceRef` on filter-only changes too, and
+// stored refs come back with sorted keys, so string identity would read those as a new dataset.
+const syncAbundanceRef = ref<PlRef | undefined>(app.model.data.abundanceRef);
 const syncIsClustered = ref<boolean | undefined>(
   app.model.outputs.datasetSpec?.axesSpec !== undefined &&
     app.model.outputs.datasetSpec.axesSpec.length >= 2 &&
@@ -668,13 +684,15 @@ watchEffect(() => {
   const spec = app.model.outputs.datasetSpec;
 
   if (abundanceRef && spec?.axesSpec) {
-    const abundanceRefStr = JSON.stringify(abundanceRef);
     const isClustered = spec.axesSpec.length >= 2 && spec.axesSpec[1]?.name === "pl7.app/clusterId";
 
     // Reset to default if:
     // 1. The user switched to a DIFFERENT dataset.
     // 2. The dataset type (clustered vs regular) has changed (self-correction for lag).
-    if (abundanceRefStr !== syncAbundanceRef.value || isClustered !== syncIsClustered.value) {
+    const datasetChanged =
+      syncAbundanceRef.value === undefined ||
+      !plRefsEqual(abundanceRef, syncAbundanceRef.value, true);
+    if (datasetChanged || isClustered !== syncIsClustered.value) {
       if (isClustered) {
         app.model.data.FilteringConfig.baseFilter = "single-sample";
         app.model.data.FilteringConfig.minAbundance.enabled = false;
@@ -682,7 +700,7 @@ watchEffect(() => {
         app.model.data.FilteringConfig.baseFilter = "none";
         app.model.data.FilteringConfig.minAbundance.enabled = true;
       }
-      syncAbundanceRef.value = abundanceRefStr;
+      syncAbundanceRef.value = abundanceRef;
       syncIsClustered.value = isClustered;
     }
   }
@@ -821,13 +839,12 @@ const isControlOrderOpen = ref(true); // Open by default
 
   <PlSlideModal v-model="settingsAreShown">
     <template #title>Settings</template>
-    <PlDropdownRef
-      v-model="app.model.data.abundanceRef"
+    <PlDatasetSelector
+      v-model="abundanceSelection"
       :options="app.model.outputs.abundanceOptions"
       label="Select abundance"
       clearable
       required
-      @update:model-value="setInput"
     />
     <PlDropdown
       v-model="app.model.data.conditionColumnRef"

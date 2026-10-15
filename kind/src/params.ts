@@ -124,6 +124,7 @@ const COLUMN_ID = "a serialized column id";
  */
 const CONTRACT = {
   abundanceRef: check(isPlRef, REF),
+  filterRef: check(isPlRef, REF),
 
   conditionColumnRef: check(isColumnId, COLUMN_ID),
   conditionOrder: check(arrayOf(isString), "an array of strings"),
