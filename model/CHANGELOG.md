@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment.model
 
+## 4.2.2
+
+### Patch Changes
+
+- c1fdf8e: Fix missing frequency and pairwise enrichment columns in the main table: give each column a condition / comparison domain so the table does not collapse them as duplicates
+
 ## 4.2.1
 
 ### Patch Changes
