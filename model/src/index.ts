@@ -25,14 +25,14 @@ import {
   createPlDataTableV3,
   readAnnotationJson,
 } from "@platforma-sdk/model";
-import { findLegacyColumnRefReplacements, getMetadataOptions } from "./metadata_columns";
+import { getMetadataOptions } from "./metadata_columns";
 import {
   getComparisonOptions,
   getMetadataValuePickers,
   listPickedComparisons,
 } from "./metadata_values";
 export type * from "@milaboratories/helpers";
-export type { LegacyColumnRefReplacement, MetadataOption } from "./metadata_columns";
+export type { MetadataOption } from "./metadata_columns";
 export type { MetadataValuePickers, PickedValueOption } from "./metadata_values";
 
 // The analysis-configuration shapes are the block's init-params contract, so
@@ -336,17 +336,6 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
     const anchor = ctx.data.abundanceRef;
     if (anchor === undefined) return undefined;
     return getMetadataOptions(ctx, anchor);
-  })
-
-  // Condition and antigen columns picked by an older version of the block, with the ids of
-  // the same columns among the current options; the UI swaps the picks over.
-  .output("legacyMetadataColumnRefs", (ctx) => {
-    const { abundanceRef: anchor, conditionColumnRef, antigenControlConfig } = ctx.data;
-    if (anchor === undefined) return undefined;
-    return findLegacyColumnRefReplacements(ctx, anchor, [
-      conditionColumnRef,
-      antigenControlConfig.antigenColumnRef,
-    ]);
   })
 
   .output("datasetSpec", (ctx) => {

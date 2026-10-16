@@ -436,28 +436,6 @@ watchEffect(() => {
   }
 });
 
-// Columns picked by an older version of the block carry ids anchored to the abundance column.
-// They are swapped for the ids of the same columns among the current options. The swap keeps
-// the column, so it keeps the condition order and the picked antigens too; those were picked
-// as plain values, which no option carries, so they show as not available until picked again.
-const legacyColumnRefSwaps = new Map<string, string>();
-watchEffect(() => {
-  const replacements = app.model.outputs.legacyMetadataColumnRefs;
-  if (!replacements?.length) return;
-  const config = app.model.data.antigenControlConfig;
-  for (const { from, to } of replacements) {
-    legacyColumnRefSwaps.set(from, to);
-    if (app.model.data.conditionColumnRef === from) {
-      conditionSyncCol.value = to;
-      app.model.data.conditionColumnRef = to;
-    }
-    if (config.antigenColumnRef === from) {
-      controlSyncCol.value = to;
-      config.antigenColumnRef = to;
-    }
-  }
-});
-
 /** Picks no sample of the abundance input carries any more, by the setting they are picked in. */
 const unavailable = computed(() => pickers.value?.unavailable);
 
@@ -592,8 +570,7 @@ watchEffect(() => {
 // selections survive component remount.
 watch(
   () => app.model.data.antigenControlConfig.antigenColumnRef,
-  (next, prev) => {
-    if (prev !== undefined && legacyColumnRefSwaps.get(prev) === next) return;
+  () => {
     const config = app.model.data.antigenControlConfig;
     config.targetAntigen = undefined;
     config.negativeAntigens = [];

@@ -1,35 +1,10 @@
-import type {
-  AnchoredPColumnId,
-  ColumnRecipe,
-  ColumnUniversalId,
-  PColumnSpec,
-  PlRef,
-  RenderCtxBase,
-  SUniversalPColumnId,
-} from "@platforma-sdk/model";
-import {
-  ColumnsCollection,
-  canonicalizeJson,
-  deriveColumnOptions,
-  getAxisId,
-  isAnchoredPColumnId,
-  matchAxis,
-  parseJsonSafely,
-} from "@platforma-sdk/model";
+import type { ColumnRecipe, ColumnUniversalId, PlRef, RenderCtxBase } from "@platforma-sdk/model";
+import { ColumnsCollection, deriveColumnOptions, getAxisId, matchAxis } from "@platforma-sdk/model";
 
 /** A sample-metadata column offered in the condition and antigen pickers. */
 export type MetadataOption = {
   value: ColumnUniversalId;
   label: string;
-};
-
-/**
- * A picked column id written by an older version of the block — anchored to the abundance
- * column — and the id of the same column among the current metadata options.
- */
-export type LegacyColumnRefReplacement = {
-  from: SUniversalPColumnId;
-  to: ColumnUniversalId;
 };
 
 /**
@@ -50,36 +25,6 @@ export function getMetadataOptions(
     value: option.id,
     label: option.label,
   }));
-}
-
-/**
- * For every picked id written by an older version of the block, the id of the same column
- * among the current metadata options, matched by column name, domain and axes. A legacy id
- * that matches no option, or more than one, is left out: the column has to be picked again.
- */
-export function findLegacyColumnRefReplacements(
-  ctx: RenderCtxBase,
-  abundanceRef: PlRef,
-  columnRefs: readonly (SUniversalPColumnId | undefined)[],
-): LegacyColumnRefReplacement[] {
-  const legacyRefs = columnRefs.filter(
-    (ref): ref is SUniversalPColumnId =>
-      ref !== undefined && parseLegacyAnchoredId(ref) !== undefined,
-  );
-  if (legacyRefs.length === 0) return [];
-
-  const options = findMetadataColumns(ctx, abundanceRef)?.columns ?? [];
-  const replacements: LegacyColumnRefReplacement[] = [];
-  for (const from of legacyRefs) {
-    const legacyId = parseLegacyAnchoredId(from);
-    if (legacyId === undefined) continue;
-    const column = ctx.resultPool.getAnchoredPColumns({ main: abundanceRef }, legacyId)?.[0];
-    if (column === undefined) continue;
-    const identity = columnIdentity(column.spec);
-    const matches = options.filter((column) => columnIdentity(column.getSpec()) === identity);
-    if (matches.length === 1) replacements.push({ from, to: matches[0].id });
-  }
-  return replacements;
 }
 
 /**
@@ -107,16 +52,3 @@ export function findMetadataColumns(
 // Internals
 
 const METADATA_COLUMN_NAME = "pl7.app/metadata";
-
-function parseLegacyAnchoredId(columnRef: string): AnchoredPColumnId | undefined {
-  const parsed = parseJsonSafely(columnRef);
-  return isAnchoredPColumnId(parsed) ? parsed : undefined;
-}
-
-function columnIdentity(spec: PColumnSpec): string {
-  return canonicalizeJson({
-    name: spec.name,
-    domain: spec.domain ?? {},
-    axes: spec.axesSpec.map(getAxisId),
-  });
-}
