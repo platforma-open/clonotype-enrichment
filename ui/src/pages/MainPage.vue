@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import type { PlRef, SUniversalPColumnId } from "@platforma-sdk/model";
-import { getRawPlatformaInstance, getSingleColumnData, type PObjectId } from "@platforma-sdk/model";
+import type { PickedValueOption } from "@platforma-open/milaboratories.clonotype-enrichment.model";
+import type { PlRef } from "@platforma-sdk/model";
+import { getRawPlatformaInstance } from "@platforma-sdk/model";
 import type { ListOption } from "@platforma-sdk/ui-vue";
 import {
   PlAccordion,
   PlAccordionSection,
   PlAgDataTableV2,
   PlAlert,
+  PlBlockDependencies,
   PlBlockPage,
   PlBtnGhost,
   PlBtnGroup,
@@ -23,7 +25,6 @@ import {
   PlSlideModal,
   PlTooltip,
   usePlDataTableSettingsV2,
-  useWatchFetch,
 } from "@platforma-sdk/ui-vue";
 import { asyncComputed } from "@vueuse/core";
 import { computed, ref, watch, watchEffect } from "vue";
@@ -37,7 +38,51 @@ const showSettings = () => {
 };
 const statsOpen = ref(false);
 
-const mapToOptions = (values?: string[]) => values?.map((v) => ({ value: v, label: v })) ?? [];
+/**
+ * Options of the condition and antigen value pickers, while they describe the columns and the
+ * target picked now. The model output follows the picks with a lag; until it catches up the
+ * pickers show as loading.
+ */
+const pickers = computed(() => {
+  const pickers = app.model.outputs.metadataValuePickers;
+  if (pickers === undefined) return undefined;
+  const { conditionColumnRef, antigenControlConfig: config } = app.model.data;
+  const { computedFor } = pickers;
+  const isCurrent =
+    computedFor.conditionColumnRef === conditionColumnRef &&
+    computedFor.antigenColumnRef === config.antigenColumnRef;
+  return isCurrent ? pickers : undefined;
+});
+
+/** Labels of every value the pickers offer and of every pick they report as not available. */
+const valueLabels = computed(() => {
+  const p = pickers.value;
+  if (p === undefined) return undefined;
+  const { unavailable } = p;
+  const options: PickedValueOption[] = [
+    ...p.conditions,
+    ...p.conditionsExcludedByTarget,
+    ...p.rounds,
+    ...p.controlConditions,
+    ...p.targetAntigens,
+    ...p.negativeAntigens,
+    ...p.libraryAntigens,
+    ...unavailable.conditions,
+    ...unavailable.controlConditions,
+    ...unavailable.negativeAntigens,
+    ...(unavailable.targetAntigen === undefined ? [] : [unavailable.targetAntigen]),
+    ...(unavailable.libraryAntigen === undefined ? [] : [unavailable.libraryAntigen]),
+  ];
+  return new Map(options.map((option) => [option.value, option.label]));
+});
+
+/** What the user sees for a picked condition or antigen value. */
+const labelOf = (value: string) => {
+  const labels = valueLabels.value;
+  if (labels === undefined) return "…";
+  return labels.get(value) ?? "Value not available";
+};
+const labelsOf = (options: readonly PickedValueOption[]) => options.map((o) => o.label);
 
 // Update page title by dataset
 function setInput(inputRef?: PlRef) {
@@ -46,6 +91,8 @@ function setInput(inputRef?: PlRef) {
 
 // updating defaultBlockLabel
 watchEffect(() => {
+  // Picked values are named by their labels, which arrive with the model outputs.
+  if (valueLabels.value === undefined) return;
   const conditionOrder = app.model.data.conditionOrder;
   const clonotypeDefinition = app.model.data.clonotypeDefinition;
   const sequenceColumnOptions = app.model.outputs.sequenceColumnOptions;
@@ -69,16 +116,15 @@ watchEffect(() => {
 
   // Add condition order
   if (conditionOrder && conditionOrder.length > 0) {
-    const conditionLabel = conditionOrder.join("-");
+    const conditionLabel = conditionOrder.map(labelOf).join("-");
     label = label ? `${label}, ${conditionLabel}` : conditionLabel;
   }
 
   // Add target antigen if defined
   const antigenControlConfig = app.model.data.antigenControlConfig;
   if (antigenControlConfig.targetAntigen && antigenControlConfig.antigenEnabled) {
-    label = label
-      ? `${label}, ${antigenControlConfig.targetAntigen}`
-      : antigenControlConfig.targetAntigen;
+    const targetLabel = labelOf(antigenControlConfig.targetAntigen);
+    label = label ? `${label}, ${targetLabel}` : targetLabel;
   }
 
   // Add filtering mode at the end
@@ -118,132 +164,18 @@ const tableLoadingText = computed(() => {
   return "Loading";
 });
 
-type MetadataFetched = {
-  conditionValues: string[];
-  conditionBySample?: Record<string, string>;
-  antigenBySample?: Record<string, string>;
-  /** Refs/IDs the fetched data corresponds to. Used to detect staleness
-   * during column switches: `useWatchFetch` keeps the previous value until
-   * the new fetch settles, so consumers must check this before acting.
-   * We store the refs (not just IDs) because refs update synchronously with
-   * user actions, whereas output-derived IDs may lag. */
-  fetchedFor: {
-    conditionColumnRef: SUniversalPColumnId | undefined;
-    antigenColumnRef: SUniversalPColumnId | undefined;
-  };
-};
+/** Conditions the order can hold: all of them, or, with a target, those of its samples. */
+const effectiveConditionOptions = computed(() => pickers.value?.conditions ?? []);
 
-/** Fetch metadata column data once from the pframe and derive all metadata-derived lists. Filter by sampleIds when available so only samples in the abundance input are used. */
-const metadataFetched = useWatchFetch(
-  () => ({
-    pframe: app.model.outputs.metadataColumnsPframe,
-    columnIds: app.model.outputs.metadataColumnIds,
-    sampleIds: app.model.outputs.sampleIds as string[] | undefined,
-  }),
-  async ({ pframe: pframeHandle, columnIds, sampleIds }) => {
-    if (!pframeHandle || !columnIds?.conditionColId) return undefined;
-
-    // Snapshot the refs that triggered this fetch, synchronously before any
-    // await. The fetched data is authoritative only for these refs — if the
-    // user has since changed them, consumers must skip until a fresh fetch.
-    const fetchedFor = {
-      conditionColumnRef: app.model.data.conditionColumnRef,
-      antigenColumnRef: app.model.data.antigenControlConfig.antigenColumnRef,
-    };
-
-    // Helper to extract data mapped by sample ID
-    const buildBySample = (colData: {
-      axesData: Record<string, (string | number | null)[]>;
-      data: (string | number | null)[];
-    }) => {
-      const axisKeys = Object.keys(colData.axesData);
-      if (!axisKeys.length) return {};
-      const sampleKey = axisKeys[0];
-      const out: Record<string, string> = {};
-      for (let i = 0; i < colData.data.length; i++) {
-        const sampleId = colData.axesData[sampleKey]?.[i];
-        const val = colData.data[i];
-        if (sampleId != null && val != null) out[String(sampleId)] = String(val);
-      }
-      return out;
-    };
-
-    // Always fetch condition column full data (sample id → value) for conditionBySample
-    const conditionColData = await getSingleColumnData(
-      pframeHandle,
-      columnIds.conditionColId as PObjectId,
-    );
-    let conditionBySample = buildBySample(conditionColData);
-
-    let antigenBySample: Record<string, string> | undefined;
-    if (columnIds.antigenColId) {
-      const antigenColData = await getSingleColumnData(
-        pframeHandle,
-        columnIds.antigenColId as PObjectId,
-      );
-      antigenBySample = buildBySample(antigenColData);
-    }
-
-    // Restrict to samples present in the abundance input (sampleIds from trace)
-    if (sampleIds?.length) {
-      const sampleIdSet = new Set(sampleIds);
-      conditionBySample = Object.fromEntries(
-        Object.entries(conditionBySample).filter(([id]) => sampleIdSet.has(id)),
-      );
-      if (antigenBySample) {
-        antigenBySample = Object.fromEntries(
-          Object.entries(antigenBySample).filter(([id]) => sampleIdSet.has(id)),
-        );
-      }
-    }
-
-    // Unique condition values from the (possibly filtered) condition map
-    const conditionValues = [...new Set(Object.values(conditionBySample))]
-      .filter(Boolean)
-      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
-
-    return {
-      conditionValues,
-      conditionBySample,
-      antigenBySample,
-      fetchedFor,
-    } satisfies MetadataFetched;
-  },
-);
-
-/** Condition values valid for the main order: all in dataset or only those in samples for the selected target antigen. */
-const effectiveConditionValues = computed(() => {
-  const raw = metadataFetched.value;
-  if (!raw?.conditionValues?.length) return [];
-  if (!raw.conditionBySample || !raw.antigenBySample) return raw.conditionValues;
-  const config = app.model.data.antigenControlConfig;
-  if (!config?.antigenEnabled || !config.targetAntigen) return raw.conditionValues;
-  // Restrict to conditions present in samples that have the selected target antigen
-  const target = config.targetAntigen;
-  const conditionsForTarget = new Set<string>();
-  for (const [sampleId, antigenValue] of Object.entries(raw.antigenBySample)) {
-    if (antigenValue === target) {
-      const c = raw.conditionBySample[sampleId];
-      if (c) conditionsForTarget.add(c);
-    }
-  }
-  return [...conditionsForTarget];
-});
-const effectiveConditionOptions = computed(() => mapToOptions(effectiveConditionValues.value));
-
-/** Conditions present in the experiment but excluded from the order because they are not in samples for the selected target antigen. */
-const conditionsExcludedByTarget = computed(() => {
-  const raw = metadataFetched.value;
-  const config = app.model.data.antigenControlConfig;
-  if (!raw?.conditionValues?.length || !config?.antigenEnabled || !config.targetAntigen) return [];
-  const effective = effectiveConditionValues.value;
-  const effectiveSet = new Set(effective);
-  return raw.conditionValues.filter((c) => !effectiveSet.has(c));
-});
+/** Conditions left out of the order because no sample of the selected target has them. */
+const conditionsExcludedByTarget = computed(() => pickers.value?.conditionsExcludedByTarget ?? []);
 
 /** Stable key for current excluded conditions (persists across page changes; alert re-shows when key changes). */
 const conditionsExcludedAlertKey = computed(() =>
-  [...conditionsExcludedByTarget.value].sort().join(","),
+  conditionsExcludedByTarget.value
+    .map((option) => option.value)
+    .sort()
+    .join(","),
 );
 
 const conditionsExcludedAlertVisible = computed({
@@ -266,168 +198,39 @@ watch(conditionsExcludedAlertKey, (key) => {
   }
 });
 
-/** Options for condition order list and present-in-rounds filter (current order). */
-const conditionOrderOptions = computed(() => mapToOptions([...app.model.data.conditionOrder]));
+/** Options of the present-in-rounds filter: the conditions of the current order. */
+const conditionOrderOptions = computed(() => pickers.value?.rounds);
 
-/** Antigens map to their conditions. */
-const antigenConditionsMap = computed(() => {
-  const raw = metadataFetched.value;
-  if (!raw?.conditionBySample || !raw?.antigenBySample) return undefined;
-  const counts: Record<string, Set<string>> = {};
-  for (const [sampleId, antigenValue] of Object.entries(raw.antigenBySample)) {
-    if (!counts[antigenValue]) counts[antigenValue] = new Set();
-    const c = raw.conditionBySample[sampleId];
-    if (c) counts[antigenValue].add(c);
-  }
-  return counts;
-});
+/** Options of the target, negative control and library dropdowns. */
+const antigenValues = computed(() => pickers.value?.targetAntigens);
+const negativeAntigenValues = computed(() => pickers.value?.negativeAntigens);
+const libraryAntigenValues = computed(() => pickers.value?.libraryAntigens);
 
-/** Antigens valid as Target. By default require >=2 conditions. When a sequenced library is
- * enabled, relax to >=1 */
-const antigenValuesList = computed(() => {
-  const map = antigenConditionsMap.value;
-  if (!map) return [];
-  const config = app.model.data.antigenControlConfig;
-  const libraryFallback = config.sequencedLibraryEnabled && !!config.sequencedLibraryAntigen;
-  return Object.entries(map)
-    .filter(
-      ([antigen, conditions]) =>
-        antigen !== config.sequencedLibraryAntigen && (conditions.size >= 2 || libraryFallback),
-    )
-    .map(([antigen]) => antigen);
-});
-const antigenValues = computed(() => {
-  const list = antigenValuesList.value;
-  const current = app.model.data.antigenControlConfig.targetAntigen;
-  // If we're loading or have a value not in the list (temporary state), include it to avoid UI error
-  if (current && !list.includes(current)) {
-    return mapToOptions([current, ...list]);
-  }
-  return mapToOptions(list);
-});
-
-/** Antigen options excluding the selected target (for negative control dropdown). */
-const negativeAntigenValues = computed(() => {
-  const current = app.model.data.antigenControlConfig.negativeAntigens;
-  const target = app.model.data.antigenControlConfig.targetAntigen;
-  const map = antigenConditionsMap.value;
-  if (!map) {
-    // During loading, show current selections if any
-    return mapToOptions(current || []);
-  }
-  // Use all antigens (>= 1 condition), not just those with >= 2 conditions
-  const allAntigens = Object.keys(map);
-  const filtered = allAntigens.filter((v) => v !== target);
-
-  // Ensure currently selected antigens are in the list (e.g. if one was removed from metadata)
-  const list = [...new Set([...filtered, ...current])];
-  return mapToOptions(list);
-});
-
-/** Antigen options excluding target and negative controls (for sequenced library dropdown). */
-const libraryAntigenValues = computed(() => {
-  const current = app.model.data.antigenControlConfig.sequencedLibraryAntigen;
-  const target = app.model.data.antigenControlConfig.targetAntigen;
-  const negatives = new Set(app.model.data.antigenControlConfig.negativeAntigens);
-  const map = antigenConditionsMap.value;
-  if (!map) {
-    // During loading, show current selection if any
-    return mapToOptions(current ? [current] : []);
-  }
-  const allAntigens = Object.keys(map);
-  const filtered = allAntigens.filter((v) => v !== target && !negatives.has(v));
-
-  // Ensure currently selected antigen is in the list
-  const list = current && !filtered.includes(current) ? [current, ...filtered] : filtered;
-  return mapToOptions(list);
-});
-
-const hasSingleSampleNegativeControl = computed(() => {
-  const map = antigenConditionsMap.value;
-  const config = app.model.data.antigenControlConfig;
-  return (
-    !!map &&
-    config.controlEnabled &&
-    config.negativeAntigens.some((a: string) => (map[a]?.size ?? 0) === 1)
-  );
-});
-
-const hasMultiSampleNegativeControl = computed(() => {
-  const map = antigenConditionsMap.value;
-  const config = app.model.data.antigenControlConfig;
-  return (
-    !!map &&
-    config.controlEnabled &&
-    config.negativeAntigens.some((a: string) => (map[a]?.size ?? 0) > 1)
-  );
-});
-
-/** Condition values in samples that have the selected negative control antigens. */
-const negativeControlConditionValues = computed(() => {
-  const raw = metadataFetched.value;
-  if (!raw?.conditionBySample || !raw?.antigenBySample) return [];
-  const config = app.model.data.antigenControlConfig;
-  if (!config?.controlEnabled || !config.negativeAntigens?.length) return [];
-  const negSet = new Set(config.negativeAntigens);
-  const conditions = new Set<string>();
-  for (const [sampleId, antigenValue] of Object.entries(raw.antigenBySample)) {
-    if (negSet.has(antigenValue)) {
-      const c = raw.conditionBySample[sampleId];
-      if (c) conditions.add(c);
-    }
-  }
-  return [...conditions];
-});
-const negativeControlConditionOptions = computed(() =>
-  mapToOptions(negativeControlConditionValues.value),
+const targetAntigenLabel = computed(
+  () => pickers.value?.unavailable.targetAntigen?.label ?? "Value",
+);
+const libraryAntigenLabel = computed(
+  () => pickers.value?.unavailable.libraryAntigen?.label ?? "Value",
 );
 
-/** Antigens whose samples have empty condition values (for error reporting). */
-const antigensWithEmptyConditions = computed(() => {
-  const raw = metadataFetched.value;
-  if (!raw?.conditionBySample || !raw?.antigenBySample) return [];
+/** Conditions of the samples of the selected negative controls. */
+const negativeControlConditionOptions = computed(() => pickers.value?.controlConditions ?? []);
 
-  const config = app.model.data.antigenControlConfig;
-  const checkSet = new Set<string>();
-  if (config.antigenEnabled && config.targetAntigen) checkSet.add(config.targetAntigen);
-  if (config.controlEnabled && config.negativeAntigens?.length) {
-    config.negativeAntigens.forEach((a) => checkSet.add(a));
-  }
+/** Picked target and negative controls some of whose samples have no condition. */
+const antigensWithEmptyConditions = computed(
+  () => pickers.value?.antigensWithEmptyConditions ?? [],
+);
 
-  if (checkSet.size === 0) return [];
+/** Whether a negative control is present in a single condition, and in several. */
+const hasSingleSampleNegativeControl = computed(
+  () => pickers.value?.negativeControls.single ?? false,
+);
+const hasMultiSampleNegativeControl = computed(
+  () => pickers.value?.negativeControls.multi ?? false,
+);
 
-  const found = new Set<string>();
-  for (const [sampleId, antigen] of Object.entries(raw.antigenBySample)) {
-    if (checkSet.has(antigen) && !raw.conditionBySample[sampleId]) {
-      found.add(antigen);
-    }
-  }
-  return [...found];
-});
-
-// Generate comparison options based on condition order
-// Creates all possible numerator-denominator pairs where numerator comes after denominator
-const comparisonOptions = computed(() => {
-  let order = [...app.model.data.conditionOrder];
-  if (app.model.data.antigenControlConfig.sequencedLibraryEnabled) {
-    order = ["0 - Library", ...order.filter((c) => c !== "0 - Library")];
-  }
-  if (order.length < 2) return [];
-
-  const comparisons = [];
-  for (let num_i = 1; num_i < order.length; num_i++) {
-    for (let den_j = 0; den_j < num_i; den_j++) {
-      const numerator = order[num_i];
-      const denominator = order[den_j];
-      const comparisonName = `${numerator} vs ${denominator}`;
-      comparisons.push({
-        value: comparisonName,
-        label: comparisonName,
-      });
-    }
-  }
-  return comparisons;
-});
+/** Comparisons the condition order produces: every condition against each one before it. */
+const comparisonOptions = computed(() => app.model.outputs.comparisonOptions ?? []);
 
 // const comparisonsMessage = computed(() => {
 //   if (comparisonOptions.value.length === 0) {
@@ -471,10 +274,22 @@ const downsamplingOptions: ListOption<string | undefined>[] = [
 // Function to create statistics table HTML
 const createStatsTable = () => {
   const stats = [
-    { label: "Minimum enrichment", value: app.model.outputs.enrichmentStats?.minValue || "" },
-    { label: "Maximum enrichment", value: app.model.outputs.enrichmentStats?.maxValue || "" },
-    { label: "Mean enrichment", value: app.model.outputs.enrichmentStats?.meanValue || "" },
-    { label: "Median enrichment", value: app.model.outputs.enrichmentStats?.medianValue || "" },
+    {
+      label: "Minimum enrichment",
+      value: app.model.outputs.enrichmentStats?.minValue || "",
+    },
+    {
+      label: "Maximum enrichment",
+      value: app.model.outputs.enrichmentStats?.maxValue || "",
+    },
+    {
+      label: "Mean enrichment",
+      value: app.model.outputs.enrichmentStats?.meanValue || "",
+    },
+    {
+      label: "Median enrichment",
+      value: app.model.outputs.enrichmentStats?.medianValue || "",
+    },
     {
       label: "Enrichment score cutoff",
       value: app.model.outputs.enrichmentStats?.cutoffValue || "",
@@ -530,15 +345,15 @@ const availableToAddToControl = computed(() => {
 });
 
 const resetConditionOrder = () => {
-  const vals = effectiveConditionValues.value;
-  if (vals?.length) {
-    app.model.data.conditionOrder = [...vals];
+  const vals = effectiveConditionOptions.value.map((option) => option.value);
+  if (vals.length) {
+    app.model.data.conditionOrder = vals;
   }
 };
 
 const resetControlConditionOrder = () => {
-  const vals = negativeControlConditionValues.value;
-  if (vals?.length) {
+  const vals = negativeControlConditionOptions.value.map((option) => option.value);
+  if (vals.length) {
     const mainOrder = app.model.data.conditionOrder;
     const orderMap = new Map(mainOrder.map((v, i) => [v, i]));
     const sorted = [...vals].sort((a, b) => {
@@ -567,7 +382,7 @@ const isWholeSequenceInput = computed(() => {
 });
 
 /**
- * Synchronization logic to initialize and validate condition orders.
+ * Synchronization logic to initialize condition orders.
  *
  * We need to distinguish between two scenarios:
  * 1. Component remounting (e.g., switching pages in UI): We MUST preserve any custom order
@@ -577,48 +392,22 @@ const isWholeSequenceInput = computed(() => {
  * 2. Active user changes (e.g., selecting a new column or dataset): We MUST reset the order
  *    to default values (all available categories) because the previous order is no longer
  *    relevant or contains invalid entries from a different column.
+ *
+ * A picked value that is no longer among the available ones (its samples left the input, or
+ * the metadata changed upstream) stays in the order and is marked as not available. The block
+ * that produced the column sees which of its values this block still uses only while they
+ * stay picked.
  */
-
-/** True when `metadataFetched.value` reflects the currently selected condition column.
- * `useWatchFetch` returns the previous fetch result until the new one settles, so
- * sync logic that reads `metadataFetched` must skip while stale to avoid committing
- * old-column values against a new-column tracker.
- * We compare against `args.conditionColumnRef` (not an output-derived ID) because
- * args update synchronously with user actions — output recomputation may lag. */
-const fetchedForCurrentConditionCol = computed(() => {
-  const fetched = metadataFetched.value;
-  if (!fetched) return true; // nothing fetched yet — guard by `vals.length > 0`
-  return fetched.fetchedFor.conditionColumnRef === app.model.data.conditionColumnRef;
-});
-
-const fetchedForCurrentAntigenCol = computed(() => {
-  const fetched = metadataFetched.value;
-  if (!fetched) return true;
-  return (
-    fetched.fetchedFor.antigenColumnRef === app.model.data.antigenControlConfig.antigenColumnRef
-  );
-});
 
 const conditionSyncCol = ref<string | undefined>(app.model.data.conditionColumnRef);
 watchEffect(() => {
   const col = app.model.data.conditionColumnRef;
-  const vals = effectiveConditionValues.value;
+  const vals = effectiveConditionOptions.value.map((option) => option.value);
 
-  if (!fetchedForCurrentConditionCol.value) return;
-
-  if (vals && vals.length > 0) {
-    const current = app.model.data.conditionOrder;
-    const valSet = new Set(vals);
-
-    // If the current order contains values that are no longer valid (e.g. not present in samples
-    // for the selected target antigen), remove them but preserve order.
-    const hasInvalidItems = current.some((v) => !valSet.has(v));
-
-    if (col !== conditionSyncCol.value || current.length === 0) {
-      app.model.data.conditionOrder = [...vals];
+  if (vals.length > 0) {
+    if (col !== conditionSyncCol.value || app.model.data.conditionOrder.length === 0) {
+      app.model.data.conditionOrder = vals;
       conditionSyncCol.value = col;
-    } else if (hasInvalidItems) {
-      app.model.data.conditionOrder = current.filter((v) => valSet.has(v));
     }
   }
 });
@@ -628,17 +417,12 @@ const controlSyncCol = ref<string | undefined>(
 );
 watchEffect(() => {
   const col = app.model.data.antigenControlConfig.antigenColumnRef;
-  const vals = negativeControlConditionValues.value;
+  const vals = negativeControlConditionOptions.value.map((option) => option.value);
 
-  if (!fetchedForCurrentAntigenCol.value) return;
-
-  if (vals && vals.length > 0) {
+  if (vals.length > 0) {
     const current = app.model.data.antigenControlConfig.controlConditionsOrder;
-    const valSet = new Set(vals);
 
-    const hasInvalidItems = current.some((v) => !valSet.has(v));
-
-    if (col !== controlSyncCol.value || current.length === 0 || hasInvalidItems) {
+    if (col !== controlSyncCol.value || current.length === 0) {
       const mainOrder = app.model.data.conditionOrder;
       const orderMap = new Map(mainOrder.map((v, i) => [v, i]));
       const sorted = [...vals].sort((a, b) => {
@@ -650,6 +434,45 @@ watchEffect(() => {
       controlSyncCol.value = col;
     }
   }
+});
+
+/** Picks no sample of the abundance input carries any more, by the setting they are picked in. */
+const unavailable = computed(() => pickers.value?.unavailable);
+
+const unavailableConditions = computed(
+  () => new Set(unavailable.value?.conditions.map((option) => option.value)),
+);
+const unavailableControlConditions = computed(
+  () => new Set(unavailable.value?.controlConditions.map((option) => option.value)),
+);
+const unavailableLibraryAntigen = computed(() => unavailable.value?.libraryAntigen);
+
+/** Selected comparisons that the current condition order no longer produces. */
+const unavailableComparisons = computed(() => {
+  const available = new Set(comparisonOptions.value.map((o) => o.value));
+  return app.model.data.additionalEnrichmentExports.filter((v) => !available.has(v));
+});
+
+/**
+ * Picked values the workflow still receives although no sample of the abundance input carries
+ * them, grouped by the setting they are picked in.
+ */
+const unavailablePicks = computed(() => {
+  const picks = unavailable.value;
+  if (picks === undefined) return [];
+  const groups: { setting: string; values: PickedValueOption[] }[] = [
+    { setting: "Conditions", values: picks.conditions },
+    { setting: "Negative control conditions", values: picks.controlConditions },
+    { setting: "Target", values: picks.targetAntigen === undefined ? [] : [picks.targetAntigen] },
+    { setting: "Negative controls", values: picks.negativeAntigens },
+    {
+      setting: "Library",
+      values: picks.libraryAntigen === undefined ? [] : [picks.libraryAntigen],
+    },
+  ];
+  return groups
+    .filter((group) => group.values.length > 0)
+    .map((group) => ({ setting: group.setting, values: labelsOf(group.values) }));
 });
 
 // Track datasets and spec to prevent unwanted updates of values
@@ -700,11 +523,14 @@ watch(
 
 // Sync control flags to model
 watchEffect(() => {
-  if (app.model.data.antigenControlConfig) {
-    app.model.data.antigenControlConfig.hasSingleConditionNegativeControl =
-      hasSingleSampleNegativeControl.value;
-    app.model.data.antigenControlConfig.hasMultiConditionNegativeControl =
-      hasMultiSampleNegativeControl.value;
+  const controls = pickers.value?.negativeControls;
+  if (controls === undefined) return;
+  const config = app.model.data.antigenControlConfig;
+  if (config.hasSingleConditionNegativeControl !== controls.single) {
+    config.hasSingleConditionNegativeControl = controls.single;
+  }
+  if (config.hasMultiConditionNegativeControl !== controls.multi) {
+    config.hasMultiConditionNegativeControl = controls.multi;
   }
 });
 
@@ -724,16 +550,22 @@ watchEffect(() => {
   const current = app.model.data.antigenControlConfig.sequencedLibraryAntigen;
 
   if (key !== librarySyncKey.value) {
-    // User changed target or negative controls — clear if no longer valid
-    if (current && !libraryAntigenValues.value.some((opt) => opt.value === current)) {
-      app.model.data.antigenControlConfig.sequencedLibraryAntigen = undefined;
+    // User changed target or negative controls — clear the library once it is the target or
+    // one of the negative controls. A library missing from the data stays picked and marked as
+    // not available.
+    const config = app.model.data.antigenControlConfig;
+    if (
+      current &&
+      (current === config.targetAntigen || config.negativeAntigens.includes(current))
+    ) {
+      config.sequencedLibraryAntigen = undefined;
     }
     librarySyncKey.value = key;
   }
 });
 
 // Clear antigen-valued selections when the antigen column itself changes.
-// These hold string values from the selected column, so a different column
+// These hold values of the selected column, so a different column
 // invalidates them outright. Plain `watch` doesn't fire on mount, so persisted
 // selections survive component remount.
 watch(
@@ -746,17 +578,27 @@ watch(
   },
 );
 
-// Drop stale comparison-export selections when the valid comparison set changes
-// (condition column change, condition reorder, target-antigen filter, sequenced
-// library toggle). Keyed on the option list so reorders are caught too.
-const validComparisonsKey = computed(() => comparisonOptions.value.map((o) => o.value).join(","));
-watch(validComparisonsKey, () => {
-  const validSet = new Set(comparisonOptions.value.map((o) => o.value));
-  const current = app.model.data.additionalEnrichmentExports;
-  const filtered = current.filter((v) => validSet.has(v));
-  if (filtered.length !== current.length) {
-    app.model.data.additionalEnrichmentExports = filtered;
-  }
+// Picking a target removes the conditions that have no samples of that target from the order,
+// once the pickers are built for that target. Conditions that leave the data on their own stay
+// in the order and are marked as not available.
+const pruneOrderForTarget = ref<{ target: string | undefined }>();
+watch(
+  () => app.model.data.antigenControlConfig.targetAntigen,
+  (target) => {
+    pruneOrderForTarget.value = { target };
+  },
+);
+watchEffect(() => {
+  const pending = pruneOrderForTarget.value;
+  const p = pickers.value;
+  if (pending === undefined || p === undefined) return;
+  if (p.computedFor.targetAntigen !== pending.target) return;
+  pruneOrderForTarget.value = undefined;
+  const excluded = new Set<string>(p.conditionsExcludedByTarget.map((option) => option.value));
+  if (excluded.size === 0) return;
+  const current = app.model.data.conditionOrder;
+  const pruned = current.filter((v) => !excluded.has(v));
+  if (pruned.length !== current.length) app.model.data.conditionOrder = pruned;
 });
 
 // Drop stale "present in rounds" selections when the condition order changes.
@@ -787,6 +629,7 @@ const isControlOrderOpen = ref(true); // Open by default
     :subtitle-placeholder="app.model.data.defaultBlockLabel"
     title="Enrichment Analysis"
   >
+    <PlBlockDependencies :handle="app.plugins.dependencies.handle" />
     <template #append>
       <PlBtnGhost @click.stop="() => (statsOpen = true)">
         Stats
@@ -821,6 +664,17 @@ const isControlOrderOpen = ref(true); // Open by default
 
   <PlSlideModal v-model="settingsAreShown">
     <template #title>Settings</template>
+    <PlAlert v-if="unavailablePicks.length > 0" type="error" icon>
+      <template #title>Selected values are missing from the data</template>
+      No sample of the input carries these values any more:
+      <ul>
+        <li v-for="group in unavailablePicks" :key="group.setting">
+          <strong>{{ group.setting }}:</strong> {{ group.values.join(", ") }}
+        </li>
+      </ul>
+      The analysis results will be wrong until they are removed or replaced, or the condition order
+      is reset to default.
+    </PlAlert>
     <PlDropdownRef
       v-model="app.model.data.abundanceRef"
       :options="app.model.outputs.abundanceOptions"
@@ -832,14 +686,17 @@ const isControlOrderOpen = ref(true); // Open by default
     <PlDropdown
       v-model="app.model.data.conditionColumnRef"
       :options="app.model.outputs.metadataOptions"
+      :disabled="app.model.data.abundanceRef === undefined"
       label="Condition column"
+      clearable
       required
     />
 
     <PlAlert v-if="antigensWithEmptyConditions.length > 0" type="error">
-      Some samples matching the <b>{{ antigensWithEmptyConditions.join(", ") }}</b> antigen have
-      empty values in the condition column. Please provide valid condition names in your metadata to
-      include these samples in the analysis.
+      Some samples matching the
+      <b>{{ labelsOf(antigensWithEmptyConditions).join(", ") }}</b> antigen have empty values in the
+      condition column. Please provide valid condition names in your metadata to include these
+      samples in the analysis.
     </PlAlert>
 
     <PlAccordion multiple>
@@ -866,10 +723,16 @@ const isControlOrderOpen = ref(true); // Open by default
         </div>
         <PlElementList v-model:items="app.model.data.conditionOrder">
           <template #item-title="{ item }">
-            {{ item }}
+            {{ labelOf(item) }}
+            <span v-if="unavailableConditions.has(item)" class="unavailable-value">
+              not available
+            </span>
           </template>
         </PlElementList>
-        <PlBtnGhost v-if="availableToAdd.length > 0" @click="resetConditionOrder">
+        <PlBtnGhost
+          v-if="availableToAdd.length > 0 || unavailableConditions.size > 0"
+          @click="resetConditionOrder"
+        >
           Reset to default
           <template #append>
             <PlMaskIcon24 name="reverse" />
@@ -882,7 +745,7 @@ const isControlOrderOpen = ref(true); // Open by default
           closeable
         >
           When <strong>Target</strong> is defined, only target-specific conditions are allowed.
-          Removed: {{ conditionsExcludedByTarget.join(", ") }}.
+          Removed: {{ labelsOf(conditionsExcludedByTarget).join(", ") }}.
         </PlAlert>
       </PlAccordionSection>
     </PlAccordion>
@@ -906,8 +769,9 @@ const isControlOrderOpen = ref(true); // Open by default
           enriched when its Log2FC between conditions is ≥ this value.
         </p>
         <p>
-          This value is used to define <strong>Enrichment quality</strong> categories in combination
-          to data-derived percentiles (q):
+          This value is used to define
+          <strong>Enrichment quality</strong> categories in combination to data-derived percentiles
+          (q):
         </p>
         <p>
           - High threshold: Max Log2FC greater than maximum between enrichment q75 and E<sub
@@ -965,7 +829,9 @@ const isControlOrderOpen = ref(true); // Open by default
       v-if="app.model.data.antigenControlConfig.antigenEnabled"
       v-model="app.model.data.antigenControlConfig.antigenColumnRef"
       :options="app.model.outputs.metadataOptions"
+      :disabled="app.model.data.abundanceRef === undefined"
       label="Antigen column"
+      clearable
       required
     />
     <PlDropdown
@@ -975,18 +841,21 @@ const isControlOrderOpen = ref(true); // Open by default
       "
       v-model="app.model.data.antigenControlConfig.targetAntigen"
       :options="antigenValues"
+      :missing-value-label="`${targetAntigenLabel} — not available`"
       label="Target"
     />
     <PlRow v-if="app.model.data.antigenControlConfig.controlEnabled">
       <PlDropdown
         v-model="app.model.data.antigenControlConfig.targetAntigen"
         :options="antigenValues"
+        :missing-value-label="`${targetAntigenLabel} — not available`"
         label="Target"
       />
       <PlDropdownMulti
         v-model="app.model.data.antigenControlConfig.negativeAntigens"
         :style="{ minWidth: '148px' }"
         :options="negativeAntigenValues"
+        missing-value-label="Antigen not available"
         label="Negative control(s)"
       />
     </PlRow>
@@ -1011,18 +880,20 @@ const isControlOrderOpen = ref(true); // Open by default
       v-if="
         app.model.data.antigenControlConfig.antigenEnabled &&
         app.model.data.antigenControlConfig.sequencedLibraryEnabled &&
-        (libraryAntigenValues.length > 0 || !metadataFetched.value)
+        (libraryAntigenValues === undefined ||
+          libraryAntigenValues.length > 0 ||
+          unavailableLibraryAntigen !== undefined)
       "
       v-model="app.model.data.antigenControlConfig.sequencedLibraryAntigen"
       :options="libraryAntigenValues"
+      :missing-value-label="`${libraryAntigenLabel} — not available`"
       label="Library"
     />
     <PlAlert
       v-if="
         app.model.data.antigenControlConfig.antigenEnabled &&
         app.model.data.antigenControlConfig.sequencedLibraryEnabled &&
-        libraryAntigenValues.length === 0 &&
-        metadataFetched.value
+        libraryAntigenValues?.length === 0
       "
       type="error"
       icon
@@ -1057,10 +928,16 @@ const isControlOrderOpen = ref(true); // Open by default
         </div>
         <PlElementList v-model:items="app.model.data.antigenControlConfig.controlConditionsOrder">
           <template #item-title="{ item }">
-            {{ item }}
+            {{ labelOf(item) }}
+            <span v-if="unavailableControlConditions.has(item)" class="unavailable-value">
+              not available
+            </span>
           </template>
         </PlElementList>
-        <PlBtnGhost v-if="availableToAddToControl.length > 0" @click="resetControlConditionOrder">
+        <PlBtnGhost
+          v-if="availableToAddToControl.length > 0 || unavailableControlConditions.size > 0"
+          @click="resetControlConditionOrder"
+        >
           Reset to default
           <template #append>
             <PlMaskIcon24 name="reverse" />
@@ -1331,6 +1208,14 @@ const isControlOrderOpen = ref(true); // Open by default
       <PlDropdownMulti
         v-model="app.model.data.additionalEnrichmentExports"
         :options="comparisonOptions"
+        :error="
+          unavailableComparisons.length > 0
+            ? `Not produced by the current condition order, so not exported: ${unavailableComparisons.join(
+                ', ',
+              )}`
+            : undefined
+        "
+        missing-value-label="Comparison not available"
         label="Export specific comparisons"
       >
         <template #tooltip>
@@ -1372,3 +1257,11 @@ const isControlOrderOpen = ref(true); // Open by default
     <div style="margin-top: 0px" v-html="createStatsTable()" />
   </PlDialogModal>
 </template>
+
+<style scoped>
+.unavailable-value {
+  margin-left: 8px;
+  color: var(--txt-error);
+  font-style: italic;
+}
+</style>

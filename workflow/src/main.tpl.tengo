@@ -92,6 +92,8 @@ wf.prepare(func(args){
 	}
 })
 
+// Picked condition and antigen values arrive as column value ids; the body works with the
+// plain values they carry.
 wf.body(func(args) {
 
 	// Load input parameters and related variables
@@ -520,4 +522,4 @@ wf.body(func(args) {
 		outputs: outputs,
 		exports: exportsMap
 	}
-})
+}, {unwrapValues: true})

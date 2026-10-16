@@ -57,15 +57,22 @@ export type AntigenControlConfig = {
  * column chosen is an ordinary state the UI reaches, so export has to be able to
  * write it and apply has to be able to take it back; a contract that demanded
  * `abundanceRef` would make export and apply stop being inverses. Whether a
- * configuration is runnable is settled by the model's `args` lambda, not here.
+ * configuration is runnable is settled by the model's `argsValidation`, not here.
  *
- * The column ids carried here (`conditionColumnRef`, `clonotypeDefinition`, the
- * antigen column inside `antigenControlConfig`) are anchored against
- * `abundanceRef` and so mean something only relative to it. They travel because
- * they are ordinary user configuration — the recipe a template exists to
- * reproduce — and whether a given id still resolves after the template lands is
- * settled by the block's own outputs and `args`, the same as after any upstream
- * change.
+ * The condition column (`conditionColumnRef`) and the antigen column inside
+ * `antigenControlConfig` are result-pool column ids, which name the block that
+ * produced the column; ids anchored against `abundanceRef`, written by earlier
+ * versions of the block, are still accepted. The `clonotypeDefinition` ids are
+ * anchored against `abundanceRef` and so mean something only relative to it.
+ * The picked condition and antigen values (`conditionOrder`, the present-in-rounds
+ * rounds, and the target, control and library antigens with the control
+ * conditions) are column value ids of those columns, which name the block that
+ * produced each value. Plain values, written by earlier versions of the block,
+ * are kept but match no option, so they show as not available.
+ * All of them travel because they are ordinary user configuration — the recipe
+ * a template exists to reproduce — and whether a given id still resolves after
+ * the template lands is settled by the block's own outputs and `argsValidation`,
+ * the same as after any upstream change.
  */
 export type BlockParams = {
   // Input wiring — a PlRef a template engine fills from an earlier entry's output.

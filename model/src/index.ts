@@ -6,7 +6,7 @@ import type {
 } from "@platforma-open/milaboratories.clonotype-enrichment.kind";
 import { kind } from "@platforma-open/milaboratories.clonotype-enrichment.kind";
 import type {
-  AnchoredPColumnSelector,
+  ArgsIssue,
   PColumnIdAndSpec,
   PFrameHandle,
   PlDataTableStateV2,
@@ -16,16 +16,24 @@ import type {
 import {
   Annotation,
   BlockModelV3,
+  blockDependencies,
   ColumnsCollection,
   DataColumn,
   DataModelBuilder,
   createPFrameForGraphs,
   createPlDataTableStateV2,
   createPlDataTableV3,
-  getUniquePartitionKeys,
   readAnnotationJson,
 } from "@platforma-sdk/model";
+import { getMetadataOptions } from "./metadata_columns";
+import {
+  getComparisonOptions,
+  getMetadataValuePickers,
+  listPickedComparisons,
+} from "./metadata_values";
 export type * from "@milaboratories/helpers";
+export type { MetadataOption } from "./metadata_columns";
+export type { MetadataValuePickers, PickedValueOption } from "./metadata_values";
 
 // The analysis-configuration shapes are the block's init-params contract, so
 // they are declared by the kind and re-exported here: the model depends on the
@@ -206,38 +214,13 @@ const dataModel = new DataModelBuilder({ kind })
 
 export const platforma = BlockModelV3.create({ dataModel, kind })
 
+  // Args are derived from incomplete data too: a field with nothing picked stays undefined or
+  // empty. Whether they are ready to run is settled by `argsValidation`.
   .args((data) => {
-    const { abundanceRef, conditionColumnRef, conditionOrder, antigenControlConfig } = data;
-
-    if (!abundanceRef) throw new Error("Abundance is required");
-    if (!conditionColumnRef) throw new Error("Condition column is required");
-    if (!conditionOrder.length) throw new Error("Conditions are required");
-    if (data.enrichmentThreshold < 0.6) throw new Error("Enrichment threshold must be ≥ 0.6");
-
-    if (antigenControlConfig.antigenEnabled || antigenControlConfig.controlEnabled) {
-      if (!antigenControlConfig.antigenColumnRef) throw new Error("Antigen column is required");
-    }
-
-    if (antigenControlConfig.antigenEnabled) {
-      if (!antigenControlConfig.targetAntigen) throw new Error("Target antigen is required");
-    }
-
-    if (antigenControlConfig.controlEnabled) {
-      if (
-        !antigenControlConfig.antigenEnabled ||
-        !antigenControlConfig.negativeAntigens.length ||
-        antigenControlConfig.controlConditionsOrder.length < 1 ||
-        antigenControlConfig.singleControlFrequencyThreshold === undefined
-      )
-        throw new Error("Control configuration is incomplete");
-    }
-
-    if (antigenControlConfig.sequencedLibraryEnabled) {
-      if (!antigenControlConfig.sequencedLibraryAntigen)
-        throw new Error("Library antigen is required");
-    } else {
-      if (conditionOrder.length <= 1) throw new Error("At least 2 conditions are required");
-    }
+    // A comparison picked for export stays in the data after the condition order changes, but
+    // the analysis only computes comparisons of the current order; one it does not compute
+    // would fail the run.
+    const producedComparisons = new Set(listPickedComparisons(data));
 
     return {
       defaultBlockLabel: data.defaultBlockLabel,
@@ -249,11 +232,51 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
       FilteringConfig: data.FilteringConfig,
       clonotypeDefinition: data.clonotypeDefinition,
       clonotypeAbundanceRef: data.clonotypeAbundanceRef,
-      additionalEnrichmentExports: data.additionalEnrichmentExports,
+      additionalEnrichmentExports: data.additionalEnrichmentExports.filter((comparison) =>
+        producedComparisons.has(comparison),
+      ),
       antigenControlConfig: data.antigenControlConfig,
       enrichmentThreshold: data.enrichmentThreshold,
       pseudoCount: data.pseudoCount,
     };
+  })
+
+  .argsValidation(({ data }) => {
+    const { conditionOrder, antigenControlConfig } = data;
+    const issues: ArgsIssue[] = [];
+    const error = (message: string) => issues.push({ severity: "error", message });
+
+    if (!data.abundanceRef) error("Abundance is required");
+    if (!data.conditionColumnRef) error("Condition column is required");
+    if (!conditionOrder.length) error("Conditions are required");
+    if (data.enrichmentThreshold < 0.6) error("Enrichment threshold must be ≥ 0.6");
+
+    if (antigenControlConfig.antigenEnabled || antigenControlConfig.controlEnabled) {
+      if (!antigenControlConfig.antigenColumnRef) error("Antigen column is required");
+    }
+
+    if (antigenControlConfig.antigenEnabled) {
+      if (!antigenControlConfig.targetAntigen) error("Target antigen is required");
+    }
+
+    if (antigenControlConfig.controlEnabled) {
+      if (
+        !antigenControlConfig.antigenEnabled ||
+        !antigenControlConfig.negativeAntigens.length ||
+        antigenControlConfig.controlConditionsOrder.length < 1 ||
+        antigenControlConfig.singleControlFrequencyThreshold === undefined
+      )
+        error("Control configuration is incomplete");
+    }
+
+    if (antigenControlConfig.sequencedLibraryEnabled) {
+      if (!antigenControlConfig.sequencedLibraryAntigen) error("Library antigen is required");
+    } else if (conditionOrder.length === 1) {
+      // An empty order is already reported as missing conditions.
+      error("At least 2 conditions are required");
+    }
+
+    return issues;
   })
 
   // Inverse of `init` — the same fields, projected back out for template export.
@@ -312,12 +335,7 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
   .output("metadataOptions", (ctx) => {
     const anchor = ctx.data.abundanceRef;
     if (anchor === undefined) return undefined;
-    return ctx.resultPool.getCanonicalOptions({ main: anchor }, [
-      {
-        axes: [{ anchor: "main", idx: 0 }],
-        name: "pl7.app/metadata",
-      },
-    ]);
+    return getMetadataOptions(ctx, anchor);
   })
 
   .output("datasetSpec", (ctx) => {
@@ -383,71 +401,12 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
   })
 
   /** PFrame with condition column and (when antigen enabled) antigen column for UI to fetch metadata values. */
-  .output("metadataColumnsPframe", (ctx) => {
-    const { conditionColumnRef, abundanceRef: anchor, antigenControlConfig: config } = ctx.data;
-    if (!conditionColumnRef || !anchor) return undefined;
+  // Options of the condition and antigen value pickers, built from the values of the picked
+  // columns among the samples of the abundance input.
+  .output("metadataValuePickers", (ctx) => getMetadataValuePickers(ctx, ctx.data))
 
-    // Resolve condition column from anchor + selector
-    const conditionCols = ctx.resultPool.getAnchoredPColumns(
-      { main: anchor },
-      JSON.parse(conditionColumnRef) as AnchoredPColumnSelector,
-    );
-    const conditionCol = conditionCols?.[0];
-    if (!conditionCol) return undefined;
-
-    const columns = [conditionCol];
-    // Add antigen column when target/control selection is enabled
-    if (config?.antigenEnabled && config.antigenColumnRef) {
-      const antigenCols = ctx.resultPool.getAnchoredPColumns(
-        { main: anchor },
-        JSON.parse(config.antigenColumnRef) as AnchoredPColumnSelector,
-      );
-      const antigenCol = antigenCols?.[0];
-      if (antigenCol) columns.push(antigenCol);
-    }
-
-    return ctx.createPFrame(columns);
-  })
-
-  // Returns the IDs for the condition column (conditionColId) and the antigen column (antigenColId) by resolving them from the block arguments.
-  .output("metadataColumnIds", (ctx) => {
-    const { conditionColumnRef, abundanceRef: anchor, antigenControlConfig: config } = ctx.data;
-    if (!conditionColumnRef || !anchor) return undefined;
-
-    const conditionCols = ctx.resultPool.getAnchoredPColumns(
-      { main: anchor },
-      JSON.parse(conditionColumnRef) as AnchoredPColumnSelector,
-    );
-    const conditionColId = conditionCols?.[0]?.id;
-
-    let antigenColId: string | undefined;
-    if (config?.antigenEnabled && config.antigenColumnRef) {
-      const antigenCols = ctx.resultPool.getAnchoredPColumns(
-        { main: anchor },
-        JSON.parse(config.antigenColumnRef) as AnchoredPColumnSelector,
-      );
-      antigenColId = antigenCols?.[0]?.id;
-    }
-
-    return { conditionColId, antigenColId };
-  })
-
-  // Sample IDs that participate in the abundance column. Read partition keys
-  // from the abundance column data: it is partitioned on `pl7.app/sampleId`
-  // (axis 0), so the partition keys at that index are the sample IDs.
-  // Avoids relying on the upstream dataset's `pl7.app/axisKeys/0` annotation,
-  // which carries `sampleGroupId` (not `sampleId`) for `MultiplexedFastq`.
-  .output("sampleIds", (ctx) => {
-    const { abundanceRef } = ctx.data;
-    if (!abundanceRef) return undefined;
-    const pCol = ctx.resultPool.getPColumnByRef(abundanceRef);
-    if (!pCol) return undefined;
-    const sampleAxisIdx = pCol.spec.axesSpec.findIndex((a) => a.name === "pl7.app/sampleId");
-    if (sampleAxisIdx < 0) return undefined;
-    const keysPerAxis = getUniquePartitionKeys(pCol.data);
-    if (!keysPerAxis || sampleAxisIdx >= keysPerAxis.length) return undefined;
-    return keysPerAxis[sampleAxisIdx].map((v) => String(v));
-  })
+  // Comparisons the condition order produces, offered for export.
+  .output("comparisonOptions", (ctx) => getComparisonOptions(ctx.data))
 
   // Get all enrichment statistics
   .output("enrichmentStats", (ctx) => {
@@ -517,7 +476,11 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
       .filter(
         (col) => readAnnotationJson(col.getSpec(), Annotation.VDJ.IsAssemblingFeature) === false,
       )
-      .map((col) => col.withSpecs({ annotations: { "pl7.app/table/visibility": "optional" } }));
+      .map((col) =>
+        col.withSpecs({
+          annotations: { "pl7.app/table/visibility": "optional" },
+        }),
+      );
 
     return createPlDataTableV3(ctx, {
       // Single primary: V3 anchors label discovery per primary column, and several
@@ -662,6 +625,8 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
     { retentive: true },
   )
 
+  .plugin(blockDependencies)
+
   .title(() => "Enrichment Analysis")
 
   .subtitle((ctx) => ctx.data.customBlockLabel || ctx.data.defaultBlockLabel)
@@ -680,13 +645,21 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
         (ctx.data.antigenControlConfig.sequencedLibraryEnabled === true &&
           ctx.data.antigenControlConfig.controlConditionsOrder.length === 1)
       ) {
-        sections.push({ type: "link", href: "/scatter", label: "Control Scatter Plot" });
+        sections.push({
+          type: "link",
+          href: "/scatter",
+          label: "Control Scatter Plot",
+        });
       }
       if (
         ctx.data.antigenControlConfig.sequencedLibraryEnabled === false &&
         ctx.data.antigenControlConfig.controlConditionsOrder.length === 1
       ) {
-        sections.push({ type: "link", href: "/box", label: "Control Box Plot" });
+        sections.push({
+          type: "link",
+          href: "/box",
+          label: "Control Box Plot",
+        });
       }
     }
 

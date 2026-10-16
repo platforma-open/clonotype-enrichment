@@ -67,11 +67,13 @@ function optional<T>(item: Guard<T>): Guard<T | undefined> {
 
 /**
  * A column identifier as this block stores it: a canonically serialized JSON
- * key. `isColumnUniversalId` covers the four key forms the SDK's id encoding
- * uses, but every column id here comes from `resultPool.getCanonicalOptions`,
- * which mints an *anchored* key — a shape none of those four recognizes even
- * though the SDK types it `SUniversalPColumnId`. Both forms are accepted, or
- * the kind would refuse ids the block itself writes.
+ * key. The condition and antigen columns are result-pool column ids, which name
+ * the block that produced the column — forms `isColumnUniversalId` covers. The
+ * clonotype-definition columns, and condition and antigen columns picked by
+ * earlier versions of the block, carry an *anchored* key minted by
+ * `resultPool.getCanonicalOptions` — a shape `isColumnUniversalId` does not
+ * recognize even though the SDK types it `SUniversalPColumnId`. Both forms are
+ * accepted, or the kind would refuse ids the block itself writes.
  */
 const isColumnId: Guard<SUniversalPColumnId> = (v): v is SUniversalPColumnId =>
   isString(v) && (isColumnUniversalId(v) || isAnchoredPColumnId(parseJsonSafely(v)));
