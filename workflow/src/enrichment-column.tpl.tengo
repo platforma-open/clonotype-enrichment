@@ -76,8 +76,10 @@ self.body(func(args) {
     // Determine the label for condition order trace
     conditionOrderLabel := customBlockLabel || defaultBlockLabel
 
-    // Add two traces, one for the condition order and one for the downsampling
-    trace := pSpec.makeTrace(abundanceSpec,
+    // Add two traces, one for the condition order and one for the downsampling.
+    // A subset run roots the trace in the filter (dataset -> the block that made the subset).
+    traceSpec := is_undefined(args.traceSpec) ? abundanceSpec : args.traceSpec
+    trace := pSpec.makeTrace(traceSpec,
         {
             type: "milaboratories.clonotype-enrichment.condition-order",
             importance: 35,
@@ -89,10 +91,19 @@ self.body(func(args) {
             label: label
         })
 
+    // Trace, plus the subset stamp on a subset run (its outputs cover only the subset)
+    finalSpec := func(spec) {
+        s := trace.inject(spec)
+        if !is_undefined(args.subset) {
+            s.domain["pl7.app/inputSubset"] = args.subset
+        }
+        return s
+    }
+
     res := undefined
     if specLabel != undefined {
         res = {
-            columnSpec: trace.inject(exportFile["enrichment.spec"]),
+            columnSpec: finalSpec(exportFile["enrichment.spec"]),
             columnData: exportFile["enrichment.data"],
             overallSpec: "empty",
             overallData: "empty",
@@ -103,16 +114,16 @@ self.body(func(args) {
         }
     } else {
         res = {
-            columnSpec: trace.inject(exportFile["enrichment.spec"]),
+            columnSpec: finalSpec(exportFile["enrichment.spec"]),
             columnData: exportFile["enrichment.data"],
-            overallSpec: trace.inject(exportFile["overall_log2fc.spec"]),
+            overallSpec: finalSpec(exportFile["overall_log2fc.spec"]),
             overallData: exportFile["overall_log2fc.data"],
-            enrichmentQualitySpec: trace.inject(exportFile["enrichment_quality.spec"]),
+            enrichmentQualitySpec: finalSpec(exportFile["enrichment_quality.spec"]),
             enrichmentQualityData: exportFile["enrichment_quality.data"]
         }
 
         if antigenControlConfig != undefined && antigenControlConfig.controlEnabled == true {
-            res.bindingSpecificitySpec = trace.inject(exportFile["binding_specificity.spec"])
+            res.bindingSpecificitySpec = finalSpec(exportFile["binding_specificity.spec"])
             res.bindingSpecificityData = exportFile["binding_specificity.data"]
         } else {
             res.bindingSpecificitySpec = "empty"

@@ -16,7 +16,7 @@ self.body(func(args) {
         mean: string(args.mean.getData())
     }
 
-    exportColumnRender := render.create(enrichmentColumnTpl, {
+    exportColumnInputs := {
         min: args.min,
         max: args.max,
         cutoff: args.cutoff,
@@ -32,7 +32,13 @@ self.body(func(args) {
         blockId: args.blockId,
         customBlockLabel: args.customBlockLabel,
         defaultBlockLabel: args.defaultBlockLabel
-    })
+    }
+    // Only for a subset run, so a full-data run keeps exactly its previous inputs
+    if !is_undefined(args.subset) {
+        exportColumnInputs.traceSpec = args.traceSpec
+        exportColumnInputs.subset = args.subset
+    }
+    exportColumnRender := render.create(enrichmentColumnTpl, exportColumnInputs)
 
     // Define output variables
     exports := pframes.pFrameBuilder()

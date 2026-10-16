@@ -87,6 +87,11 @@ wf.prepare(func(args){
 		bundleBuilder.addRef(args.clonotypeAbundanceRef)
 	}
 
+	// Optional subset column picked alongside the abundance (PlDatasetSelector)
+	if !is_undefined(args.inputFilter) {
+		bundleBuilder.addRef(json.decode(args.inputFilter))
+	}
+
 	return {
 		columns: bundleBuilder.build()
 	}
@@ -131,12 +136,37 @@ wf.body(func(args) {
 		label = label + " - Pseudo: " + string(args.pseudoCount)
 	}
 
-	// Get abundance table
-	cloneTable := pframes.csvFileBuilder()
-	cloneTable.add(columns.getColumn(args.abundanceRef), {header: "abundance"})
-	cloneTable.add(columns.getColumn(args.conditionColumnRef), {header: "condition"})
+	// Optional subset: only its elements enter the analysis. The trace roots in the filter
+	// so downstream labels name it.
+	filterColumn := undefined
+	traceSpec := abundanceSpec
+	if !is_undefined(args.inputFilter) {
+		f := columns.getColumn(json.decode(args.inputFilter))
+		filterColumn = { spec: f.spec, data: f.data }
+		traceSpec = f.spec
+	}
+
+	// Get abundance table. Without a subset, the plain builder (unfiltered runs unchanged).
+	// With one, the abundance is the filtered primary.
+	cloneTable := undefined
+	addCloneColumn := undefined
+	abundanceColumn := columns.getColumn(args.abundanceRef)
+	if is_undefined(filterColumn) {
+		cloneTable = pframes.csvFileBuilder()
+		cloneTable.add(abundanceColumn, {header: "abundance"})
+		addCloneColumn = cloneTable.add
+	} else {
+		cloneTable = pframes.tableBuilder("csv").setColumnJoin("left")
+		cloneTable.addPrimary("main", {
+			__isPrimaryRef: "v1",
+			column: abundanceColumn,
+			filter: filterColumn
+		}, {header: "abundance"})
+		addCloneColumn = cloneTable.addColumn
+	}
+	addCloneColumn(columns.getColumn(args.conditionColumnRef), {header: "condition"})
 	if antigenControlConfig.antigenEnabled {
-		cloneTable.add(columns.getColumn(antigenControlConfig.antigenColumnRef), {header: "antigen"})
+		addCloneColumn(columns.getColumn(antigenControlConfig.antigenColumnRef), {header: "antigen"})
 	}
 	cloneTable.setAxisHeader(abundanceSpec.axesSpec[0].name, "sampleId")
 	cloneTable.setAxisHeader(abundanceSpec.axesSpec[1].name, "elementId")
@@ -324,7 +354,7 @@ wf.body(func(args) {
 	// Prepare pFrame to be exported
 	// Two traces: condition order (block label) and downsampling
 	conditionOrderLabel := args.customBlockLabel || args.defaultBlockLabel
-	trace := pSpec.makeTrace(abundanceSpec,
+	trace := pSpec.makeTrace(traceSpec,
 		{
 			type: "milaboratories.clonotype-enrichment.condition-order",
 			importance: 35,
@@ -339,9 +369,14 @@ wf.body(func(args) {
 	exportsFreq := pframes.pFrameBuilder()
 	for condition in conditionOrder {
 		colId := strings.substituteSpecialCharacters("frequency_" + condition)
+		freqSpec := trace.inject(frequencyPf[colId + ".spec"])
+		// A run on a subset says so: its outputs cover only the subset's elements.
+		if !is_undefined(filterColumn) {
+			freqSpec.domain["pl7.app/inputSubset"] = args.inputFilter
+		}
 		exportsFreq.add(
 			"Frequency " + condition,
-			trace.inject(frequencyPf[colId + ".spec"]),
+			freqSpec,
 			frequencyPf[colId + ".data"]
 		)
 	}
@@ -361,7 +396,7 @@ wf.body(func(args) {
 				comparison: comparison
 			}
 
-			exportColumnRender := render.create(enrichmentColumnTpl, {
+			exportColumnInputs := {
 				min: annotationStats.min,
 				max: annotationStats.max,
 				median: annotationStats.median,
@@ -380,7 +415,13 @@ wf.body(func(args) {
 				specLabel: specLabel,
 				customBlockLabel: args.customBlockLabel,
 				defaultBlockLabel: args.defaultBlockLabel
-			})
+			}
+			// Only for a subset run, so a full-data run keeps exactly its previous inputs
+			if !is_undefined(filterColumn) {
+				exportColumnInputs.traceSpec = traceSpec
+				exportColumnInputs.subset = args.inputFilter
+			}
+			exportColumnRender := render.create(enrichmentColumnTpl, exportColumnInputs)
 
 			exportsAdditionalEnrichments.add(
 				"Enrichment - " + comparison,
@@ -393,7 +434,7 @@ wf.body(func(args) {
 	//////////// Calculate annotation values ////////////
 	mainAnnotationStats := calculateAnnotationValues(topEnrichedColCsv, "Enrichment")
 
-	buildExports := render.create(buildMainExportTpl, {
+	buildExportsInputs := {
 		abundanceSpec: abundanceSpec,
 		inputType: inputType,
 		topEnrichedColCsv: topEnrichedColCsv,
@@ -412,7 +453,13 @@ wf.body(func(args) {
 		customBlockLabel: args.customBlockLabel,
 		defaultBlockLabel: args.defaultBlockLabel,
 		filteredTooMuch: calculateEnrichment.getFileContent("filtered_too_much.txt")
-	})
+	}
+	// Only for a subset run, so a full-data run keeps exactly its previous inputs
+	if !is_undefined(filterColumn) {
+		buildExportsInputs.traceSpec = traceSpec
+		buildExportsInputs.subset = args.inputFilter
+	}
+	buildExports := render.create(buildMainExportTpl, buildExportsInputs)
 
 	exports := buildExports.output("exports")
 	outStats := buildExports.output("outStats")
