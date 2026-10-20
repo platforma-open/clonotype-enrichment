@@ -228,6 +228,16 @@ def test_normalized_error_adds_variant_and_parent_in_quadrature():
     assert x["pn_2_0"] == 0.0
 
 
+def test_parent_against_itself_has_no_error():
+    out, _ = errors(
+        links=links([("X", "PX"), ("P", "PX"), ("Y", "PX")]), mutations=mutations({"X": 2, "Y": 1, "P": 0})
+    )
+    p = row(out, "P")
+    assert p["pn_1_0"] == 0.0
+    assert p["se_1_0"] > 0
+    assert p["pnse_1_0"] == 0.0 and p["pnse_max"] == 0.0
+
+
 def test_cancelled_normalized_error_is_the_raw_error():
     out, summary = errors(
         links=links([("X", "PX"), ("P", "PX"), ("Y", "PX")]), mutations=mutations({"X": 2, "Y": 1, "P": 1})

@@ -189,28 +189,22 @@ def frequency_pivot(
     pseudo_count: float
 ) -> pl.DataFrame:
     """One row per element: its abundance and its frequency in each condition."""
-    # Create pivot table for target track
     pivot_df = (
         pivot_ready
         .pivot(values='abundance', index='elementId', on='condition', aggregate_function='sum')
         .fill_null(0)
     )
 
-    # Ensure all conditions are present in pivot
     pivot_df_schema = pivot_df.collect_schema().names()
     for condition in condition_order:
         if condition not in pivot_df_schema:
             pivot_df = pivot_df.with_columns(pl.lit(0).alias(condition))
     pivot_df_schema = pivot_df.collect_schema().names()
 
-    # Convert elementId to index by setting it aside
     pivot_df = pivot_df.sort('elementId')
-
-    # Sort columns alphabetically but keep elementId
     condition_cols = sorted([col for col in pivot_df_schema if col != 'elementId'])
     pivot_df = pivot_df.select(['elementId'] + condition_cols)
 
-    # Pre-calculate frequencies for target track
     freq_expressions = []
     for condition in condition_order:
         total = totals.get(condition, 1)
@@ -219,7 +213,6 @@ def frequency_pivot(
             ((pl.col(condition) + pseudo_count) / (total + (n_clonotypes * pseudo_count))).alias(f'freq_{condition}')
         )
 
-    # Add frequency columns
     return pivot_df.with_columns(freq_expressions)
 
 

@@ -15,7 +15,7 @@ export type ParentRunSummary = {
   }[];
   multiParentVariants?: number;
   conditions?: string[];
-  /** Per parent, in condition order. Reads are null where the parent has no row after filtering. */
+  /** Per parent, in condition order. Reads are null for a parent that cannot be identified or has no data. */
   parentStates?: {
     parentId: string;
     states: ("observed" | "thin" | "absent")[];
@@ -27,10 +27,11 @@ export type ParentRunSummary = {
  * `on` and `off` follow the two input columns; `partial` names the one that resolved. The summaries
  * come from the last run and are absent before it.
  */
-export type ParentNormalization =
+export type ParentNormalization = (
   | { state: "off" }
   | { state: "partial"; resolved: typeof MUTATION_COUNT | typeof PARENT_LINK }
-  | { state: "on"; summary?: ParentRunSummary; proteinSummary?: ParentRunSummary };
+  | { state: "on" }
+) & { summary?: ParentRunSummary; proteinSummary?: ParentRunSummary };
 
 const domainKey = (axis: AxisSpec) =>
   JSON.stringify(Object.entries(axis.domain ?? {}).sort(([a], [b]) => a.localeCompare(b)));

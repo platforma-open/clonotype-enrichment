@@ -527,7 +527,6 @@ const createStatsTable = () => {
 
 const escapeHtml = (text: string) => text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
-// Per parent and condition: observed (20+ reads), thin (1-19) or absent, with the reads in brackets
 const createParentStatesTable = (title: string, summary?: ParentRunSummary) => {
   const conditions = summary?.conditions;
   const parents = summary?.parentStates;
@@ -571,7 +570,7 @@ const createParentStatesTable = (title: string, summary?: ParentRunSummary) => {
 
 const createParentStatesTables = () => {
   const state = parentNormalization.value;
-  if (state?.state !== "on") return "";
+  if (!state) return "";
   return (
     createParentStatesTable("Parents", state.summary) +
     createParentStatesTable("Parents (protein level)", state.proteinSummary)
@@ -614,7 +613,7 @@ const parentPartialMessage = computed(() => {
 
 const parentRunNotes = computed(() => {
   const state = parentNormalization.value;
-  if (state?.state !== "on") return [];
+  if (!state) return [];
   const notes: string[] = [];
   const grains = [
     { name: "variant", summary: state.summary },

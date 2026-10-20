@@ -295,7 +295,6 @@ wf.body(func(args) {
 			}
 		}
 
-		// Add filtering flags based on user selection
 		if FilteringConfig.baseFilter != "none" {
 			calculateEnrichment = calculateEnrichment.arg("--filter_clonotypes")
 
@@ -309,7 +308,6 @@ wf.body(func(args) {
 			}
 		}
 
-		// Apply minimum abundance filters based on selection
 		if FilteringConfig.minAbundance.enabled {
 			calculateEnrichment = calculateEnrichment.arg("--filter_clonotypes")
 			if FilteringConfig.minAbundance.metric == "count" {
@@ -319,7 +317,6 @@ wf.body(func(args) {
 			}
 		}
 
-		// Apply in-round presence filters based on selection
 		if FilteringConfig.presentInRounds.enabled {
 			calculateEnrichment = calculateEnrichment.arg("--filter_clonotypes")
 			calculateEnrichment = calculateEnrichment.arg("--present_in_rounds").arg(string(FilteringConfig.presentInRounds.rounds))
@@ -449,7 +446,6 @@ wf.body(func(args) {
 	}
 
 	comparisonExport := func(spec, enrichmentCsv, enrichmentFrame, comparison) {
-		// Convert display name (e.g., "Treatment vs Control") to column ID format (enrichment_Treatment_Control)
 		colId := strings.substituteSpecialCharacters("enrichment_" + text.re_compile(" vs ").replace(comparison, "_"))
 
 		annotationStats := calculateAnnotationValues(enrichmentCsv, "Enrichment " + comparison)
@@ -492,7 +488,6 @@ wf.body(func(args) {
 		}
 	}
 
-	// Export additional enrichment comparisons if selected
 	exportsAdditionalEnrichments := pframes.pFrameBuilder()
 	if additionalEnrichmentExports != undefined && len(additionalEnrichmentExports) > 0 {
 		for comparison in additionalEnrichmentExports {
@@ -629,7 +624,8 @@ wf.body(func(args) {
 			tplInputs.traceSpec = traceSpec
 			tplInputs.subset = args.inputFilter
 		}
-		// The main table is one frame: the template adds the block's own enrichment columns to its own
+		// One frame for the whole main table. A column that arrives in a later frame is shown even when
+		// optional: by then the table has saved its hidden-column list, and that list wins.
 		if forTable {
 			tplInputs.mainCsv = enrichCsv
 			tplInputs.mainImportParams = enrichmentImportParams

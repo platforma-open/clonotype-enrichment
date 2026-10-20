@@ -561,8 +561,8 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
       )
       .map((col) => col.withSpecs({ annotations: { "pl7.app/table/visibility": "optional" } }));
 
-    // The primary is one of the block's own columns: the parent-enrichment ones
-    // (pl7.app/enrichment/...) may be empty for some rows.
+    // Not a parent-enrichment column as primary: those can be empty for some rows, and rows the
+    // primary lacks are not shown.
     const primary = pCols.find((c) => !c.spec.name.startsWith("pl7.app/enrichment/")) ?? pCols[0];
 
     return createPlDataTableV3(ctx, {
@@ -717,16 +717,17 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
       ctx.resultPool.getSpecs().entries.map((e) => e.obj),
       variantAxis,
     );
-    if (state.state !== "on") return state;
 
     // A summary from a run on another dataset says nothing about this one.
     if (JSON.stringify(ctx.activeArgs?.abundanceRef) !== JSON.stringify(anchor)) return state;
+    // Read regardless of `state`, which covers only the selected grain: the protein grain finds its
+    // parent columns on its own and can normalize when the selected grain does not.
     const summary = (field: string) =>
       ctx.outputs
         ?.resolve({ field, allowPermanentAbsence: true })
         ?.getDataAsJson<ParentRunSummary>();
     return {
-      state: "on",
+      ...state,
       summary: summary("parentSummary"),
       proteinSummary: summary("proteinSummary"),
     };

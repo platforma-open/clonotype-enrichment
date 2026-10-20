@@ -1,4 +1,4 @@
-"""Parent-normalized enrichment, its measurement error and the parent table, for one grain.
+"""Parent-normalized enrichment, its measurement error and the run summary, for one grain.
 
 Column headers name conditions by their index in the effective condition order, never by name, since
 names are arbitrary user text: `pn_{i}_{j}` is the value for "condition i vs condition j".
@@ -43,7 +43,6 @@ def key(i: int, j: int) -> str:
 
 
 def read_enrichment(path: str, conditions: List[str]) -> pl.DataFrame:
-    """`elementId` plus `e_{i}_{j}`: the block's own log2FC per pair."""
     renames = {
         f"Enrichment {conditions[i]} vs {conditions[j]}": f"e_{key(i, j)}"
         for i, j in pair_indices(len(conditions))
@@ -57,7 +56,6 @@ def read_enrichment(path: str, conditions: List[str]) -> pl.DataFrame:
 
 
 def read_counts(path: str, conditions: List[str]) -> pl.DataFrame:
-    """`elementId` plus `k_{i}`: reads per condition."""
     renames = {condition: f"k_{i}" for i, condition in enumerate(conditions)}
     frame = pl.read_csv(
         path,
@@ -102,7 +100,6 @@ def resolve_parents(links: pl.DataFrame, mutations: pl.DataFrame) -> Tuple[pl.Da
 
 
 def counting_errors(counts: pl.DataFrame, pairs: List[Tuple[int, int]]) -> pl.DataFrame:
-    """`c_{i}_{j}`: (1/ln2)·sqrt(1/k_i + 1/k_j), a zero count replaced by the error pseudocount."""
     def floored(i: int) -> pl.Expr:
         return pl.max_horizontal(pl.col(f"k_{i}"), pl.lit(ZERO_READS_PSEUDOCOUNT))
 
@@ -163,13 +160,13 @@ def pick(cols: List[str], position: pl.Expr, present: pl.Expr) -> pl.Expr:
 
 
 def quadrature(*terms: pl.Expr) -> pl.Expr:
-    """sqrt of the sum of squares over the non-null terms; null when all are null."""
+    """Null terms are skipped; the result is null only when every term is."""
     squares = [t ** 2 for t in terms]
     return pl.when(pl.any_horizontal([t.is_not_null() for t in terms])).then(pl.sum_horizontal(squares).sqrt())
 
 
 def larger(counting: pl.Expr, replicate: pl.Expr) -> pl.Expr:
-    """max(counting, replicate); a null replicate leaves the counting error."""
+    """A null replicate error leaves the counting error."""
     return pl.max_horizontal(counting, replicate.fill_null(counting))
 
 
@@ -239,7 +236,9 @@ def compute(
             on=PARENT_KEY,
             how="inner",
         )
-        scored = scored.join(parent_values.drop(PARENT_KEY, REASON), on=PARENT, how="left")
+        scored = scored.join(parent_values.drop(REASON), on=PARENT, how="left")
+        # The parent against itself: the two terms are the same number, so the difference has no error
+        is_parent = pl.col(ID) == pl.col(PARENT_KEY)
 
         for i, j in pairs:
             k = key(i, j)
@@ -253,10 +252,10 @@ def compute(
                 if mode == MODE_CANCELLED:
                     pnse = pl.col(f"se_{k}")
                 else:
-                    pnse = larger(
+                    pnse = pl.when(is_parent).then(pl.lit(0.0)).otherwise(larger(
                         quadrature(pl.col(f"c_{k}"), pl.col(f"p_c_{k}")),
                         quadrature(pl.col(f"r_{k}"), pl.col(f"p_r_{k}")),
-                    )
+                    ))
                 scored = scored.with_columns(
                     pl.when(pl.col(f"pn_{k}").is_not_null()).then(pnse).alias(f"pnse_{k}")
                 )
@@ -335,7 +334,7 @@ def max_negative_control(
 
 
 def parent_reads(parents: pl.DataFrame, values: pl.DataFrame, n: int) -> pl.DataFrame:
-    """`[parentId, k_{i}]`. A parent not identified, or not scored, has null reads."""
+    """`[parentId, k_{i}]`. A parent that cannot be identified, or has no row, has null reads."""
     scored = values.select(pl.col(ID).alias(PARENT_KEY), *[pl.col(f"k_{i}") for i in range(n)])
     return parents.join(scored, on=PARENT_KEY, how="left").select(PARENT, *[f"k_{i}" for i in range(n)])
 

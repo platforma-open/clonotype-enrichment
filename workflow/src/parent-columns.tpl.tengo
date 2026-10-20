@@ -1,5 +1,6 @@
-// Columns of one grain built from the parent-enrichment computation. A child template because the
-// reference mode sits in the domain, and the mode is known only once the computation has run.
+// Columns of one grain built from the parent-enrichment computation, and for the selected grain the
+// whole main-table frame. A child template because the reference mode sits in the domain, and the
+// mode is known only once the computation has run.
 
 self := import("@platforma-sdk/workflow-tengo:tpl")
 ll := import("@platforma-sdk/workflow-tengo:ll")
@@ -38,7 +39,7 @@ self.body(func(args) {
 		return res
 	}
 
-	// Keys match the `i_j` column headers parent_enrichment.py writes.
+	// Keys match the `i_j` column headers of the computation's output.
 	pairs := []
 	pairKeyByLabel := {}
 	for i := 1; i < len(conditions); i++ {
@@ -64,7 +65,6 @@ self.body(func(args) {
 		}
 	}
 
-	// Labels follow sort-seq-analysis: "<quantity> vs Parent", "<quantity> Error", the pair in brackets.
 	normalized := func(id, domain, quantity, context, annotations) {
 		return column(id, "pl7.app/enrichment/parentNormalized", "Double", withMode(domain),
 			maps.merge({
