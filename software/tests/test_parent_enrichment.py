@@ -53,7 +53,7 @@ TWO_PARENTS_MUTATIONS = mutations({"a0": 0, "a1": 2, "b0": 0, "b1": 1})
 
 
 def test_each_variant_is_referenced_to_its_own_parent():
-    out, parents, summary = pe.compute(
+    out, summary = pe.compute(
         CONDITIONS, TWO_PARENTS_VALUES, TWO_PARENTS_COUNTS, TWO_PARENTS_LINKS, TWO_PARENTS_MUTATIONS
     )
     assert summary["mode"] == pe.MODE_REFERENCED
@@ -67,10 +67,10 @@ def test_each_variant_is_referenced_to_its_own_parent():
 
 
 def test_maximum_is_taken_over_normalized_pairs_and_is_not_clipped():
-    out, _, _ = pe.compute(CONDITIONS, TWO_PARENTS_VALUES, TWO_PARENTS_COUNTS, TWO_PARENTS_LINKS, TWO_PARENTS_MUTATIONS)
+    out, _ = pe.compute(CONDITIONS, TWO_PARENTS_VALUES, TWO_PARENTS_COUNTS, TWO_PARENTS_LINKS, TWO_PARENTS_MUTATIONS)
     assert row(out, "a1")["pn_max"] == 2.0
     all_below = values({"a0": (1.0, 1.0, 1.0), "a1": (0.0, -1.0, 0.5)})
-    out, _, _ = pe.compute(
+    out, _ = pe.compute(
         CONDITIONS, all_below, counts({"a0": (9, 9, 9), "a1": (9, 9, 9)}),
         links([("a0", "A"), ("a1", "A")]), mutations({"a0": 0, "a1": 1}),
     )
@@ -79,7 +79,7 @@ def test_maximum_is_taken_over_normalized_pairs_and_is_not_clipped():
 
 def test_parent_missing_in_a_round_drops_only_the_pairs_using_it():
     no_r2 = counts({"a0": (100, 200, 0), "a1": (10, 80, 20)})
-    out, parents, _ = pe.compute(
+    out, summary = pe.compute(
         CONDITIONS, values({"a0": (1.0, 2.0, 1.0), "a1": (3.0, 1.0, -2.0)}), no_r2,
         links([("a0", "A"), ("a1", "A")]), mutations({"a0": 0, "a1": 1}),
     )
@@ -87,18 +87,28 @@ def test_parent_missing_in_a_round_drops_only_the_pairs_using_it():
     assert a1["pn_1_0"] == 2.0
     assert a1["pn_2_0"] is None and a1["pn_2_1"] is None and a1["pn_overall"] is None
     assert a1["pn_max"] == 2.0
-    a = parents.row(0, named=True)
-    assert (a["state_0"], a["state_1"], a["state_2"]) == (pe.STATE_OBSERVED, pe.STATE_OBSERVED, pe.STATE_ABSENT)
+    assert summary["parentStates"][0]["states"] == [pe.STATE_OBSERVED, pe.STATE_OBSERVED, pe.STATE_ABSENT]
 
 
 def test_thin_parent_still_gives_a_value():
-    _, parents, _ = pe.compute(
+    _, summary = pe.compute(
         CONDITIONS, values({"a0": (1.0, 2.0, 1.0)}), counts({"a0": (19, 20, 1)}),
         links([("a0", "A")]), mutations({"a0": 0}),
     )
-    a = parents.row(0, named=True)
-    assert (a["state_0"], a["state_1"], a["state_2"]) == (pe.STATE_THIN, pe.STATE_OBSERVED, pe.STATE_THIN)
-    assert (a["reads_0"], a["reads_2"]) == (19, 1)
+    assert summary["parentStates"][0]["states"] == [pe.STATE_THIN, pe.STATE_OBSERVED, pe.STATE_THIN]
+
+
+def test_summary_carries_parent_states():
+    _, summary = pe.compute(
+        CONDITIONS, values({"a0": (1.0, 2.0, 1.0)}), counts({"a0": (500, 12, 0)}),
+        links([("a0", "A")]), mutations({"a0": 0}),
+    )
+    assert summary["conditions"] == CONDITIONS
+    assert summary["parentStates"] == [{
+        "parentId": "A",
+        "states": [pe.STATE_OBSERVED, pe.STATE_THIN, pe.STATE_ABSENT],
+        "reads": [500, 12, 0],
+    }]
 
 
 @pytest.mark.parametrize(
@@ -106,7 +116,7 @@ def test_thin_parent_still_gives_a_value():
     [({"b0": 1, "b1": 1}, pe.REASON_NO_UNMUTATED), ({"b0": 0, "b1": 0}, pe.REASON_SEVERAL_UNMUTATED)],
 )
 def test_one_unidentifiable_parent_cancels_the_whole_run(b_mutations, reason):
-    out, parents, summary = pe.compute(
+    out, summary = pe.compute(
         CONDITIONS, TWO_PARENTS_VALUES, TWO_PARENTS_COUNTS, TWO_PARENTS_LINKS,
         mutations({"a0": 0, "a1": 2, **b_mutations}),
     )
@@ -115,12 +125,12 @@ def test_one_unidentifiable_parent_cancels_the_whole_run(b_mutations, reason):
     a1 = row(out, "a1")
     assert (a1["pn_1_0"], a1["pn_2_0"], a1["pn_2_1"]) == (3.0, 1.0, -2.0)
     assert a1["pn_max"] == 3.0
-    b = parents.filter(pl.col("parentId") == "B").row(0, named=True)
-    assert b["reads_0"] is None and b["state_0"] == pe.STATE_ABSENT
+    b = next(p for p in summary["parentStates"] if p["parentId"] == "B")
+    assert b["states"][0] == pe.STATE_ABSENT and b["reads"][0] is None
 
 
 def test_variant_with_two_parents_is_scored_nowhere():
-    out, _, summary = pe.compute(
+    out, summary = pe.compute(
         CONDITIONS, TWO_PARENTS_VALUES, TWO_PARENTS_COUNTS,
         links([("a0", "A"), ("a1", "A"), ("a1", "B"), ("b0", "B"), ("b1", "B")]), TWO_PARENTS_MUTATIONS,
     )
@@ -131,9 +141,8 @@ def test_variant_with_two_parents_is_scored_nowhere():
 
 
 def test_mode_off_gives_reads_only():
-    out, parents, summary = pe.compute(CONDITIONS, TWO_PARENTS_VALUES, TWO_PARENTS_COUNTS)
+    out, summary = pe.compute(CONDITIONS, TWO_PARENTS_VALUES, TWO_PARENTS_COUNTS)
     assert summary == {"mode": None}
-    assert parents is None
     assert [c for c in out.columns if c.startswith("pn_")] == []
     assert row(out, "b1")["reads_1"] == 7
 
@@ -148,7 +157,7 @@ def test_negative_control_maximum_is_parent_normalized():
         "numReads": [10.0, 10.0, 0.0, 10.0],
         "denReads": [10.0, 10.0, 10.0, 10.0],
     })
-    out, _, _ = pe.compute(
+    out, _ = pe.compute(
         CONDITIONS, values({"a0": (0.0, 0.0, 0.0), "a1": (1.0, 1.0, 1.0)}),
         counts({"a0": (9, 9, 9), "a1": (9, 9, 9)}),
         links([("a0", "A"), ("a1", "A")]), mutations({"a0": 0, "a1": 1}), control_pairs=control,
@@ -178,13 +187,13 @@ def counting(k_num, k_den):
 
 
 def test_counting_error_uses_the_pseudocount_for_a_zero_count_only():
-    out, _, _ = errors()
+    out, _ = errors()
     assert row(out, "X")["se_2_0"] == pytest.approx(counting(0, 8))
     assert row(out, "X")["se_2_1"] == pytest.approx(counting(0, 4))
 
 
 def test_replicate_error_is_the_weighted_scatter_and_wins_when_larger():
-    out, _, _ = errors()
+    out, _ = errors()
     x = row(out, "X")
     # x = [1, 3], equal weights: SD/sqrt(n) = sqrt(2)/sqrt(2) = 1.
     assert x["nt_1_0"] == 2
@@ -192,14 +201,14 @@ def test_replicate_error_is_the_weighted_scatter_and_wins_when_larger():
 
 
 def test_single_variant_has_no_replicate_error():
-    out, _, _ = errors()
+    out, _ = errors()
     y = row(out, "Y")
     assert y["nt_1_0"] == 1
     assert y["se_1_0"] == pytest.approx(counting(2, 4))
 
 
 def test_error_of_the_maximum_is_taken_at_the_pair_of_the_maximum():
-    out, _, _ = errors()
+    out, _ = errors()
     x = row(out, "X")
     assert x["se_max"] == x["se_1_0"]
     assert x["nt_max"] == 2
@@ -207,7 +216,7 @@ def test_error_of_the_maximum_is_taken_at_the_pair_of_the_maximum():
 
 
 def test_normalized_error_adds_variant_and_parent_in_quadrature():
-    out, _, summary = errors(
+    out, summary = errors(
         links=links([("X", "PX"), ("P", "PX"), ("Y", "PX")]), mutations=mutations({"X": 2, "Y": 1, "P": 0})
     )
     assert summary["mode"] == pe.MODE_REFERENCED
@@ -220,7 +229,7 @@ def test_normalized_error_adds_variant_and_parent_in_quadrature():
 
 
 def test_cancelled_normalized_error_is_the_raw_error():
-    out, _, summary = errors(
+    out, summary = errors(
         links=links([("X", "PX"), ("P", "PX"), ("Y", "PX")]), mutations=mutations({"X": 2, "Y": 1, "P": 1})
     )
     assert summary["mode"] == pe.MODE_CANCELLED

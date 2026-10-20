@@ -64,31 +64,32 @@ self.body(func(args) {
 		}
 	}
 
-	normalized := func(id, domain, label, annotations) {
+	// Labels follow sort-seq-analysis: "<quantity> vs Parent", "<quantity> Error", the pair in brackets.
+	normalized := func(id, domain, quantity, context, annotations) {
 		return column(id, "pl7.app/enrichment/parentNormalized", "Double", withMode(domain),
 			maps.merge({
-				"pl7.app/label": "Parent-normalized " + label,
+				"pl7.app/label": quantity + " vs Parent" + context,
 				"pl7.app/description": NORMALIZED_DESCRIPTION,
 				"pl7.app/score/rankValues": "increasing",
-				"pl7.app/format": ".2f"
+				"pl7.app/format": "+.2f"
 			}, annotations))
 	}
 
-	errorColumns := func(suffix, domain, label) {
+	errorColumns := func(suffix, domain, quantity, context) {
 		cols := [
 			column("se_" + suffix, "pl7.app/enrichment/uncertainty", "Double", domain, {
-				"pl7.app/label": "Uncertainty " + label,
+				"pl7.app/label": quantity + " Error" + context,
 				"pl7.app/description": ERROR_DESCRIPTION,
 				"pl7.app/format": ".2f"
 			}),
 			column("nt_" + suffix, "pl7.app/enrichment/ntVariants", "Int", domain, {
-				"pl7.app/label": "Synonymous variants " + label
+				"pl7.app/label": quantity + " NT Variants" + context
 			})
 		]
 		if parentMode {
 			cols = append(cols, column("pnse_" + suffix, "pl7.app/enrichment/parentNormalizedUncertainty",
 				"Double", withMode(domain), {
-					"pl7.app/label": "Uncertainty parent-normalized " + label,
+					"pl7.app/label": quantity + " vs Parent Error" + context,
 					"pl7.app/description": NORMALIZED_ERROR_DESCRIPTION,
 					"pl7.app/format": ".2f"
 				}))
@@ -98,6 +99,8 @@ self.body(func(args) {
 
 	exportIds := []
 	tableIds := []
+	// Hidden by default in the main table even where the export shows them, as the raw pair columns are
+	tableOptional := {}
 	valueColumns := []
 	addValue := func(col, toExports, toTable) {
 		valueColumns = append(valueColumns, col)
@@ -113,19 +116,19 @@ self.body(func(args) {
 	overallDomain := pfEnrichmentConvExport.valueDomain(base, "overall", args.conditionOrder)
 
 	if parentMode {
-		addValue(normalized("pn_max", maxDomain, "Max Log2FC", {
+		addValue(normalized("pn_max", maxDomain, "Max Log2FC", "", {
 			"pl7.app/isScore": "true",
 			"pl7.app/table/orderPriority": "8990"
 		}), true, forTable)
-		addValue(normalized("pn_overall", overallDomain, "Overall Log2FC", {
+		addValue(normalized("pn_overall", overallDomain, "Overall Log2FC", "", {
 			"pl7.app/table/orderPriority": "89"
 		}), true, forTable)
 	}
 	if withErrors {
-		for col in errorColumns("max", maxDomain, "Max Log2FC") {
+		for col in errorColumns("max", maxDomain, "Max Log2FC", "") {
 			addValue(col, true, false)
 		}
-		for col in errorColumns("overall", overallDomain, "Overall Log2FC") {
+		for col in errorColumns("overall", overallDomain, "Overall Log2FC", "") {
 			addValue(col, true, false)
 		}
 	}
@@ -140,31 +143,34 @@ self.body(func(args) {
 		isExported := !is_undefined(exported[pair.key])
 		domain := pfEnrichmentConvExport.valueDomain(base, "comparison", args.conditionOrder, pair.label)
 		if parentMode && (isExported || forTable) {
-			addValue(normalized("pn_" + pair.key, domain, "Log2FC " + pair.label, isExported ? {
+			addValue(normalized("pn_" + pair.key, domain, "Log2FC", " (" + pair.label + ")", isExported ? {
 				"pl7.app/isScore": "true"
 			} : {
 				"pl7.app/table/visibility": "optional"
 			}), isExported, forTable)
+			tableOptional["pn_" + pair.key] = true
 		}
 		if withErrors && isExported {
-			for col in errorColumns(pair.key, domain, "Log2FC " + pair.label) {
+			for col in errorColumns(pair.key, domain, "Log2FC", " (" + pair.label + ")") {
 				addValue(col, true, false)
 			}
 		}
 	}
 
 	if parentMode && args.addMaxNegControl && forTable {
-		addValue(normalized("pn_maxneg", withMode({}), "Control max Log2FC", {
+		addValue(normalized("pn_maxneg", withMode({}), "Control max Log2FC", "", {
 			"pl7.app/table/visibility": "optional"
 		}), false, true)
 	}
 
-	for i, condition in conditions {
-		addValue(column("reads_" + string(i), "pl7.app/enrichment/reads", "Int",
-			maps.merge(base, {"pl7.app/enrichment/condition": condition}), {
-				"pl7.app/label": "Reads " + condition,
-				"pl7.app/table/visibility": "optional"
-			}), true, forTable)
+	if forTable {
+		for i, condition in conditions {
+			addValue(column("reads_" + string(i), "pl7.app/enrichment/reads", "Int",
+				maps.merge(base, {"pl7.app/enrichment/condition": condition}), {
+					"pl7.app/label": "Reads (" + condition + ")",
+					"pl7.app/table/visibility": "optional"
+				}), false, true)
+		}
 	}
 
 	values := xsv.importFile(args.valuesCsv, "csv", {
@@ -174,7 +180,9 @@ self.body(func(args) {
 		partitionKeyLength: 0
 	}, {cpu: 1, mem: "8GiB"})
 
-	trace := pSpec.makeTrace(args.abundanceSpec,
+	// A subset run roots the trace in the filter (dataset -> the block that made the subset).
+	traceSpec := is_undefined(args.traceSpec) ? args.abundanceSpec : args.traceSpec
+	trace := pSpec.makeTrace(traceSpec,
 		{
 			type: "milaboratories.clonotype-enrichment.condition-order",
 			importance: 35,
@@ -186,45 +194,34 @@ self.body(func(args) {
 			label: args.downsamplingLabel
 		})
 
-	exports := pframes.pFrameBuilder()
-	for id in exportIds {
-		exports.add(args.prefix + id, trace.inject(values[id + ".spec"]), values[id + ".data"])
+	// Trace, plus the subset stamp on a subset run (its outputs cover only the subset)
+	exportSpec := func(spec) {
+		s := trace.inject(spec)
+		if !is_undefined(args.subset) {
+			s.domain["pl7.app/inputSubset"] = args.subset
+		}
+		return s
 	}
 
-	if parentMode {
-		parentColumns := []
-		for i, condition in conditions {
-			domain := maps.merge(base, {"pl7.app/enrichment/condition": condition})
-			parentColumns = append(parentColumns, column("reads_" + string(i), "pl7.app/enrichment/parentReads",
-				"Int", domain, {
-					"pl7.app/label": "Parent reads " + condition,
-					"pl7.app/table/visibility": "optional"
-				}))
-			parentColumns = append(parentColumns, column("state_" + string(i), "pl7.app/enrichment/parentState",
-				"String", domain, {
-					"pl7.app/label": "Parent state " + condition,
-					"pl7.app/table/visibility": "optional",
-					"pl7.app/isDiscreteFilter": "true",
-					"pl7.app/discreteValues": "[\"observed\", \"thin\", \"absent\"]"
-				}))
-		}
-		parents := xsv.importFile(args.parentsCsv, "csv", {
-			axes: [{column: "parentId", spec: args.parentAxisSpec}],
-			columns: parentColumns,
-			storageFormat: "Parquet",
-			partitionKeyLength: 0
-		}, {cpu: 1, mem: "4GiB"})
-		for col in parentColumns {
-			exports.add(args.prefix + "parent_" + col.id, trace.inject(parents[col.id + ".spec"]),
-				parents[col.id + ".data"])
-		}
+	exports := pframes.pFrameBuilder()
+	for id in exportIds {
+		exports.add(args.prefix + id, exportSpec(values[id + ".spec"]), values[id + ".data"])
 	}
 
 	table := "empty"
 	if forTable {
 		tableFrame := pframes.pFrameBuilder()
+		main := xsv.importFile(args.mainCsv, "csv", args.mainImportParams, {cpu: 1, mem: "32GiB"})
+		for col in args.mainImportParams.columns {
+			tableFrame.add(col.id, main[col.id + ".spec"], main[col.id + ".data"])
+		}
 		for id in tableIds {
-			tableFrame.add(id, values[id + ".spec"], values[id + ".data"])
+			spec := values[id + ".spec"]
+			if tableOptional[id] {
+				spec = copy(spec)
+				spec.annotations = maps.merge(spec.annotations, {"pl7.app/table/visibility": "optional"})
+			}
+			tableFrame.add(id, spec, values[id + ".data"])
 		}
 		table = tableFrame.build()
 	}

@@ -181,9 +181,8 @@ def compute(
     nt_values: Optional[pl.DataFrame] = None,
     nt_counts: Optional[pl.DataFrame] = None,
     protein_map: Optional[pl.DataFrame] = None,
-) -> Tuple[pl.DataFrame, Optional[pl.DataFrame], Dict]:
-    """Returns the per-element values table, the per-parent table (None when the mode is off) and
-    the run summary."""
+) -> Tuple[pl.DataFrame, Dict]:
+    """Returns the per-element values table and the run summary."""
     n = len(conditions)
     pairs = pair_indices(n)
     pair_keys = [key(i, j) for i, j in pairs]
@@ -203,7 +202,6 @@ def compute(
             values = values.with_columns(larger(pl.col(f"c_{k}"), pl.col(f"r_{k}")).alias(f"se_{k}"))
 
     summary: Dict = {"mode": None}
-    parents_out = None
 
     if mode_on:
         parents, assignment, several = resolve_parents(links, mutations)
@@ -273,7 +271,8 @@ def compute(
                 how="left",
             )
 
-        parents_out = parent_table(parents, values, n)
+        summary["conditions"] = list(conditions)
+        summary["parentStates"] = parent_states(parents, values, n)
 
     if with_errors:
         raw_cols = [f"e_{k}" for k in pair_keys]
@@ -287,7 +286,7 @@ def compute(
             error_cols += [pl.col(f"se_{overall}").alias("se_overall"), pl.col(f"n_{overall}").alias("nt_overall")]
         out = out.join(values.select(ID, *error_cols), on=ID, how="left")
 
-    return out.sort(ID), parents_out, summary
+    return out.sort(ID), summary
 
 
 def max_negative_control(
@@ -321,21 +320,35 @@ def max_negative_control(
     )
 
 
-def parent_table(parents: pl.DataFrame, values: pl.DataFrame, n: int) -> pl.DataFrame:
-    """`[parentId, reads_{i}, state_{i}]`. A parent not identified, or not scored, is absent."""
+def parent_reads(parents: pl.DataFrame, values: pl.DataFrame, n: int) -> pl.DataFrame:
+    """`[parentId, k_{i}]`. A parent not identified, or not scored, has null reads."""
     scored = values.select(pl.col(ID).alias(PARENT_KEY), *[pl.col(f"k_{i}") for i in range(n)])
-    table = parents.join(scored, on=PARENT_KEY, how="left")
-    columns = [PARENT]
-    for i in range(n):
-        reads = pl.col(f"k_{i}")
-        columns.append(reads.cast(pl.Int64).alias(f"reads_{i}"))
-        columns.append(
-            pl.when(reads.is_null() | (reads <= 0)).then(pl.lit(STATE_ABSENT))
-            .when(reads < THIN_READS).then(pl.lit(STATE_THIN))
-            .otherwise(pl.lit(STATE_OBSERVED))
-            .alias(f"state_{i}")
-        )
-    return table.select(columns).sort(PARENT)
+    return parents.join(scored, on=PARENT_KEY, how="left").select(PARENT, *[f"k_{i}" for i in range(n)])
+
+
+def state(reads: pl.Expr) -> pl.Expr:
+    return (
+        pl.when(reads.is_null() | (reads <= 0)).then(pl.lit(STATE_ABSENT))
+        .when(reads < THIN_READS).then(pl.lit(STATE_THIN))
+        .otherwise(pl.lit(STATE_OBSERVED))
+    )
+
+
+def parent_states(parents: pl.DataFrame, values: pl.DataFrame, n: int) -> List[Dict]:
+    """Per parent, its state and reads in each condition, in condition order, for the run summary."""
+    table = (
+        parent_reads(parents, values, n)
+        .with_columns(*[state(pl.col(f"k_{i}")).alias(f"state_{i}") for i in range(n)])
+        .sort(PARENT)
+    )
+    return [
+        {
+            "parentId": row[PARENT],
+            "states": [row[f"state_{i}"] for i in range(n)],
+            "reads": [None if row[f"k_{i}"] is None else int(row[f"k_{i}"]) for i in range(n)],
+        }
+        for row in table.iter_rows(named=True)
+    ]
 
 
 def main() -> None:
@@ -350,7 +363,6 @@ def main() -> None:
     parser.add_argument("--nt_counts", help="reads per nucleotide variant per condition")
     parser.add_argument("--protein_map", help="CSV [elementId, mappedId]: nucleotide -> amino-acid variant")
     parser.add_argument("--values_out", required=True)
-    parser.add_argument("--parents_out", required=True)
     parser.add_argument("--summary_out", required=True)
     args = parser.parse_args()
 
@@ -359,7 +371,7 @@ def main() -> None:
     def table(path: Optional[str], schema: Dict) -> Optional[pl.DataFrame]:
         return None if path is None else pl.read_csv(path, columns=list(schema), schema_overrides=schema)
 
-    out, parents_out, summary = compute(
+    out, summary = compute(
         conditions,
         read_enrichment(args.enrichment, conditions),
         read_counts(args.counts, conditions),
@@ -375,9 +387,6 @@ def main() -> None:
     )
 
     out.write_csv(args.values_out)
-    if parents_out is None:
-        parents_out = pl.DataFrame(schema={PARENT: pl.Utf8})
-    parents_out.write_csv(args.parents_out)
     with open(args.summary_out, "w") as f:
         json.dump(summary, f, sort_keys=True)
 

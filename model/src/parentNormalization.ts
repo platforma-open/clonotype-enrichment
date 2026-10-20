@@ -14,6 +14,13 @@ export type ParentRunSummary = {
     reason: "no-unmutated-variant" | "several-unmutated-variants";
   }[];
   multiParentVariants?: number;
+  conditions?: string[];
+  /** Per parent, in condition order. Reads are null where the parent has no row after filtering. */
+  parentStates?: {
+    parentId: string;
+    states: ("observed" | "thin" | "absent")[];
+    reads: (number | null)[];
+  }[];
 };
 
 /**

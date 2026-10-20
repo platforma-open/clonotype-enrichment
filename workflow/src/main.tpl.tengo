@@ -568,7 +568,6 @@ wf.body(func(args) {
 			arg("--enrichment").arg("enrichment.csv").
 			arg("--counts").arg("counts.csv").
 			arg("--values_out").arg("values.csv").
-			arg("--parents_out").arg("parents.csv").
 			arg("--summary_out").arg("summary.json")
 		if !is_undefined(opts.parents) {
 			builder = builder.
@@ -593,18 +592,16 @@ wf.body(func(args) {
 		}
 		return builder.
 			saveFile("values.csv").
-			saveFile("parents.csv").
 			saveFileContent("summary.json").
 			printErrStreamToStdout().
 			saveStdoutContent().
 			run()
 	}
 
-	parentColumns := func(parentRun, axisSpec, parentMode, parentAxisSpec, withErrors, forTable, prefix) {
+	parentColumns := func(parentRun, axisSpec, parentMode, withErrors, forTable, prefix) {
 		tplInputs := {
 			summary: parentRun.getFileContent("summary.json"),
 			valuesCsv: parentRun.getFile("values.csv"),
-			parentsCsv: parentRun.getFile("parents.csv"),
 			axisSpec: axisSpec,
 			parentMode: parentMode,
 			withErrors: withErrors,
@@ -622,23 +619,30 @@ wf.body(func(args) {
 			conditionOrderLabel: conditionOrderLabel,
 			downsamplingLabel: label
 		}
-		if parentMode {
-			tplInputs.parentAxisSpec = parentAxisSpec
+		// Only for a subset run, so a full-data run keeps exactly its previous inputs
+		if !is_undefined(filterColumn) {
+			tplInputs.traceSpec = traceSpec
+			tplInputs.subset = args.inputFilter
+		}
+		// The main table is one frame: the template adds the block's own enrichment columns to its own
+		if forTable {
+			tplInputs.mainCsv = enrichCsv
+			tplInputs.mainImportParams = enrichmentImportParams
 		}
 		return render.create(parentColumnsTpl, tplInputs)
 	}
 
 	parentBaselineExport := undefined
-	parentTablePf := undefined
+	mainTablePf := undefined
 	parentSummary := undefined
 	if withParentStep {
 		parentRun := runParentEnrichment(calculateEnrichment, {
 			parents: inputs.parentMode ? parentTables(variantAxisSpec, inputs.mutationCount, inputs.parentLink, inputs.parentAxis) : undefined,
 			controlPairs: addMaxNegControlEnrichment
 		})
-		built := parentColumns(parentRun, variantAxisSpec, inputs.parentMode, inputs.parentAxis, false, true, "")
+		built := parentColumns(parentRun, variantAxisSpec, inputs.parentMode, false, true, "")
 		parentBaselineExport = built.output("exports")
-		parentTablePf = pframes.exportFrame(built.output("table"))
+		mainTablePf = pframes.exportFrame(built.output("table"))
 		parentSummary = parentRun.getFileContent("summary.json")
 	}
 
@@ -661,7 +665,7 @@ wf.body(func(args) {
 		proteinExports := pframes.pFrameBuilder()
 
 		proteinStats := calculateAnnotationValues(proteinHighestCsv, "Enrichment")
-		proteinRaw := render.create(enrichmentColumnTpl, {
+		proteinRawInputs := {
 			min: proteinStats.min,
 			max: proteinStats.max,
 			median: proteinStats.median,
@@ -679,7 +683,13 @@ wf.body(func(args) {
 			blockId: blockId,
 			customBlockLabel: args.customBlockLabel,
 			defaultBlockLabel: args.defaultBlockLabel
-		})
+		}
+		// Only for a subset run, so a full-data run keeps exactly its previous inputs
+		if !is_undefined(filterColumn) {
+			proteinRawInputs.traceSpec = traceSpec
+			proteinRawInputs.subset = args.inputFilter
+		}
+		proteinRaw := render.create(enrichmentColumnTpl, proteinRawInputs)
 		proteinExports.add("Protein Enrichment - Highest", proteinRaw.output("columnSpec"), proteinRaw.output("columnData"))
 		proteinExports.add("Protein Enrichment - Overall", proteinRaw.output("overallSpec"), proteinRaw.output("overallData"))
 
@@ -700,7 +710,7 @@ wf.body(func(args) {
 			controlPairs: addMaxNegControlEnrichment,
 			errors: { ntRun: calculateEnrichment, proteinMap: proteinMap }
 		})
-		proteinBuilt := parentColumns(proteinParentRun, proteinAxisSpec, inputs.aaParentMode, inputs.aaParentAxis, true, false, "protein_")
+		proteinBuilt := parentColumns(proteinParentRun, proteinAxisSpec, inputs.aaParentMode, true, false, "protein_")
 
 		proteinExport = {
 			raw: proteinExports.build(),
@@ -789,7 +799,7 @@ wf.body(func(args) {
 	// Define outputs
 	outputs := {
 		outStats: outStats,
-		enrichmentPf: pframes.exportFrame(enrichmentPf),
+		enrichmentPf: withParentStep ? mainTablePf : pframes.exportFrame(enrichmentPf),
 		bubblePf: pframes.exportFrame(bubblePf),
 		stackedPf: pframes.exportFrame(stackedPf),
 		linePf: pframes.exportFrame(linePf),
@@ -799,7 +809,6 @@ wf.body(func(args) {
 		outputs.controlScatterPf = pframes.exportFrame(controlScatterPf)
 	}
 	if withParentStep {
-		outputs.parentTablePf = parentTablePf
 		outputs.parentSummary = parentSummary
 	}
 	if inputs.pooling {

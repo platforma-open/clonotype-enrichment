@@ -561,19 +561,17 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
       )
       .map((col) => col.withSpecs({ annotations: { "pl7.app/table/visibility": "optional" } }));
 
-    const parentCols =
-      ctx.outputs
-        ?.resolve({ field: "parentTablePf", allowPermanentAbsence: true })
-        ?.getPColumns() ?? [];
+    // The primary is one of the block's own columns: the parent-enrichment ones
+    // (pl7.app/enrichment/...) may be empty for some rows.
+    const primary = pCols.find((c) => !c.spec.name.startsWith("pl7.app/enrichment/")) ?? pCols[0];
 
     return createPlDataTableV3(ctx, {
       // Single primary: V3 anchors label discovery per primary column, and several
       // same-axis enrichment columns collide. They share one PFrame, so joining
       // the rest as secondary is equivalent to the old inner join among core columns.
-      primaryColumns: [DataColumn.fromColumn(pCols[0])],
+      primaryColumns: [DataColumn.fromColumn(primary)],
       columns: [
-        ...pCols.slice(1).map((c) => DataColumn.fromColumn(c)),
-        ...parentCols.map((c) => DataColumn.fromColumn(c)),
+        ...pCols.filter((c) => c !== primary).map((c) => DataColumn.fromColumn(c)),
         ...mainSeqCols,
         ...otherRegionCols,
       ],

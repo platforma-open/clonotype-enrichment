@@ -8,6 +8,7 @@ import {
   plRefsEqual,
   type PObjectId,
 } from "@platforma-sdk/model";
+import type { ParentRunSummary } from "@platforma-open/milaboratories.clonotype-enrichment.model";
 import type { ListOption } from "@platforma-sdk/ui-vue";
 import {
   PlAccordion,
@@ -507,7 +508,8 @@ const createStatsTable = () => {
     )
     .join("");
 
-  return `
+  return (
+    `
     <table style="width: 100%; border-collapse: collapse; margin: 0;">
       <thead>
         <tr style="background-color: #f9fafb;">
@@ -519,7 +521,61 @@ const createStatsTable = () => {
         ${rows}
       </tbody>
     </table>
+  ` + createParentStatesTables()
+  );
+};
+
+const escapeHtml = (text: string) => text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+
+// Per parent and condition: observed (20+ reads), thin (1-19) or absent, with the reads in brackets
+const createParentStatesTable = (title: string, summary?: ParentRunSummary) => {
+  const conditions = summary?.conditions;
+  const parents = summary?.parentStates;
+  if (!conditions || !parents || parents.length === 0) return "";
+  const cell = "padding: 8px 12px; border-bottom: 1px solid #e5e7eb; white-space: nowrap;";
+  const head =
+    "padding: 12px; border-bottom: 2px solid #e5e7eb; color: #111; font-weight: 600; white-space: nowrap;";
+  const header = conditions
+    .map((c) => `<th style="${head} text-align: right;">${escapeHtml(c)}</th>`)
+    .join("");
+  const rows = parents
+    .map((parent) => {
+      const cells = parent.states
+        .map((state, i) => {
+          const reads = parent.reads[i];
+          const color = state === "observed" ? "#374151" : state === "thin" ? "#b45309" : "#b91c1c";
+          const text = reads === null ? state : `${state} (${reads.toLocaleString()})`;
+          return `<td style="${cell} text-align: right; color: ${color};">${text}</td>`;
+        })
+        .join("");
+      return `<tr><td style="${cell} font-weight: 500; color: #111;">${escapeHtml(parent.parentId)}</td>${cells}</tr>`;
+    })
+    .join("");
+  return `
+    <div style="margin-top: 24px; font-weight: 600; color: #111;">${title}</div>
+    <div style="overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse; margin: 0;">
+        <thead>
+          <tr style="background-color: #f9fafb;">
+            <th style="${head} text-align: left;">Parent</th>
+            ${header}
+          </tr>
+        </thead>
+        <tbody>
+          ${rows}
+        </tbody>
+      </table>
+    </div>
   `;
+};
+
+const createParentStatesTables = () => {
+  const state = parentNormalization.value;
+  if (state?.state !== "on") return "";
+  return (
+    createParentStatesTable("Parents", state.summary) +
+    createParentStatesTable("Parents (protein level)", state.proteinSummary)
+  );
 };
 
 // Check if the output enrichment file is empty
@@ -877,9 +933,8 @@ const isControlOrderOpen = ref(true); // Open by default
       <template #title>Too few sequences</template>
       Current filters removed all sequences. Consider relaxing filter criteria.
     </PlAlert>
-    <PlAlert v-if="parentNormalization?.state === 'on'" type="info" icon>
-      <template #title>Parent normalization is on</template>
-      Parent-normalized values are relative to each variant's own parent.
+    <PlAlert v-if="parentRunNotes.length > 0" type="warn" icon>
+      <template #title>Some values are not relative to the parent</template>
       <div v-for="note in parentRunNotes" :key="note">{{ note }}</div>
     </PlAlert>
     <PlAlert v-if="parentPartialMessage" type="warn" icon>
