@@ -22,7 +22,9 @@ getColumns := func(countsSpec, conditionOrder, controlEnabled, addPresentInNegCo
                           spec: {
                             name: "pl7.app/frequency",
                             valueType: "Double",
-                            domain: {},
+                            domain: {
+                              "pl7.app/enrichment/condition": condition
+                            },
                             annotations: {
                               "pl7.app/label": "Frequency " + condition,
                               // add isScore only in exports to ease plots
@@ -42,7 +44,9 @@ getColumns := func(countsSpec, conditionOrder, controlEnabled, addPresentInNegCo
                             spec: {
                               name: "pl7.app/enrichment",
                               valueType: "Double",
-                              domain: {},
+                              domain: {
+                                "pl7.app/enrichment/comparison": condition + " vs " + conditionBaseline
+                              },
                               annotations: {
                                 "pl7.app/label": "Enrichment " + condition + " vs " + conditionBaseline,
                                 // add isScore only in exports to ease plots

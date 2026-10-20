@@ -7,10 +7,12 @@ import type {
 import { kind } from "@platforma-open/milaboratories.clonotype-enrichment.kind";
 import type {
   AnchoredPColumnSelector,
+  DatasetOption,
   PColumnIdAndSpec,
   PFrameHandle,
   PlDataTableStateV2,
   PlRef,
+  PObjectSpec,
   SUniversalPColumnId,
 } from "@platforma-sdk/model";
 import {
@@ -19,10 +21,14 @@ import {
   ColumnsCollection,
   DataColumn,
   DataModelBuilder,
+  buildDatasetOptions,
+  createGlobalPObjectId,
   createPFrameForGraphs,
   createPlDataTableStateV2,
   createPlDataTableV3,
   getUniquePartitionKeys,
+  isPColumnSpec,
+  plRefsEqual,
   readAnnotationJson,
 } from "@platforma-sdk/model";
 import type { ParentNormalization, ParentRunSummary } from "./parentNormalization";
@@ -70,6 +76,8 @@ export type BlockData = {
   defaultBlockLabel: string;
   customBlockLabel: string;
   abundanceRef?: PlRef;
+  /** Subset column picked with the abundance in PlDatasetSelector (e.g. a Repertoire Labeling label). */
+  filterRef?: PlRef;
   conditionColumnRef?: SUniversalPColumnId;
   conditionOrder: string[];
   downsampling: DownsamplingParameters;
@@ -207,6 +215,13 @@ const dataModel = new DataModelBuilder({ kind })
     excludedAlertDismissedKey: undefined,
   }));
 
+// Key axes of the datasets this block filters: bulk and single-cell clonotypes, and variants.
+const DATASET_KEY_AXES: ReadonlySet<string> = new Set([
+  "pl7.app/vdj/clonotypeKey",
+  "pl7.app/vdj/scClonotypeKey",
+  "pl7.app/variantKey",
+]);
+
 export const platforma = BlockModelV3.create({ dataModel, kind })
 
   .args((data) => {
@@ -256,6 +271,11 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
       antigenControlConfig: data.antigenControlConfig,
       enrichmentThreshold: data.enrichmentThreshold,
       pseudoCount: data.pseudoCount,
+      // The subset's canonical column id, which the workflow stamps as the outputs'
+      // `pl7.app/inputSubset`. Absent without a filter, so unfiltered args are unchanged.
+      ...(data.filterRef !== undefined && {
+        inputFilter: createGlobalPObjectId(data.filterRef.blockId, data.filterRef.name),
+      }),
     };
   })
 
@@ -266,6 +286,7 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
   // output, and the UI re-derives it against whatever input the template lands on.
   .templateParams((data) => ({
     abundanceRef: data.abundanceRef,
+    filterRef: data.filterRef,
 
     conditionColumnRef: data.conditionColumnRef,
     conditionOrder: data.conditionOrder,
@@ -281,21 +302,39 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
     customBlockLabel: data.customBlockLabel,
   }))
 
-  .output("abundanceOptions", (ctx) =>
-    ctx.resultPool.getOptions(
-      [
-        {
-          axes: [{ name: "pl7.app/sampleId" }, {}],
-          annotations: {
-            "pl7.app/isAbundance": "true",
-            "pl7.app/abundance/normalized": "false",
-            "pl7.app/abundance/isPrimary": "true",
-          },
-        },
-      ],
-      { includeNativeLabel: true },
-    ),
-  )
+  // Primary raw abundances, each with its subset columns (e.g. Repertoire Labeling labels) as filters.
+  .output("abundanceOptions", (ctx): DatasetOption[] => {
+    const isPrimaryAbundance = (spec: PObjectSpec) =>
+      isPColumnSpec(spec) &&
+      spec.axesSpec.length === 2 &&
+      spec.axesSpec[0].name === "pl7.app/sampleId" &&
+      spec.annotations?.["pl7.app/isAbundance"] === "true" &&
+      spec.annotations?.["pl7.app/abundance/normalized"] === "false" &&
+      spec.annotations?.["pl7.app/abundance/isPrimary"] === "true";
+
+    // Labels as before, with the column's own label (e.g. "Number of Reads"): buildDatasetOptions
+    // derives them without it and takes no label options for the datasets.
+    const labeled = ctx.resultPool.getOptions(isPrimaryAbundance, {
+      label: { includeNativeLabel: true },
+    });
+
+    const options =
+      buildDatasetOptions(ctx, {
+        primary: isPrimaryAbundance,
+        // Only subsets keyed by the element axis alone. Cluster abundances get none: the
+        // cluster-mode per-clonotype table could not apply a cluster subset.
+        filter: (spec) =>
+          isPColumnSpec(spec) &&
+          spec.axesSpec.length === 1 &&
+          DATASET_KEY_AXES.has(spec.axesSpec[0].name),
+        requireEnrichments: false,
+      }) ?? [];
+
+    return options.map((option) => {
+      const label = labeled.find((o) => plRefsEqual(o.ref, option.primary.ref, true))?.label;
+      return label === undefined ? option : { ...option, primary: { ...option.primary, label } };
+    });
+  })
 
   .output("sequenceColumnOptions", (ctx) => {
     const anchor = ctx.data.abundanceRef;

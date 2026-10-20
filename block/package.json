@@ -1,6 +1,6 @@
 {
   "name": "@platforma-open/milaboratories.clonotype-enrichment",
-  "version": "3.2.2",
+  "version": "4.3.0",
   "files": [
     "dist",
     "block-pack"

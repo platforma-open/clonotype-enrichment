@@ -70,6 +70,8 @@ export type AntigenControlConfig = {
 export type BlockParams = {
   // Input wiring — a PlRef a template engine fills from an earlier entry's output.
   abundanceRef?: PlRef;
+  /** A subset column (`pl7.app/isSubset`) the input is restricted to before the analysis. */
+  filterRef?: PlRef;
 
   // Analysis configuration — the recipe a template exists to reproduce.
   conditionColumnRef?: SUniversalPColumnId;
