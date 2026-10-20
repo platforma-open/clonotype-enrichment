@@ -1,0 +1,228 @@
+// Parent normalization and protein-grain pooling: the parent-enrichment step per grain and its columns.
+
+ll := import("@platforma-sdk/workflow-tengo:ll")
+exec := import("@platforma-sdk/workflow-tengo:exec")
+assets := import("@platforma-sdk/workflow-tengo:assets")
+xsv := import("@platforma-sdk/workflow-tengo:pframes.xsv")
+pframes := import("@platforma-sdk/workflow-tengo:pframes")
+render := import("@platforma-sdk/workflow-tengo:render")
+json := import("json")
+
+pfEnrichmentConv := import(":pf-enrichment-conv")
+pfEnrichmentConvExport := import(":pf-enrichment-conv-export")
+
+parentColumnsTpl := assets.importTemplate(":parent-columns")
+enrichmentColumnTpl := assets.importTemplate(":enrichment-column")
+parentEnrichmentSw := assets.importSoftware("@platforma-open/milaboratories.clonotype-enrichment.software:parent-enrichment")
+
+csvTable := func(fill) {
+	builder := pframes.csvFileBuilder()
+	fill(builder)
+	builder.mem("8GiB")
+	builder.cpu(1)
+	return builder.build()
+}
+
+parentTables := func(axisSpec, mutationCount, parentLink, parentAxisSpec) {
+	return {
+		mutations: csvTable(func(b) {
+			b.setAxisHeader(axisSpec, "elementId")
+			b.add(mutationCount, {header: "mutationCount"})
+		}),
+		links: csvTable(func(b) {
+			b.setAxisHeader(axisSpec, "elementId")
+			b.setAxisHeader(parentAxisSpec, "parentId")
+			b.add(parentLink, {header: "link"})
+		})
+	}
+}
+
+// opts: parents (from parentTables), controlPairs (bool), errors ({ntRun, proteinMap})
+runParentEnrichment := func(conditions, enrichmentRun, opts) {
+	builder := exec.builder().
+		software(parentEnrichmentSw).
+		mem("16GiB").
+		cpu(1).
+		addFile("enrichment.csv", enrichmentRun.getFile("enrichment_results.csv")).
+		addFile("counts.csv", enrichmentRun.getFile("counts.csv")).
+		addFile("reference.csv", enrichmentRun.getFile("reference.csv")).
+		arg("--conditions").arg(string(json.encode(conditions))).
+		arg("--enrichment").arg("enrichment.csv").
+		arg("--counts").arg("counts.csv").
+		arg("--reference").arg("reference.csv").
+		arg("--values_out").arg("values.csv").
+		arg("--summary_out").arg("summary.json")
+	if !is_undefined(opts.parents) {
+		builder = builder.
+			addFile("parent_links.csv", opts.parents.links).
+			addFile("mutations.csv", opts.parents.mutations).
+			arg("--parents").arg("parent_links.csv").
+			arg("--mutations").arg("mutations.csv")
+		if opts.controlPairs {
+			builder = builder.
+				addFile("control_pairs.csv", enrichmentRun.getFile("control_pairs.csv")).
+				arg("--control_pairs").arg("control_pairs.csv")
+		}
+	}
+	if !is_undefined(opts.errors) {
+		builder = builder.
+			addFile("nt_enrichment.csv", opts.errors.ntRun.getFile("reference.csv")).
+			addFile("nt_counts.csv", opts.errors.ntRun.getFile("counts.csv")).
+			addFile("protein_map.csv", opts.errors.proteinMap).
+			arg("--nt_enrichment").arg("nt_enrichment.csv").
+			arg("--nt_counts").arg("nt_counts.csv").
+			arg("--protein_map").arg("protein_map.csv")
+	}
+	return builder.
+		saveFile("values.csv").
+		saveFileContent("summary.json").
+		printErrStreamToStdout().
+		saveStdoutContent().
+		run()
+}
+
+/**
+ * @param ctx: {args, inputs (from parent-inputs.resolve), abundanceSpec, enrichmentRun,
+ *   enrichCsv, enrichmentImportParams, runEnrichment, comparisonExport, calculateAnnotationValues,
+ *   conditionOrder, antigenControlConfig, filteringConfig, additionalEnrichmentExports,
+ *   addMaxNegControlEnrichment, addPresentInNegControl, blockId, inputType, downsampling,
+ *   conditionOrderLabel, downsamplingLabel, subsetTraceSpec (undefined on a full-data run)}
+ * @return {mainTablePf, parentBaselineExport, parentSummary, proteinExport, proteinSummary}, each
+ *   undefined where its grain does not run
+ */
+build := func(ctx) {
+	args := ctx.args
+	inputs := ctx.inputs
+	abundanceSpec := ctx.abundanceSpec
+	variantAxisSpec := abundanceSpec.axesSpec[1]
+	conditions := pfEnrichmentConvExport.effectiveOrder(ctx.conditionOrder, ctx.antigenControlConfig)
+	exportComparisons := ctx.additionalEnrichmentExports
+	isSubset := !is_undefined(ctx.subsetTraceSpec)
+
+	parentColumns := func(parentRun, axisSpec, parentMode, withErrors, forTable, prefix, levelLabel) {
+		tplInputs := {
+			levelLabel: levelLabel,
+			summary: parentRun.getFileContent("summary.json"),
+			valuesCsv: parentRun.getFile("values.csv"),
+			axisSpec: axisSpec,
+			parentMode: parentMode,
+			withErrors: withErrors,
+			forTable: forTable,
+			prefix: prefix,
+			conditions: conditions,
+			conditionOrder: ctx.conditionOrder,
+			exportComparisons: is_undefined(exportComparisons) ? [] : exportComparisons,
+			addMaxNegControl: ctx.addMaxNegControlEnrichment,
+			filteringConfig: ctx.filteringConfig,
+			enrichmentThreshold: args.enrichmentThreshold,
+			antigenControlConfig: ctx.antigenControlConfig,
+			blockId: ctx.blockId,
+			abundanceSpec: abundanceSpec,
+			conditionOrderLabel: ctx.conditionOrderLabel,
+			downsamplingLabel: ctx.downsamplingLabel
+		}
+		// Only for a subset run, so a full-data run keeps exactly its previous inputs
+		if isSubset {
+			tplInputs.traceSpec = ctx.subsetTraceSpec
+			tplInputs.subset = args.inputFilter
+		}
+		// One frame for the whole main table. A column that arrives in a later frame is shown even when
+		// optional: by then the table has saved its hidden-column list, and that list wins.
+		if forTable {
+			tplInputs.mainCsv = ctx.enrichCsv
+			tplInputs.mainImportParams = ctx.enrichmentImportParams
+		}
+		return render.create(parentColumnsTpl, tplInputs)
+	}
+
+	res := {}
+
+	if inputs.parentMode || inputs.pooling {
+		parentRun := runParentEnrichment(conditions, ctx.enrichmentRun, {
+			parents: inputs.parentMode ? parentTables(variantAxisSpec, inputs.mutationCount, inputs.parentLink, inputs.parentAxis) : undefined,
+			controlPairs: ctx.addMaxNegControlEnrichment
+		})
+		built := parentColumns(parentRun, variantAxisSpec, inputs.parentMode, false, true, "", undefined)
+		res.parentBaselineExport = built.output("exports")
+		res.mainTablePf = pframes.exportFrame(built.output("table"))
+		res.parentSummary = parentRun.getFileContent("summary.json")
+	}
+
+	if inputs.pooling {
+		proteinAxisSpec := inputs.proteinAxis
+		proteinSpec := copy(abundanceSpec)
+		proteinSpec.axesSpec = [abundanceSpec.axesSpec[0], proteinAxisSpec]
+
+		proteinMap := csvTable(func(b) {
+			b.setAxisHeader(variantAxisSpec, "elementId")
+			b.setAxisHeader(proteinAxisSpec, "mappedId")
+			b.add(inputs.proteinLinker, {header: "link"})
+		})
+		proteinRun := ctx.runEnrichment(proteinMap, true)
+		proteinEnrichCsv := proteinRun.getFile("enrichment_results.csv")
+		proteinHighestCsv := proteinRun.getFile("highest_enrichment_clonotype.csv")
+
+		proteinExports := pframes.pFrameBuilder()
+
+		proteinStats := ctx.calculateAnnotationValues(proteinHighestCsv, "Enrichment")
+		proteinRawInputs := {
+			levelLabel: "AA Variants",
+			min: proteinStats.min,
+			max: proteinStats.max,
+			median: proteinStats.median,
+			mean: proteinStats.mean,
+			cutoff: proteinStats.cutoff,
+			overall75Percentile: proteinStats.overall75Percentile,
+			abundanceSpec: proteinSpec,
+			inputType: ctx.inputType,
+			topEnrichedColCsv: proteinHighestCsv,
+			downsampling: ctx.downsampling,
+			FilteringConfig: ctx.filteringConfig,
+			conditionOrder: ctx.conditionOrder,
+			antigenControlConfig: ctx.antigenControlConfig,
+			enrichmentThreshold: args.enrichmentThreshold,
+			blockId: ctx.blockId,
+			customBlockLabel: args.customBlockLabel,
+			defaultBlockLabel: args.defaultBlockLabel
+		}
+		// Only for a subset run, so a full-data run keeps exactly its previous inputs
+		if isSubset {
+			proteinRawInputs.traceSpec = ctx.subsetTraceSpec
+			proteinRawInputs.subset = args.inputFilter
+		}
+		proteinRaw := render.create(enrichmentColumnTpl, proteinRawInputs)
+		proteinExports.add("Protein Enrichment - Highest", proteinRaw.output("columnSpec"), proteinRaw.output("columnData"))
+		proteinExports.add("Protein Enrichment - Overall", proteinRaw.output("overallSpec"), proteinRaw.output("overallData"))
+
+		if exportComparisons != undefined && len(exportComparisons) > 0 {
+			proteinEnrichmentPf := xsv.importFile(proteinEnrichCsv, "csv",
+				pfEnrichmentConv.getColumns(proteinSpec, ctx.conditionOrder,
+					ctx.antigenControlConfig.controlEnabled, ctx.addPresentInNegControl,
+					ctx.addMaxNegControlEnrichment, ctx.antigenControlConfig.sequencedLibraryEnabled),
+				{ cpu: 1, mem: "32GiB" })
+			for comparison in exportComparisons {
+				col := ctx.comparisonExport(proteinSpec, proteinEnrichCsv, proteinEnrichmentPf, comparison, "AA Variants")
+				proteinExports.add("Protein Enrichment - " + comparison, col.spec, col.data)
+			}
+		}
+
+		proteinParentRun := runParentEnrichment(conditions, proteinRun, {
+			parents: inputs.aaParentMode ? parentTables(proteinAxisSpec, inputs.aaMutationCount, inputs.aaParentLink, inputs.aaParentAxis) : undefined,
+			controlPairs: ctx.addMaxNegControlEnrichment,
+			errors: { ntRun: ctx.enrichmentRun, proteinMap: proteinMap }
+		})
+		proteinBuilt := parentColumns(proteinParentRun, proteinAxisSpec, inputs.aaParentMode, true, false, "protein_", "AA Variants")
+
+		res.proteinExport = {
+			raw: proteinExports.build(),
+			derived: proteinBuilt.output("exports")
+		}
+		res.proteinSummary = proteinParentRun.getFileContent("summary.json")
+	}
+
+	return res
+}
+
+export ll.toStrict({
+	build: build
+})
