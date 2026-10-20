@@ -26,6 +26,17 @@ effectiveOrder := func(conditionOrder, antigenControlConfig) {
   return conditionOrder
 }
 
+// The protein-level columns derive from the nucleotide abundance, so they inherit its "NT Variants"
+// step. This step takes the profiler's level type: labels count a type from the newest step, so it
+// replaces the inherited one instead of showing beside it.
+levelStep := func(label) {
+  return {
+    type: "milaboratories.synthetic-repertoire-profiler.level",
+    importance: 80,
+    label: label
+  }
+}
+
 // The domain of one enrichment value: `kind` is "max", "overall" or "comparison" (which takes the
 // "X vs Y" comparison as its extra argument).
 valueDomain := func(base, kind, conditionOrder, ...comparison) {
@@ -179,6 +190,7 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percenti
 export ll.toStrict({
 	baseDomain: baseDomain,
 	effectiveOrder: effectiveOrder,
+	levelStep: levelStep,
 	valueDomain: valueDomain,
 	getColumns: getColumns
 })

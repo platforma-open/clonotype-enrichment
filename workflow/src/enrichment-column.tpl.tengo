@@ -79,7 +79,7 @@ self.body(func(args) {
     // Add two traces, one for the condition order and one for the downsampling.
     // A subset run roots the trace in the filter (dataset -> the block that made the subset).
     traceSpec := is_undefined(args.traceSpec) ? abundanceSpec : args.traceSpec
-    trace := pSpec.makeTrace(traceSpec,
+    steps := [
         {
             type: "milaboratories.clonotype-enrichment.condition-order",
             importance: 35,
@@ -89,7 +89,12 @@ self.body(func(args) {
             type: "milaboratories.clonotype-enrichment.downsampling",
             importance: 30,
             label: label
-        })
+        }
+    ]
+    if !is_undefined(args.levelLabel) {
+        steps = append(steps, pfEnrichmentConvExport.levelStep(args.levelLabel))
+    }
+    trace := pSpec.makeTrace(traceSpec, steps...)
 
     // Trace, plus the subset stamp on a subset run (its outputs cover only the subset)
     finalSpec := func(spec) {

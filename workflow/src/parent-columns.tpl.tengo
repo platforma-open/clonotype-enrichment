@@ -182,7 +182,7 @@ self.body(func(args) {
 
 	// A subset run roots the trace in the filter (dataset -> the block that made the subset).
 	traceSpec := is_undefined(args.traceSpec) ? args.abundanceSpec : args.traceSpec
-	trace := pSpec.makeTrace(traceSpec,
+	steps := [
 		{
 			type: "milaboratories.clonotype-enrichment.condition-order",
 			importance: 35,
@@ -192,7 +192,12 @@ self.body(func(args) {
 			type: "milaboratories.clonotype-enrichment.downsampling",
 			importance: 30,
 			label: args.downsamplingLabel
-		})
+		}
+	]
+	if !is_undefined(args.levelLabel) {
+		steps = append(steps, pfEnrichmentConvExport.levelStep(args.levelLabel))
+	}
+	trace := pSpec.makeTrace(traceSpec, steps...)
 
 	// Trace, plus the subset stamp on a subset run (its outputs cover only the subset)
 	exportSpec := func(spec) {

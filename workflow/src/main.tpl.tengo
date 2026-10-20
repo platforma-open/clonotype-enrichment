@@ -445,7 +445,7 @@ wf.body(func(args) {
 		)
 	}
 
-	comparisonExport := func(spec, enrichmentCsv, enrichmentFrame, comparison) {
+	comparisonExport := func(spec, enrichmentCsv, enrichmentFrame, comparison, levelLabel) {
 		colId := strings.substituteSpecialCharacters("enrichment_" + text.re_compile(" vs ").replace(comparison, "_"))
 
 		annotationStats := calculateAnnotationValues(enrichmentCsv, "Enrichment " + comparison)
@@ -456,6 +456,7 @@ wf.body(func(args) {
 		}
 
 		exportColumnInputs := {
+			levelLabel: levelLabel,
 			min: annotationStats.min,
 			max: annotationStats.max,
 			median: annotationStats.median,
@@ -491,7 +492,7 @@ wf.body(func(args) {
 	exportsAdditionalEnrichments := pframes.pFrameBuilder()
 	if additionalEnrichmentExports != undefined && len(additionalEnrichmentExports) > 0 {
 		for comparison in additionalEnrichmentExports {
-			col := comparisonExport(abundanceSpec, enrichCsv, enrichmentPf, comparison)
+			col := comparisonExport(abundanceSpec, enrichCsv, enrichmentPf, comparison, undefined)
 			exportsAdditionalEnrichments.add("Enrichment - " + comparison, col.spec, col.data)
 		}
 	}
@@ -598,8 +599,9 @@ wf.body(func(args) {
 			run()
 	}
 
-	parentColumns := func(parentRun, axisSpec, parentMode, withErrors, forTable, prefix) {
+	parentColumns := func(parentRun, axisSpec, parentMode, withErrors, forTable, prefix, levelLabel) {
 		tplInputs := {
+			levelLabel: levelLabel,
 			summary: parentRun.getFileContent("summary.json"),
 			valuesCsv: parentRun.getFile("values.csv"),
 			axisSpec: axisSpec,
@@ -641,7 +643,7 @@ wf.body(func(args) {
 			parents: inputs.parentMode ? parentTables(variantAxisSpec, inputs.mutationCount, inputs.parentLink, inputs.parentAxis) : undefined,
 			controlPairs: addMaxNegControlEnrichment
 		})
-		built := parentColumns(parentRun, variantAxisSpec, inputs.parentMode, false, true, "")
+		built := parentColumns(parentRun, variantAxisSpec, inputs.parentMode, false, true, "", undefined)
 		parentBaselineExport = built.output("exports")
 		mainTablePf = pframes.exportFrame(built.output("table"))
 		parentSummary = parentRun.getFileContent("summary.json")
@@ -667,6 +669,7 @@ wf.body(func(args) {
 
 		proteinStats := calculateAnnotationValues(proteinHighestCsv, "Enrichment")
 		proteinRawInputs := {
+			levelLabel: "AA Variants",
 			min: proteinStats.min,
 			max: proteinStats.max,
 			median: proteinStats.median,
@@ -701,7 +704,7 @@ wf.body(func(args) {
 					addMaxNegControlEnrichment, antigenControlConfig.sequencedLibraryEnabled),
 				{ cpu: 1, mem: "32GiB" })
 			for comparison in additionalEnrichmentExports {
-				col := comparisonExport(proteinSpec, proteinEnrichCsv, proteinEnrichmentPf, comparison)
+				col := comparisonExport(proteinSpec, proteinEnrichCsv, proteinEnrichmentPf, comparison, "AA Variants")
 				proteinExports.add("Protein Enrichment - " + comparison, col.spec, col.data)
 			}
 		}
@@ -711,7 +714,7 @@ wf.body(func(args) {
 			controlPairs: addMaxNegControlEnrichment,
 			errors: { ntRun: calculateEnrichment, proteinMap: proteinMap }
 		})
-		proteinBuilt := parentColumns(proteinParentRun, proteinAxisSpec, inputs.aaParentMode, true, false, "protein_")
+		proteinBuilt := parentColumns(proteinParentRun, proteinAxisSpec, inputs.aaParentMode, true, false, "protein_", "AA Variants")
 
 		proteinExport = {
 			raw: proteinExports.build(),
