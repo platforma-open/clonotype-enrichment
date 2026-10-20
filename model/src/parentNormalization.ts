@@ -23,15 +23,15 @@ export type ParentRunSummary = {
   }[];
 };
 
-/**
- * `on` and `off` follow the two input columns; `partial` names the one that resolved. The summaries
- * come from the last run and are absent before it.
- */
-export type ParentNormalization = (
-  | { state: "off" }
-  | { state: "partial"; resolved: typeof MUTATION_COUNT | typeof PARENT_LINK }
-  | { state: "on" }
-) & { summary?: ParentRunSummary; proteinSummary?: ParentRunSummary };
+export type ParentInput = typeof MUTATION_COUNT | typeof PARENT_LINK;
+
+/** The summaries come from the last run and are absent before it. */
+export type ParentNormalization = {
+  /** The one parent column found on the selected grain, when the other is missing. */
+  halfMatched?: ParentInput;
+  summary?: ParentRunSummary;
+  proteinSummary?: ParentRunSummary;
+};
 
 const domainKey = (axis: AxisSpec) =>
   JSON.stringify(Object.entries(axis.domain ?? {}).sort(([a], [b]) => a.localeCompare(b)));
@@ -50,15 +50,13 @@ const isParentLinkOn = (spec: PColumnSpec, axis: AxisSpec) =>
   spec.axesSpec.some((a) => a.name === PARENT_ID_AXIS);
 
 /** Mirrors the workflow's discovery: each column must resolve to exactly one; several count as none. */
-export function parentInputsState(
+export function halfMatchedParentInput(
   specs: PObjectSpec[],
   variantAxis: AxisSpec,
-): ParentNormalization {
+): ParentInput | undefined {
   const columns = specs.filter(isPColumnSpec);
   const mutationCount = columns.filter((s) => isMutationCountOn(s, variantAxis)).length === 1;
   const parentLink = columns.filter((s) => isParentLinkOn(s, variantAxis)).length === 1;
-  if (mutationCount && parentLink) return { state: "on" };
-  if (mutationCount) return { state: "partial", resolved: MUTATION_COUNT };
-  if (parentLink) return { state: "partial", resolved: PARENT_LINK };
-  return { state: "off" };
+  if (mutationCount === parentLink) return undefined;
+  return mutationCount ? MUTATION_COUNT : PARENT_LINK;
 }

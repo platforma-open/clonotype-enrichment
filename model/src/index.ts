@@ -32,7 +32,7 @@ import {
   readAnnotationJson,
 } from "@platforma-sdk/model";
 import type { ParentNormalization, ParentRunSummary } from "./parentNormalization";
-import { parentInputsState } from "./parentNormalization";
+import { halfMatchedParentInput } from "./parentNormalization";
 export type * from "@milaboratories/helpers";
 export type { ParentNormalization, ParentRunSummary } from "./parentNormalization";
 
@@ -713,21 +713,20 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
     if (!anchor) return undefined;
     const variantAxis = ctx.resultPool.getPColumnSpecByRef(anchor)?.axesSpec[1];
     if (!variantAxis) return undefined;
-    const state = parentInputsState(
+    const halfMatched = halfMatchedParentInput(
       ctx.resultPool.getSpecs().entries.map((e) => e.obj),
       variantAxis,
     );
 
     // A summary from a run on another dataset says nothing about this one.
-    if (JSON.stringify(ctx.activeArgs?.abundanceRef) !== JSON.stringify(anchor)) return state;
-    // Read regardless of `state`, which covers only the selected grain: the protein grain finds its
-    // parent columns on its own and can normalize when the selected grain does not.
+    if (JSON.stringify(ctx.activeArgs?.abundanceRef) !== JSON.stringify(anchor))
+      return { halfMatched };
     const summary = (field: string) =>
       ctx.outputs
         ?.resolve({ field, allowPermanentAbsence: true })
         ?.getDataAsJson<ParentRunSummary>();
     return {
-      ...state,
+      halfMatched,
       summary: summary("parentSummary"),
       proteinSummary: summary("proteinSummary"),
     };

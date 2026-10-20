@@ -569,11 +569,11 @@ const createParentStatesTable = (title: string, summary?: ParentRunSummary) => {
 };
 
 const createParentStatesTables = () => {
-  const state = parentNormalization.value;
-  if (!state) return "";
+  const parent = parentNormalization.value;
+  if (!parent) return "";
   return (
-    createParentStatesTable("Parents", state.summary) +
-    createParentStatesTable("Parents (protein level)", state.proteinSummary)
+    createParentStatesTable("Parents", parent.summary) +
+    createParentStatesTable("Parents (protein level)", parent.proteinSummary)
   );
 };
 
@@ -602,22 +602,20 @@ const UNIDENTIFIABLE_REASONS: Record<string, string> = {
 const parentNormalization = computed(() => app.model.outputs.parentNormalization);
 
 const parentPartialMessage = computed(() => {
-  const state = parentNormalization.value;
-  if (state?.state !== "partial") return undefined;
-  const found = PARENT_COLUMN_LABELS[state.resolved];
-  const missing = Object.entries(PARENT_COLUMN_LABELS).find(
-    ([name]) => name !== state.resolved,
-  )?.[1];
+  const halfMatched = parentNormalization.value?.halfMatched;
+  if (!halfMatched) return undefined;
+  const found = PARENT_COLUMN_LABELS[halfMatched];
+  const missing = Object.entries(PARENT_COLUMN_LABELS).find(([name]) => name !== halfMatched)?.[1];
   return `The ${found} column was found, but the ${missing} column was not. Values are not normalized to the parent.`;
 });
 
 const parentRunNotes = computed(() => {
-  const state = parentNormalization.value;
-  if (!state) return [];
+  const parent = parentNormalization.value;
+  if (!parent) return [];
   const notes: string[] = [];
   const grains = [
-    { name: "variant", summary: state.summary },
-    { name: "protein", summary: state.proteinSummary },
+    { name: "variant", summary: parent.summary },
+    { name: "protein", summary: parent.proteinSummary },
   ];
   for (const { name, summary } of grains) {
     for (const parent of summary?.unidentifiable ?? []) {
