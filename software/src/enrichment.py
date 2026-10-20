@@ -184,6 +184,63 @@ def write_counts(track_df: pl.DataFrame, condition_order: List[str], counts_csv:
     counts.select(['elementId'] + condition_order).sort('elementId').write_csv(counts_csv)
 
 
+def frequency_pivot(
+    pivot_ready: pl.DataFrame, condition_order: List[str], totals: Dict[str, int], n_clonotypes: int,
+    pseudo_count: float
+) -> pl.DataFrame:
+    """One row per element: its abundance and its frequency in each condition."""
+    # Create pivot table for target track
+    pivot_df = (
+        pivot_ready
+        .pivot(values='abundance', index='elementId', on='condition', aggregate_function='sum')
+        .fill_null(0)
+    )
+
+    # Ensure all conditions are present in pivot
+    pivot_df_schema = pivot_df.collect_schema().names()
+    for condition in condition_order:
+        if condition not in pivot_df_schema:
+            pivot_df = pivot_df.with_columns(pl.lit(0).alias(condition))
+    pivot_df_schema = pivot_df.collect_schema().names()
+
+    # Convert elementId to index by setting it aside
+    pivot_df = pivot_df.sort('elementId')
+
+    # Sort columns alphabetically but keep elementId
+    condition_cols = sorted([col for col in pivot_df_schema if col != 'elementId'])
+    pivot_df = pivot_df.select(['elementId'] + condition_cols)
+
+    # Pre-calculate frequencies for target track
+    freq_expressions = []
+    for condition in condition_order:
+        total = totals.get(condition, 1)
+        # This ensures frequencies sum to 1: Σ[(abundance + p) / (total + N*p)] = 1
+        freq_expressions.append(
+            ((pl.col(condition) + pseudo_count) / (total + (n_clonotypes * pseudo_count))).alias(f'freq_{condition}')
+        )
+
+    # Add frequency columns
+    return pivot_df.with_columns(freq_expressions)
+
+
+def write_reference(
+    track_df: pl.DataFrame, condition_order: List[str], totals: Dict[str, int], n_clonotypes: int,
+    pseudo_count: float, reference_csv: str
+) -> None:
+    """Each element's pairwise log2FC, before filters, with the same formula as the main table."""
+    pair_cols = [
+        f'Enrichment {condition_order[i]} vs {condition_order[j]}'
+        for i in range(1, len(condition_order)) for j in range(i)
+    ]
+    if track_df.height == 0:
+        pl.DataFrame(schema={'elementId': pl.Utf8, **{c: pl.Float64 for c in pair_cols}}).write_csv(reference_csv)
+        return
+    pivot_ready = track_df.group_by(['elementId', 'condition']).agg(pl.col('abundance').sum().alias('abundance'))
+    pivot_df = frequency_pivot(pivot_ready, condition_order, totals, n_clonotypes, pseudo_count)
+    _calculate_enrichments_vectorized(pivot_df, condition_order).select(['elementId'] + pair_cols) \
+        .sort('elementId').write_csv(reference_csv)
+
+
 def control_pair_rows(
     antigen: str, antigen_pivot: pl.DataFrame, antigen_enrichment: pl.DataFrame, conditions: List[str]
 ) -> List[pl.DataFrame]:
@@ -329,6 +386,7 @@ def hybrid_enrichment_analysis(
     element_map_csv: Optional[str] = None,
     counts_csv: Optional[str] = None,
     control_pairs_csv: Optional[str] = None,
+    reference_csv: Optional[str] = None,
 ) -> None:
     """
     Optimized hybrid enrichment analysis using polars for better performance and memory efficiency.
@@ -412,6 +470,8 @@ def hybrid_enrichment_analysis(
             write_counts(pl.DataFrame(), effective_condition_order, counts_csv)
         if control_pairs_csv:
             pl.DataFrame(schema=CONTROL_PAIRS_SCHEMA).write_csv(control_pairs_csv)
+        if reference_csv:
+            write_reference(pl.DataFrame(), effective_condition_order, {}, 0, pseudo_count, reference_csv)
         return
 
     if clonotype_definition_csv:
@@ -529,6 +589,12 @@ def hybrid_enrichment_analysis(
     # Calculate track-specific n_clonotypes for normalization
     target_n_clonotypes = target_track_df.select('elementId').n_unique()
 
+    # Before the filters too: a parent the filters remove still serves as its variants' reference.
+    # Totals and N are taken before the filters, so these values equal the filtered ones.
+    if reference_csv:
+        write_reference(target_track_df, effective_condition_order, target_total_reads_dict,
+                        target_n_clonotypes, pseudo_count, reference_csv)
+
     # Apply clonotype filtering if requested on the target track
     if filter_clonotypes:
         target_track_df = filter_clonotypes_by_criteria(
@@ -555,38 +621,8 @@ def hybrid_enrichment_analysis(
         with open(filtered_too_much_txt, 'w') as f:
             f.write(too_few)
 
-    # Create pivot table for target track
-    pivot_df = (
-        target_track_pivot_ready
-        .pivot(values='abundance', index='elementId', on='condition', aggregate_function='sum')
-        .fill_null(0)
-    )
-
-    # Ensure all conditions are present in pivot
-    pivot_df_schema = pivot_df.collect_schema().names()
-    for condition in effective_condition_order:
-        if condition not in pivot_df_schema:
-            pivot_df = pivot_df.with_columns(pl.lit(0).alias(condition))
-    pivot_df_schema = pivot_df.collect_schema().names()
-
-    # Convert elementId to index by setting it aside
-    pivot_df = pivot_df.sort('elementId')
-
-    # Sort columns alphabetically but keep elementId
-    condition_cols = sorted([col for col in pivot_df_schema if col != 'elementId'])
-    pivot_df = pivot_df.select(['elementId'] + condition_cols)
-
-    # Pre-calculate frequencies for target track
-    freq_expressions = []
-    for condition in effective_condition_order:
-        total = target_total_reads_dict.get(condition, 1)
-        # This ensures frequencies sum to 1: Σ[(abundance + p) / (total + N*p)] = 1
-        freq_expressions.append(
-            ((pl.col(condition) + pseudo_count) / (total + (target_n_clonotypes * pseudo_count))).alias(f'freq_{condition}')
-        )
-
-    # Add frequency columns
-    pivot_df = pivot_df.with_columns(freq_expressions)
+    pivot_df = frequency_pivot(target_track_pivot_ready, effective_condition_order,
+                               target_total_reads_dict, target_n_clonotypes, pseudo_count)
 
     # Calculate Overall Log2FC (last vs first)
     if len(effective_condition_order) >= 2:
@@ -1372,6 +1408,8 @@ if __name__ == "__main__":
                         help="Output CSV: reads per element per condition, target track, before filters")
     parser.add_argument("--control_pairs_out", required=False,
                         help="Output CSV: log2FC per control-arm pair with its read counts")
+    parser.add_argument("--reference_out", required=False,
+                        help="Output CSV: pairwise log2FC per element, target track, before filters")
 
     args = parser.parse_args()
 
@@ -1410,4 +1448,5 @@ if __name__ == "__main__":
         element_map_csv=args.element_map,
         counts_csv=args.counts_out,
         control_pairs_csv=args.control_pairs_out,
+        reference_csv=args.reference_out,
     )

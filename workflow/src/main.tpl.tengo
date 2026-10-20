@@ -20,6 +20,7 @@ parentEnrichmentSw := assets.importSoftware("@platforma-open/milaboratories.clon
 parentInputs := import(":parent-inputs")
 
 pfEnrichmentConv := import(":pf-enrichment-conv")
+pfEnrichmentConvExport := import(":pf-enrichment-conv-export")
 pfFrequencyConv := import(":pf-frequency-conv")
 pfBubbleConv := import(":pf-bubble-conv")
 pfStackedConv := import(":pf-stacked-conv")
@@ -334,8 +335,10 @@ wf.body(func(args) {
 			calculateEnrichment = calculateEnrichment.
 				arg("--counts_out").arg("counts.csv").
 				arg("--control_pairs_out").arg("control_pairs.csv").
+				arg("--reference_out").arg("reference.csv").
 				saveFile("counts.csv").
-				saveFile("control_pairs.csv")
+				saveFile("control_pairs.csv").
+				saveFile("reference.csv")
 		}
 
 		return calculateEnrichment.
@@ -532,7 +535,7 @@ wf.body(func(args) {
 	outStats := buildExports.output("outStats")
 
 	//////////// Parent normalization and protein-grain errors ////////////
-	effectiveConditions := antigenControlConfig.sequencedLibraryEnabled ? ["0 - Library"] + conditionOrder : conditionOrder
+	effectiveConditions := pfEnrichmentConvExport.effectiveOrder(conditionOrder, antigenControlConfig)
 
 	csvTable := func(fill) {
 		builder := pframes.csvFileBuilder()
@@ -564,9 +567,11 @@ wf.body(func(args) {
 			cpu(1).
 			addFile("enrichment.csv", enrichmentRun.getFile("enrichment_results.csv")).
 			addFile("counts.csv", enrichmentRun.getFile("counts.csv")).
+			addFile("reference.csv", enrichmentRun.getFile("reference.csv")).
 			arg("--conditions").arg(string(json.encode(effectiveConditions))).
 			arg("--enrichment").arg("enrichment.csv").
 			arg("--counts").arg("counts.csv").
+			arg("--reference").arg("reference.csv").
 			arg("--values_out").arg("values.csv").
 			arg("--summary_out").arg("summary.json")
 		if !is_undefined(opts.parents) {
@@ -583,7 +588,7 @@ wf.body(func(args) {
 		}
 		if !is_undefined(opts.errors) {
 			builder = builder.
-				addFile("nt_enrichment.csv", opts.errors.ntRun.getFile("enrichment_results.csv")).
+				addFile("nt_enrichment.csv", opts.errors.ntRun.getFile("reference.csv")).
 				addFile("nt_counts.csv", opts.errors.ntRun.getFile("counts.csv")).
 				addFile("protein_map.csv", opts.errors.proteinMap).
 				arg("--nt_enrichment").arg("nt_enrichment.csv").

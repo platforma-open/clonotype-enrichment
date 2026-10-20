@@ -17,6 +17,15 @@ baseDomain := func(conditionOrder, enrichmentThreshold, antigenControlConfig, fi
   return domain
 }
 
+// The order the values are computed in: with a sequenced library, the library comes first and is the
+// baseline of the overall value.
+effectiveOrder := func(conditionOrder, antigenControlConfig) {
+  if antigenControlConfig.sequencedLibraryEnabled {
+    return ["0 - Library"] + conditionOrder
+  }
+  return conditionOrder
+}
+
 // The domain of one enrichment value: `kind` is "max", "overall" or "comparison" (which takes the
 // "X vs Y" comparison as its extra argument).
 valueDomain := func(base, kind, conditionOrder, ...comparison) {
@@ -100,7 +109,7 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percenti
         }
       }
 
-  overallDomain := valueDomain(base, "overall", conditionOrder)
+  overallDomain := valueDomain(base, "overall", effectiveOrder(conditionOrder, antigenControlConfig))
 
   // Overall Log2FC columns will have additional specs if target was selected
   overallColumn := {
@@ -169,6 +178,7 @@ getColumns := func(abundanceSpec, inputType, min, max, cutoff, overall75Percenti
 
 export ll.toStrict({
 	baseDomain: baseDomain,
+	effectiveOrder: effectiveOrder,
 	valueDomain: valueDomain,
 	getColumns: getColumns
 })

@@ -122,13 +122,15 @@ def replicate_errors(
 
     SE² = n/(n−1) · Σ wᵢ² (xᵢ − x̄)² / (Σ wᵢ)², weighted by each variant's reads in the reference
     round j. Null, not zero, with fewer than two variants: zero would claim perfect agreement.
+    `nt_values` are taken before the block's filters, as the protein's pooled reads are. A variant
+    with no reads in round j carries no weight and is not counted.
     """
     rows = nt_values.join(protein_map, on=ID, how="inner").join(nt_counts, on=ID, how="left")
     result = protein_map.select(pl.col(PROTEIN).alias(ID)).unique()
     for i, j in pairs:
         x, w = pl.col(f"e_{key(i, j)}"), pl.col(f"k_{j}").fill_null(0.0)
         per_pair = (
-            rows.filter(x.is_not_null())
+            rows.filter(x.is_not_null() & (w > 0))
             .with_columns(((w * x).sum().over(PROTEIN) / w.sum().over(PROTEIN)).alias("_centre"))
             .group_by(PROTEIN)
             .agg(
@@ -181,8 +183,13 @@ def compute(
     nt_values: Optional[pl.DataFrame] = None,
     nt_counts: Optional[pl.DataFrame] = None,
     protein_map: Optional[pl.DataFrame] = None,
+    reference: Optional[pl.DataFrame] = None,
 ) -> Tuple[pl.DataFrame, Dict]:
-    """Returns the per-element values table and the run summary."""
+    """Returns the per-element values table and the run summary.
+
+    `values` holds the variants the block shows, after its filters. `reference` holds every element
+    before them; parents are looked up there, so a filtered parent still serves its variants.
+    """
     n = len(conditions)
     pairs = pair_indices(n)
     pair_keys = [key(i, j) for i, j in pairs]
@@ -190,16 +197,23 @@ def compute(
     mode_on = links is not None and mutations is not None
     with_errors = nt_values is not None and nt_counts is not None and protein_map is not None
 
-    values = values.join(counts, on=ID, how="left")
-    out = values.select(ID, *[pl.col(f"k_{i}").cast(pl.Int64).alias(f"reads_{i}") for i in range(n)])
-
+    errors = None
     if with_errors:
         errors = counting_errors(counts, pairs).join(
             replicate_errors(nt_values, nt_counts, protein_map, pairs), on=ID, how="left"
         )
-        values = values.join(errors, on=ID, how="left")
-        for k in pair_keys:
-            values = values.with_columns(larger(pl.col(f"c_{k}"), pl.col(f"r_{k}")).alias(f"se_{k}"))
+
+    def with_counts_and_errors(frame: pl.DataFrame) -> pl.DataFrame:
+        frame = frame.join(counts, on=ID, how="left")
+        if errors is not None:
+            frame = frame.join(errors, on=ID, how="left")
+            for k in pair_keys:
+                frame = frame.with_columns(larger(pl.col(f"c_{k}"), pl.col(f"r_{k}")).alias(f"se_{k}"))
+        return frame
+
+    lookup = with_counts_and_errors(values if reference is None else reference)
+    values = with_counts_and_errors(values)
+    out = values.select(ID, *[pl.col(f"k_{i}").cast(pl.Int64).alias(f"reads_{i}") for i in range(n)])
 
     summary: Dict = {"mode": None}
 
@@ -221,7 +235,7 @@ def compute(
         if with_errors:
             parent_cols += [f"c_{k}" for k in pair_keys] + [f"r_{k}" for k in pair_keys]
         parent_values = parents.filter(pl.col(PARENT_KEY).is_not_null()).join(
-            values.select(pl.col(ID).alias(PARENT_KEY), *[pl.col(c).alias(f"p_{c}") for c in parent_cols]),
+            lookup.select(pl.col(ID).alias(PARENT_KEY), *[pl.col(c).alias(f"p_{c}") for c in parent_cols]),
             on=PARENT_KEY,
             how="inner",
         )
@@ -272,7 +286,7 @@ def compute(
             )
 
         summary["conditions"] = list(conditions)
-        summary["parentStates"] = parent_states(parents, values, n)
+        summary["parentStates"] = parent_states(parents, lookup, n)
 
     if with_errors:
         raw_cols = [f"e_{k}" for k in pair_keys]
@@ -359,9 +373,10 @@ def main() -> None:
     parser.add_argument("--parents", help="CSV [elementId, parentId]: the parent linker")
     parser.add_argument("--mutations", help="CSV [elementId, mutationCount]")
     parser.add_argument("--control_pairs", help="control-arm pairs of this grain")
-    parser.add_argument("--nt_enrichment", help="enrichment_results.csv at nucleotide grain")
+    parser.add_argument("--nt_enrichment", help="pairwise log2FC at nucleotide grain, before filters")
     parser.add_argument("--nt_counts", help="reads per nucleotide variant per condition")
     parser.add_argument("--protein_map", help="CSV [elementId, mappedId]: nucleotide -> amino-acid variant")
+    parser.add_argument("--reference", help="pairwise log2FC of every element of this grain, before filters")
     parser.add_argument("--values_out", required=True)
     parser.add_argument("--summary_out", required=True)
     args = parser.parse_args()
@@ -384,6 +399,7 @@ def main() -> None:
         nt_values=None if args.nt_enrichment is None else read_enrichment(args.nt_enrichment, conditions),
         nt_counts=None if args.nt_counts is None else read_counts(args.nt_counts, conditions),
         protein_map=table(args.protein_map, {ID: pl.Utf8, PROTEIN: pl.Utf8}),
+        reference=None if args.reference is None else read_enrichment(args.reference, conditions),
     )
 
     out.write_csv(args.values_out)

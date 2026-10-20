@@ -235,3 +235,35 @@ def test_cancelled_normalized_error_is_the_raw_error():
     assert summary["mode"] == pe.MODE_CANCELLED
     x = row(out, "X")
     assert x["pnse_1_0"] == pytest.approx(x["se_1_0"])
+
+
+def test_filtered_parent_still_serves_its_variants():
+    # The block's filters removed the parent a0 from the shown values; the reference still has it.
+    shown = values({"a1": (3.0, 1.0, -2.0)})
+    reference = values({"a0": (1.0, 2.0, 1.0), "a1": (3.0, 1.0, -2.0)})
+    out, summary = pe.compute(
+        CONDITIONS, shown, counts({"a0": (100, 200, 400), "a1": (10, 80, 20)}),
+        links([("a0", "A"), ("a1", "A")]), mutations({"a0": 0, "a1": 1}), reference=reference,
+    )
+    assert out["elementId"].to_list() == ["a1"]
+    a1 = row(out, "a1")
+    assert (a1["pn_1_0"], a1["pn_2_0"], a1["pn_2_1"]) == (2.0, -1.0, -3.0)
+    assert summary["parentStates"] == [{
+        "parentId": "A",
+        "states": [pe.STATE_OBSERVED, pe.STATE_OBSERVED, pe.STATE_OBSERVED],
+        "reads": [100, 200, 400],
+    }]
+
+
+def test_variant_without_reads_in_the_reference_round_is_not_counted():
+    nt_values = values({"n1": (1.0, 0.0, 0.0), "n2": (3.0, 0.0, 0.0), "n4": (9.0, 0.0, 0.0)})
+    nt_counts = counts({"n1": (4, 1, 1), "n2": (4, 1, 1), "n4": (0, 5, 5)})
+    protein_map = pl.DataFrame({"elementId": ["n1", "n2", "n4"], "mappedId": ["X", "X", "X"]})
+    out, _ = pe.compute(
+        CONDITIONS, values({"X": (2.0, 0.0, 0.0)}), counts({"X": (8, 11, 11)}),
+        nt_values=nt_values, nt_counts=nt_counts, protein_map=protein_map,
+    )
+    x = row(out, "X")
+    # n4 has no reads in R0, the reference round of 1_0: the scatter is over n1 and n2 only.
+    assert x["nt_1_0"] == 2
+    assert x["se_1_0"] == pytest.approx(max(counting(11, 8), 1.0))

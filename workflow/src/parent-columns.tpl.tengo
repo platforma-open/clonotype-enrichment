@@ -113,7 +113,7 @@ self.body(func(args) {
 	}
 
 	maxDomain := pfEnrichmentConvExport.valueDomain(base, "max", args.conditionOrder)
-	overallDomain := pfEnrichmentConvExport.valueDomain(base, "overall", args.conditionOrder)
+	overallDomain := pfEnrichmentConvExport.valueDomain(base, "overall", conditions)
 
 	if parentMode {
 		addValue(normalized("pn_max", maxDomain, "Max Log2FC", "", {
