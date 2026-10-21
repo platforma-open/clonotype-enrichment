@@ -31,6 +31,7 @@ import {
   isPColumnSpec,
   readAnnotationJson,
 } from "@platforma-sdk/model";
+import { graphMakerPlugin } from "@milaboratories/graph-maker/plugin";
 import { PRIMARY_ABUNDANCE, parseRunColumn, toColumnId } from "./abundance";
 import { getClonotypeDefinitionOptions } from "./clonotype_definition";
 import { findColumn, getOutputColumns, toIdsAndSpecs, toPColumns } from "./columns";
@@ -333,7 +334,29 @@ const DATASET_KEY_AXES: ReadonlySet<string> = new Set([
   "pl7.app/variantKey",
 ]);
 
+// The frequency line plot is a graph-maker plugin instance. Only this chart is
+// migrated: it is the one whose frame needs a linker, because a clustered
+// dataset keys the frequencies by cluster while everything a user would
+// annotate them with is keyed by clonotype.
+const linePlugin = graphMakerPlugin.create({
+  pluginId: "line",
+  config: {
+    chartType: "scatterplot",
+    initialTitle: "Top enriched sequences",
+    initialTemplate: "curve_dots",
+    initialState: {
+      currentTab: null,
+      layersSettings: { curve: { smoothing: false } },
+    },
+  },
+});
+
 export const platforma = BlockModelV3.create({ dataModel, kind })
+
+  .plugin(linePlugin, {
+    anchorColumns: (ctx) => ctx.outputs?.resolve("linePf")?.getPColumns(),
+    defaultPalette: () => "bright" as const,
+  })
 
   // Built even from an incomplete configuration; `argsIssues` decides whether it may run.
   .args((data) => {
@@ -668,15 +691,6 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
     }
 
     return toIdsAndSpecs(pCols);
-  })
-
-  .outputWithStatus("linePf", (ctx): PFrameHandle | undefined => {
-    const pCols = getOutputColumns(ctx.outputs?.resolve("linePf"))?.getColumns();
-    if (pCols === undefined) {
-      return undefined;
-    }
-
-    return createPFrameForGraphs(ctx, toPColumns(pCols));
   })
 
   .output("isRunning", (ctx) => ctx.outputs?.getIsReadyOrError() === false)
