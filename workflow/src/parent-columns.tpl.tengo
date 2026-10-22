@@ -1,0 +1,238 @@
+// Columns of one grain built from the parent-enrichment computation, and for the selected grain the
+// whole main-table frame. A child template because the reference mode sits in the domain, and the
+// mode is known only once the computation has run.
+
+self := import("@platforma-sdk/workflow-tengo:tpl")
+ll := import("@platforma-sdk/workflow-tengo:ll")
+json := import("json")
+xsv := import("@platforma-sdk/workflow-tengo:pframes.xsv")
+pSpec := import("@platforma-sdk/workflow-tengo:pframes.spec")
+pframes := import("@platforma-sdk/workflow-tengo:pframes")
+maps := import("@platforma-sdk/workflow-tengo:maps")
+
+pfEnrichmentConvExport := import(":pf-enrichment-conv-export")
+
+self.defineOutputs("exports", "table")
+
+NORMALIZED_DESCRIPTION := "Log2 fold change relative to the variant's own parent. Zero means level with the parent; a negative value is a variant that did worse than its parent."
+ERROR_DESCRIPTION := "Measurement error: the larger of the counting error and the scatter of the synonymous nucleotide variants. The symmetric error understates below roughly 20 reads; check the read counts."
+NORMALIZED_ERROR_DESCRIPTION := ERROR_DESCRIPTION + " Variant and parent errors are added in quadrature. Read counts are multinomial rather than Poisson, so this understates slightly, more so the larger the parent's share of the library."
+
+self.body(func(args) {
+	conditions := args.conditions
+	axisSpec := args.axisSpec
+	parentMode := args.parentMode
+	withErrors := args.withErrors
+	forTable := args.forTable
+
+	base := pfEnrichmentConvExport.baseDomain(args.conditionOrder, args.enrichmentThreshold,
+		args.antigenControlConfig, args.filteringConfig, args.blockId)
+
+	mode := undefined
+	if parentMode {
+		mode = json.decode(args.summary.getData()).mode
+		ll.assert(mode == "referenced" || mode == "cancelled", "unexpected reference mode %v", mode)
+	}
+	withMode := func(domain) {
+		res := copy(domain)
+		res["pl7.app/enrichment/referenceMode"] = mode
+		return res
+	}
+
+	// Keys match the `i_j` column headers of the computation's output.
+	pairs := []
+	pairKeyByLabel := {}
+	for i := 1; i < len(conditions); i++ {
+		for j := 0; j < i; j++ {
+			label := conditions[i] + " vs " + conditions[j]
+			key := string(i) + "_" + string(j)
+			pairs = append(pairs, {key: key, label: label})
+			pairKeyByLabel[label] = key
+		}
+	}
+
+	column := func(id, name, valueType, domain, annotations) {
+		return {
+			column: id,
+			id: id,
+			allowNA: true,
+			spec: {
+				name: name,
+				valueType: valueType,
+				domain: domain,
+				annotations: maps.merge({"pl7.app/table/visibility": "default"}, annotations)
+			}
+		}
+	}
+
+	normalized := func(id, domain, quantity, context, annotations) {
+		return column(id, "pl7.app/enrichment/parentNormalized", "Double", withMode(domain),
+			maps.merge({
+				"pl7.app/label": quantity + " vs Parent" + context,
+				"pl7.app/description": NORMALIZED_DESCRIPTION,
+				"pl7.app/score/rankValues": "increasing",
+				"pl7.app/format": "+.2f"
+			}, annotations))
+	}
+
+	errorColumns := func(suffix, domain, quantity, context) {
+		cols := [
+			column("se_" + suffix, "pl7.app/enrichment/uncertainty", "Double", domain, {
+				"pl7.app/label": quantity + " Error" + context,
+				"pl7.app/description": ERROR_DESCRIPTION,
+				"pl7.app/format": ".2f"
+			}),
+			column("nt_" + suffix, "pl7.app/enrichment/ntVariants", "Int", domain, {
+				"pl7.app/label": quantity + " NT Variants" + context
+			})
+		]
+		if parentMode {
+			cols = append(cols, column("pnse_" + suffix, "pl7.app/enrichment/parentNormalizedUncertainty",
+				"Double", withMode(domain), {
+					"pl7.app/label": quantity + " vs Parent Error" + context,
+					"pl7.app/description": NORMALIZED_ERROR_DESCRIPTION,
+					"pl7.app/format": ".2f"
+				}))
+		}
+		return cols
+	}
+
+	exportIds := []
+	tableIds := []
+	// Hidden by default in the main table even where the export shows them, as the raw pair columns are
+	tableOptional := {}
+	valueColumns := []
+	addValue := func(col, toExports, toTable) {
+		valueColumns = append(valueColumns, col)
+		if toExports {
+			exportIds = append(exportIds, col.id)
+		}
+		if toTable {
+			tableIds = append(tableIds, col.id)
+		}
+	}
+
+	maxDomain := pfEnrichmentConvExport.valueDomain(base, "max", args.conditionOrder)
+	overallDomain := pfEnrichmentConvExport.valueDomain(base, "overall", conditions)
+
+	if parentMode {
+		addValue(normalized("pn_max", maxDomain, "Max Log2FC", "", {
+			"pl7.app/isScore": "true",
+			"pl7.app/table/orderPriority": "8990"
+		}), true, forTable)
+		addValue(normalized("pn_overall", overallDomain, "Overall Log2FC", "", {
+			"pl7.app/table/orderPriority": "89"
+		}), true, forTable)
+	}
+	if withErrors {
+		for col in errorColumns("max", maxDomain, "Max Log2FC", "") {
+			addValue(col, true, false)
+		}
+		for col in errorColumns("overall", overallDomain, "Overall Log2FC", "") {
+			addValue(col, true, false)
+		}
+	}
+
+	exported := {}
+	for comparison in args.exportComparisons {
+		key := pairKeyByLabel[comparison]
+		ll.assert(!is_undefined(key), "comparison %v is not a pair of %v", comparison, conditions)
+		exported[key] = comparison
+	}
+	for pair in pairs {
+		isExported := !is_undefined(exported[pair.key])
+		domain := pfEnrichmentConvExport.valueDomain(base, "comparison", args.conditionOrder, pair.label)
+		if parentMode && (isExported || forTable) {
+			addValue(normalized("pn_" + pair.key, domain, "Log2FC", " (" + pair.label + ")", isExported ? {
+				"pl7.app/isScore": "true"
+			} : {
+				"pl7.app/table/visibility": "optional"
+			}), isExported, forTable)
+			tableOptional["pn_" + pair.key] = true
+		}
+		if withErrors && isExported {
+			for col in errorColumns(pair.key, domain, "Log2FC", " (" + pair.label + ")") {
+				addValue(col, true, false)
+			}
+		}
+	}
+
+	if parentMode && args.addMaxNegControl && forTable {
+		addValue(normalized("pn_maxneg", withMode({}), "Control max Log2FC", "", {
+			"pl7.app/table/visibility": "optional"
+		}), false, true)
+	}
+
+	if forTable {
+		for i, condition in conditions {
+			addValue(column("reads_" + string(i), "pl7.app/enrichment/reads", "Int",
+				maps.merge(base, {"pl7.app/enrichment/condition": condition}), {
+					"pl7.app/label": "Reads (" + condition + ")",
+					"pl7.app/table/visibility": "optional"
+				}), false, true)
+		}
+	}
+
+	values := xsv.importFile(args.valuesCsv, "csv", {
+		axes: [{column: "elementId", spec: axisSpec}],
+		columns: valueColumns,
+		storageFormat: "Parquet",
+		partitionKeyLength: 0
+	}, {cpu: 1, mem: "8GiB"})
+
+	// A subset run roots the trace in the filter (dataset -> the block that made the subset).
+	traceSpec := is_undefined(args.traceSpec) ? args.abundanceSpec : args.traceSpec
+	steps := [
+		{
+			type: "milaboratories.clonotype-enrichment.condition-order",
+			importance: 35,
+			label: args.conditionOrderLabel
+		},
+		{
+			type: "milaboratories.clonotype-enrichment.downsampling",
+			importance: 30,
+			label: args.downsamplingLabel
+		}
+	]
+	if !is_undefined(args.levelLabel) {
+		steps = append(steps, pfEnrichmentConvExport.levelStep(args.levelLabel))
+	}
+	trace := pSpec.makeTrace(traceSpec, steps...)
+
+	// Trace, plus the subset stamp on a subset run (its outputs cover only the subset)
+	exportSpec := func(spec) {
+		s := trace.inject(spec)
+		if !is_undefined(args.subset) {
+			s.domain["pl7.app/inputSubset"] = args.subset
+		}
+		return s
+	}
+
+	exports := pframes.pFrameBuilder()
+	for id in exportIds {
+		exports.add(args.prefix + id, exportSpec(values[id + ".spec"]), values[id + ".data"])
+	}
+
+	table := "empty"
+	if forTable {
+		tableFrame := pframes.pFrameBuilder()
+		main := xsv.importFile(args.mainCsv, "csv", args.mainImportParams, {cpu: 1, mem: "32GiB"})
+		for col in args.mainImportParams.columns {
+			tableFrame.add(col.id, main[col.id + ".spec"], main[col.id + ".data"])
+		}
+		for id in tableIds {
+			spec := values[id + ".spec"]
+			if tableOptional[id] {
+				spec = copy(spec)
+				spec.annotations = maps.merge(spec.annotations, {"pl7.app/table/visibility": "optional"})
+			}
+			tableFrame.add(id, spec, values[id + ".data"])
+		}
+		table = tableFrame.build()
+	}
+
+	return {
+		exports: exports.build(),
+		table: table
+	}
+})

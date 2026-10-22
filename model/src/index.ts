@@ -31,7 +31,10 @@ import {
   plRefsEqual,
   readAnnotationJson,
 } from "@platforma-sdk/model";
+import type { ParentNormalization, ParentRunSummary } from "./parentNormalization";
+import { halfMatchedParentInput } from "./parentNormalization";
 export type * from "@milaboratories/helpers";
+export type { ParentNormalization, ParentRunSummary } from "./parentNormalization";
 
 // The analysis-configuration shapes are the block's init-params contract, so
 // they are declared by the kind and re-exported here: the model depends on the
@@ -558,13 +561,17 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
       )
       .map((col) => col.withSpecs({ annotations: { "pl7.app/table/visibility": "optional" } }));
 
+    // Not a parent-enrichment column as primary: those can be empty for some rows, and rows the
+    // primary lacks are not shown.
+    const primary = pCols.find((c) => !c.spec.name.startsWith("pl7.app/enrichment/")) ?? pCols[0];
+
     return createPlDataTableV3(ctx, {
       // Single primary: V3 anchors label discovery per primary column, and several
       // same-axis enrichment columns collide. They share one PFrame, so joining
       // the rest as secondary is equivalent to the old inner join among core columns.
-      primaryColumns: [DataColumn.fromColumn(pCols[0])],
+      primaryColumns: [DataColumn.fromColumn(primary)],
       columns: [
-        ...pCols.slice(1).map((c) => DataColumn.fromColumn(c)),
+        ...pCols.filter((c) => c !== primary).map((c) => DataColumn.fromColumn(c)),
         ...mainSeqCols,
         ...otherRegionCols,
       ],
@@ -700,6 +707,30 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
     },
     { retentive: true },
   )
+
+  .output("parentNormalization", (ctx): ParentNormalization | undefined => {
+    const anchor = ctx.data.abundanceRef;
+    if (!anchor) return undefined;
+    const variantAxis = ctx.resultPool.getPColumnSpecByRef(anchor)?.axesSpec[1];
+    if (!variantAxis) return undefined;
+    const halfMatched = halfMatchedParentInput(
+      ctx.resultPool.getSpecs().entries.map((e) => e.obj),
+      variantAxis,
+    );
+
+    // A summary from a run on another dataset says nothing about this one.
+    if (JSON.stringify(ctx.activeArgs?.abundanceRef) !== JSON.stringify(anchor))
+      return { halfMatched };
+    const summary = (field: string) =>
+      ctx.outputs
+        ?.resolve({ field, allowPermanentAbsence: true })
+        ?.getDataAsJson<ParentRunSummary>();
+    return {
+      halfMatched,
+      summary: summary("parentSummary"),
+      proteinSummary: summary("proteinSummary"),
+    };
+  })
 
   .title(() => "Enrichment Analysis")
 
