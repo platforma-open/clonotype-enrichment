@@ -6,34 +6,72 @@ import type {
 } from "@platforma-open/milaboratories.clonotype-enrichment.kind";
 import { kind } from "@platforma-open/milaboratories.clonotype-enrichment.kind";
 import type {
-  AnchoredPColumnSelector,
+  ColumnUniversalId,
+  ColumnValueId,
   DatasetOption,
-  PColumnIdAndSpec,
   PFrameHandle,
   PlDataTableStateV2,
   PlRef,
   PObjectSpec,
-  SUniversalPColumnId,
+  ArgsIssue,
 } from "@platforma-sdk/model";
 import {
   Annotation,
   BlockModelV3,
   ColumnsCollection,
-  DataColumn,
   DataModelBuilder,
   buildDatasetOptions,
-  createGlobalPObjectId,
   createPFrameForGraphs,
   createPlDataTableStateV2,
   createPlDataTableV3,
-  getUniquePartitionKeys,
+  deriveColumnOptions,
+  isColumnUniversalId,
+  isColumnValueId,
   isPColumnSpec,
-  plRefsEqual,
   readAnnotationJson,
 } from "@platforma-sdk/model";
+import { PRIMARY_ABUNDANCE, toColumnId } from "./abundance";
+import { getClonotypeDefinitionOptions } from "./clonotype_definition";
+import {
+  exact,
+  findColumn,
+  getOutputColumns,
+  resultPool,
+  toIdsAndSpecs,
+  toPColumns,
+} from "./columns";
+import { getMetadataOptions } from "./metadata_columns";
+import {
+  getAbundanceSamples,
+  getAntigenValuesSource,
+  getComparisonOptions,
+  getConditionValuesSource,
+  listPickedComparisons,
+} from "./metadata_values";
+import type {
+  AntigenControlConfigV1,
+  BlockDataV1,
+  BlockDataV2,
+  DownsamplingParametersV1,
+  FilteringConfigV1,
+} from "./stored_data";
 import type { ParentNormalization, ParentRunSummary } from "./parentNormalization";
-import { halfMatchedParentInput } from "./parentNormalization";
+import { MUTATION_COUNT, PARENT_LINK, halfMatchedParentInput } from "./parentNormalization";
 export type * from "@milaboratories/helpers";
+export { fromDatasetSelection, toDatasetSelection } from "./abundance";
+export type { AbundancePick } from "./abundance";
+export type { ClonotypeColumnOption } from "./clonotype_definition";
+export type { MetadataOption } from "./metadata_columns";
+export { buildMetadataValuePickers, deriveMetadataValues } from "./metadata_values";
+export type {
+  AntigenConditions,
+  MetadataColumnFrame,
+  MetadataValuePickers,
+  MetadataValues,
+  PickedValueOption,
+  SampleValue,
+  SampleValues,
+} from "./metadata_values";
 export type { ParentNormalization, ParentRunSummary } from "./parentNormalization";
 
 // The analysis-configuration shapes are the block's init-params contract, so
@@ -50,13 +88,13 @@ type OldArgs = {
   defaultBlockLabel: string;
   customBlockLabel: string;
   abundanceRef?: PlRef;
-  conditionColumnRef?: SUniversalPColumnId;
+  conditionColumnRef?: string;
   conditionOrder: string[];
-  downsampling: DownsamplingParameters;
-  FilteringConfig: FilteringConfig;
-  clonotypeDefinition: SUniversalPColumnId[];
+  downsampling: DownsamplingParametersV1;
+  FilteringConfig: FilteringConfigV1;
+  clonotypeDefinition: string[];
   additionalEnrichmentExports: string[];
-  antigenControlConfig: AntigenControlConfig;
+  antigenControlConfig: AntigenControlConfigV1;
   enrichmentThreshold: number;
   pseudoCount: number;
 };
@@ -75,20 +113,20 @@ type OldUiState = {
 export type BlockData = {
   defaultBlockLabel: string;
   customBlockLabel: string;
-  abundanceRef?: PlRef;
+  abundanceRef?: ColumnUniversalId;
   /** Subset column picked with the abundance in PlDatasetSelector (e.g. a Repertoire Labeling label). */
-  filterRef?: PlRef;
-  conditionColumnRef?: SUniversalPColumnId;
-  conditionOrder: string[];
+  filterRef?: ColumnUniversalId;
+  conditionColumnRef?: ColumnUniversalId;
+  conditionOrder: ColumnValueId[];
   downsampling: DownsamplingParameters;
   FilteringConfig: FilteringConfig;
-  clonotypeDefinition: SUniversalPColumnId[];
+  clonotypeDefinition: ColumnUniversalId[];
   /**
-   * Cluster-mode only: PlRef of the upstream per-element primary abundance the
+   * Cluster-mode only: column id of the upstream per-element primary abundance the
    * input cluster abundance was built from (per clonotype for VDJ clusters, per
    * variant for peptide clusters).
    */
-  clonotypeAbundanceRef?: PlRef;
+  clonotypeAbundanceRef?: ColumnUniversalId;
   additionalEnrichmentExports: string[];
   antigenControlConfig: AntigenControlConfig;
   enrichmentThreshold: number; // Default: 2.0 log2 FC
@@ -118,8 +156,50 @@ function migrateScatterStateToUmap(state: GraphMakerState): GraphMakerState {
   };
 }
 
+/**
+ * Moves stored data to column ids. A ref to an upstream output becomes the result-pool id of
+ * that output, which names the same block and column. The condition and antigen columns were
+ * picked by ids anchored against the abundance column and their values stored plain; neither
+ * names the block that produced the metadata, so they cannot become column ids and column value
+ * ids and are dropped, to be picked again. So are clonotype-definition columns picked by
+ * anchored ids; without them a clonotype is the abundance column's element.
+ */
+function toColumnIds(data: BlockDataV2): BlockData {
+  const ref = (stored: PlRef | undefined) =>
+    stored === undefined ? undefined : toColumnId(stored);
+  const column = (stored: string | undefined) => (isColumnUniversalId(stored) ? stored : undefined);
+  const value = (picked: string | undefined) => (isColumnValueId(picked) ? picked : undefined);
+  const values = (picked: string[]) => picked.filter(isColumnValueId);
+
+  const config = data.antigenControlConfig;
+  return {
+    ...data,
+    abundanceRef: ref(data.abundanceRef),
+    filterRef: ref(data.filterRef),
+    clonotypeAbundanceRef: ref(data.clonotypeAbundanceRef),
+    conditionColumnRef: column(data.conditionColumnRef),
+    conditionOrder: values(data.conditionOrder),
+    clonotypeDefinition: data.clonotypeDefinition.filter(isColumnUniversalId),
+    FilteringConfig: {
+      ...data.FilteringConfig,
+      presentInRounds: {
+        ...data.FilteringConfig.presentInRounds,
+        rounds: values(data.FilteringConfig.presentInRounds.rounds),
+      },
+    },
+    antigenControlConfig: {
+      ...config,
+      antigenColumnRef: column(config.antigenColumnRef),
+      targetAntigen: value(config.targetAntigen),
+      negativeAntigens: values(config.negativeAntigens),
+      controlConditionsOrder: values(config.controlConditionsOrder),
+      sequencedLibraryAntigen: value(config.sequencedLibraryAntigen),
+    },
+  };
+}
+
 const dataModel = new DataModelBuilder({ kind })
-  .from<BlockData>("v1")
+  .from<BlockDataV1>("v1")
   .upgradeLegacy<OldArgs, OldUiState>(({ args, uiState }) => ({
     ...args,
     tableState: uiState.tableState,
@@ -130,10 +210,11 @@ const dataModel = new DataModelBuilder({ kind })
     boxState: uiState.boxState,
     excludedAlertDismissedKey: uiState.excludedAlertDismissedKey,
   }))
-  .migrate<BlockData>("v2", (data) => ({
+  .migrate<BlockDataV2>("v2", (data) => ({
     ...data,
     scatterState: migrateScatterStateToUmap(data.scatterState),
   }))
+  .migrate<BlockData>("v3", toColumnIds)
   // `params` is absent when a block is created by hand rather than from a
   // template, so every field the contract carries keeps its own default.
   .init(({ params }) => ({
@@ -224,38 +305,12 @@ const DATASET_KEY_AXES: ReadonlySet<string> = new Set([
 
 export const platforma = BlockModelV3.create({ dataModel, kind })
 
+  // Built even from an incomplete configuration; `argsIssues` decides whether it may run.
   .args((data) => {
-    const { abundanceRef, conditionColumnRef, conditionOrder, antigenControlConfig } = data;
-
-    if (!abundanceRef) throw new Error("Abundance is required");
-    if (!conditionColumnRef) throw new Error("Condition column is required");
-    if (!conditionOrder.length) throw new Error("Conditions are required");
-    if (data.enrichmentThreshold < 0.6) throw new Error("Enrichment threshold must be ≥ 0.6");
-
-    if (antigenControlConfig.antigenEnabled || antigenControlConfig.controlEnabled) {
-      if (!antigenControlConfig.antigenColumnRef) throw new Error("Antigen column is required");
-    }
-
-    if (antigenControlConfig.antigenEnabled) {
-      if (!antigenControlConfig.targetAntigen) throw new Error("Target antigen is required");
-    }
-
-    if (antigenControlConfig.controlEnabled) {
-      if (
-        !antigenControlConfig.antigenEnabled ||
-        !antigenControlConfig.negativeAntigens.length ||
-        antigenControlConfig.controlConditionsOrder.length < 1 ||
-        antigenControlConfig.singleControlFrequencyThreshold === undefined
-      )
-        throw new Error("Control configuration is incomplete");
-    }
-
-    if (antigenControlConfig.sequencedLibraryEnabled) {
-      if (!antigenControlConfig.sequencedLibraryAntigen)
-        throw new Error("Library antigen is required");
-    } else {
-      if (conditionOrder.length <= 1) throw new Error("At least 2 conditions are required");
-    }
+    // A comparison picked for export stays in the data after the condition order changes, but
+    // the analysis only computes comparisons of the current order; one it does not compute
+    // would fail the run.
+    const producedComparisons = new Set(listPickedComparisons(data));
 
     return {
       defaultBlockLabel: data.defaultBlockLabel,
@@ -267,16 +322,55 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
       FilteringConfig: data.FilteringConfig,
       clonotypeDefinition: data.clonotypeDefinition,
       clonotypeAbundanceRef: data.clonotypeAbundanceRef,
-      additionalEnrichmentExports: data.additionalEnrichmentExports,
+      additionalEnrichmentExports: data.additionalEnrichmentExports.filter((comparison) =>
+        producedComparisons.has(comparison),
+      ),
       antigenControlConfig: data.antigenControlConfig,
       enrichmentThreshold: data.enrichmentThreshold,
       pseudoCount: data.pseudoCount,
       // The subset's canonical column id, which the workflow stamps as the outputs'
       // `pl7.app/inputSubset`. Absent without a filter, so unfiltered args are unchanged.
-      ...(data.filterRef !== undefined && {
-        inputFilter: createGlobalPObjectId(data.filterRef.blockId, data.filterRef.name),
-      }),
+      ...(data.filterRef !== undefined && { inputFilter: data.filterRef }),
     };
+  })
+
+  .argsIssues(({ args }) => {
+    const { abundanceRef, conditionColumnRef, conditionOrder, antigenControlConfig } = args;
+    const issues: ArgsIssue[] = [];
+    const error = (message: string) => {
+      issues.push({ severity: "error", message });
+    };
+
+    if (!abundanceRef) error("Abundance is required");
+    if (!conditionColumnRef) error("Condition column is required");
+    if (!conditionOrder.length) error("Conditions are required");
+    if (args.enrichmentThreshold < 0.6) error("Enrichment threshold must be ≥ 0.6");
+
+    if (antigenControlConfig.antigenEnabled || antigenControlConfig.controlEnabled) {
+      if (!antigenControlConfig.antigenColumnRef) error("Antigen column is required");
+    }
+
+    if (antigenControlConfig.antigenEnabled) {
+      if (!antigenControlConfig.targetAntigen) error("Target antigen is required");
+    }
+
+    if (antigenControlConfig.controlEnabled) {
+      if (
+        !antigenControlConfig.antigenEnabled ||
+        !antigenControlConfig.negativeAntigens.length ||
+        antigenControlConfig.controlConditionsOrder.length < 1 ||
+        antigenControlConfig.singleControlFrequencyThreshold === undefined
+      )
+        error("Control configuration is incomplete");
+    }
+
+    if (antigenControlConfig.sequencedLibraryEnabled) {
+      if (!antigenControlConfig.sequencedLibraryAntigen) error("Library antigen is required");
+    } else {
+      if (conditionOrder.length <= 1) error("At least 2 conditions are required");
+    }
+
+    return issues;
   })
 
   // Inverse of `init` — the same fields, projected back out for template export.
@@ -314,9 +408,10 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
 
     // Labels as before, with the column's own label (e.g. "Number of Reads"): buildDatasetOptions
     // derives them without it and takes no label options for the datasets.
-    const labeled = ctx.resultPool.getOptions(isPrimaryAbundance, {
-      label: { includeNativeLabel: true },
-    });
+    const labeled = deriveColumnOptions(
+      ColumnsCollection(["result_pool"]).filter({ include: PRIMARY_ABUNDANCE }),
+      { includeNativeLabel: true },
+    );
 
     const options =
       buildDatasetOptions(ctx, {
@@ -331,39 +426,25 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
       }) ?? [];
 
     return options.map((option) => {
-      const label = labeled.find((o) => plRefsEqual(o.ref, option.primary.ref, true))?.label;
+      const label = labeled.find((o) => o.id === toColumnId(option.primary.ref))?.label;
       return label === undefined ? option : { ...option, primary: { ...option.primary, label } };
     });
   })
 
   .output("sequenceColumnOptions", (ctx) => {
-    const anchor = ctx.data.abundanceRef;
-    if (anchor === undefined) return undefined;
-    return ctx.resultPool.getCanonicalOptions({ main: anchor }, [
-      {
-        axes: [{ anchor: "main", idx: 1 }],
-        name: "pl7.app/vdj/sequence",
-      },
-      {
-        axes: [{ anchor: "main", idx: 1 }],
-        name: "pl7.app/sequence",
-      },
-    ]);
+    const abundanceRef = ctx.data.abundanceRef;
+    if (abundanceRef === undefined) return undefined;
+    return getClonotypeDefinitionOptions(abundanceRef);
   })
 
   .output("metadataOptions", (ctx) => {
-    const anchor = ctx.data.abundanceRef;
-    if (anchor === undefined) return undefined;
-    return ctx.resultPool.getCanonicalOptions({ main: anchor }, [
-      {
-        axes: [{ anchor: "main", idx: 0 }],
-        name: "pl7.app/metadata",
-      },
-    ]);
+    const abundanceRef = ctx.data.abundanceRef;
+    if (abundanceRef === undefined) return undefined;
+    return getMetadataOptions(abundanceRef);
   })
 
   .output("datasetSpec", (ctx) => {
-    if (ctx.data.abundanceRef) return ctx.resultPool.getPColumnSpecByRef(ctx.data.abundanceRef);
+    if (ctx.data.abundanceRef) return findColumn(ctx.data.abundanceRef)?.getSpec();
     else return undefined;
   })
 
@@ -374,13 +455,13 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
    * input or when no unique match exists.
    */
   .output("discoveredClonotypeAbundance", (ctx) => {
-    const anchor = ctx.data.abundanceRef;
-    if (!anchor) return undefined;
-    const anchorSpec = ctx.resultPool.getPColumnSpecByRef(anchor);
-    if (!anchorSpec) return undefined;
+    const abundanceRef = ctx.data.abundanceRef;
+    if (!abundanceRef) return undefined;
+    const abundanceSpec = findColumn(abundanceRef)?.getSpec();
+    if (!abundanceSpec) return undefined;
 
     // Only when the input is cluster abundance (row axis = clusterId).
-    const clusterAxis = anchorSpec.axesSpec[1];
+    const clusterAxis = abundanceSpec.axesSpec[1];
     if (clusterAxis?.name !== "pl7.app/clusterId") return undefined;
 
     // Clonotype identity = clusterId axis domain minus clustering-specific keys.
@@ -398,21 +479,13 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
       name === "pl7.app/variantKey";
 
     // Candidate primary, raw-count abundances keyed by sampleId × <row axis>.
-    const candidates = ctx.resultPool.getOptions([
-      {
-        axes: [{ name: "pl7.app/sampleId" }, {}],
-        annotations: {
-          "pl7.app/isAbundance": "true",
-          "pl7.app/abundance/isPrimary": "true",
-          "pl7.app/abundance/normalized": "false",
-        },
-      },
-    ]);
+    const candidates = ColumnsCollection(["result_pool"])
+      .filter({ include: PRIMARY_ABUNDANCE })
+      .getColumns();
 
     // Keep those whose row axis is a clonotype key carrying the matching identity.
-    const matches = candidates.filter((opt) => {
-      const spec = ctx.resultPool.getPColumnSpecByRef(opt.ref);
-      const rowAxis = spec?.axesSpec?.[1];
+    const matches = candidates.filter((column) => {
+      const rowAxis = column.getSpec().axesSpec[1];
       if (!rowAxis || !isElementAxis(rowAxis.name)) return false;
       const candidateKey = JSON.stringify(
         Object.entries(rowAxis.domain ?? {}).sort(([a], [b]) => a.localeCompare(b)),
@@ -421,75 +494,20 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
     });
 
     // Exactly one is expected; anything else → no column (don't guess).
-    return matches.length === 1 ? matches[0].ref : undefined;
+    return matches.length === 1 ? matches[0].id : undefined;
   })
 
-  /** PFrame with condition column and (when antigen enabled) antigen column for UI to fetch metadata values. */
-  .output("metadataColumnsPframe", (ctx) => {
-    const { conditionColumnRef, abundanceRef: anchor, antigenControlConfig: config } = ctx.data;
-    if (!conditionColumnRef || !anchor) return undefined;
+  // Where the UI reads the values of the picked condition column, and of the antigen column while
+  // target selection is on, for the value pickers. The values are read in the UI, through a frame
+  // of each column, so a column of any storage format can be picked from.
+  .output("conditionValues", (ctx) => getConditionValuesSource(ctx, ctx.data))
+  .output("antigenValues", (ctx) => getAntigenValuesSource(ctx, ctx.data))
 
-    // Resolve condition column from anchor + selector
-    const conditionCols = ctx.resultPool.getAnchoredPColumns(
-      { main: anchor },
-      JSON.parse(conditionColumnRef) as AnchoredPColumnSelector,
-    );
-    const conditionCol = conditionCols?.[0];
-    if (!conditionCol) return undefined;
+  // Samples of the abundance input: the value pickers offer only the values of these samples.
+  .output("abundanceSamples", (ctx) => getAbundanceSamples(ctx.data))
 
-    const columns = [conditionCol];
-    // Add antigen column when target/control selection is enabled
-    if (config?.antigenEnabled && config.antigenColumnRef) {
-      const antigenCols = ctx.resultPool.getAnchoredPColumns(
-        { main: anchor },
-        JSON.parse(config.antigenColumnRef) as AnchoredPColumnSelector,
-      );
-      const antigenCol = antigenCols?.[0];
-      if (antigenCol) columns.push(antigenCol);
-    }
-
-    return ctx.createPFrame(columns);
-  })
-
-  // Returns the IDs for the condition column (conditionColId) and the antigen column (antigenColId) by resolving them from the block arguments.
-  .output("metadataColumnIds", (ctx) => {
-    const { conditionColumnRef, abundanceRef: anchor, antigenControlConfig: config } = ctx.data;
-    if (!conditionColumnRef || !anchor) return undefined;
-
-    const conditionCols = ctx.resultPool.getAnchoredPColumns(
-      { main: anchor },
-      JSON.parse(conditionColumnRef) as AnchoredPColumnSelector,
-    );
-    const conditionColId = conditionCols?.[0]?.id;
-
-    let antigenColId: string | undefined;
-    if (config?.antigenEnabled && config.antigenColumnRef) {
-      const antigenCols = ctx.resultPool.getAnchoredPColumns(
-        { main: anchor },
-        JSON.parse(config.antigenColumnRef) as AnchoredPColumnSelector,
-      );
-      antigenColId = antigenCols?.[0]?.id;
-    }
-
-    return { conditionColId, antigenColId };
-  })
-
-  // Sample IDs that participate in the abundance column. Read partition keys
-  // from the abundance column data: it is partitioned on `pl7.app/sampleId`
-  // (axis 0), so the partition keys at that index are the sample IDs.
-  // Avoids relying on the upstream dataset's `pl7.app/axisKeys/0` annotation,
-  // which carries `sampleGroupId` (not `sampleId`) for `MultiplexedFastq`.
-  .output("sampleIds", (ctx) => {
-    const { abundanceRef } = ctx.data;
-    if (!abundanceRef) return undefined;
-    const pCol = ctx.resultPool.getPColumnByRef(abundanceRef);
-    if (!pCol) return undefined;
-    const sampleAxisIdx = pCol.spec.axesSpec.findIndex((a) => a.name === "pl7.app/sampleId");
-    if (sampleAxisIdx < 0) return undefined;
-    const keysPerAxis = getUniquePartitionKeys(pCol.data);
-    if (!keysPerAxis || sampleAxisIdx >= keysPerAxis.length) return undefined;
-    return keysPerAxis[sampleAxisIdx].map((v) => String(v));
-  })
+  // Comparisons the condition order produces, offered for export.
+  .output("comparisonOptions", (ctx) => getComparisonOptions(ctx.data))
 
   // Get all enrichment statistics
   .output("enrichmentStats", (ctx) => {
@@ -507,19 +525,21 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
 
   // Returns a map of results for main table
   .outputWithStatus("pt", (ctx) => {
-    const pCols = ctx.outputs?.resolve("enrichmentPf")?.getPColumns();
+    const pCols = getOutputColumns(ctx.outputs?.resolve("enrichmentPf"))?.getColumns();
 
     if (!pCols?.length) {
       return undefined;
     }
 
     // Pull sequence columns from result pool to show in the table
-    const anchor = ctx.activeArgs?.abundanceRef;
-    const enrichmentAxisName = pCols[0]?.spec.axesSpec[0]?.name;
-    const allSeqCols = anchor
-      ? ColumnsCollection(["result_pool"], { ctx: ctx.ctx })
+    const abundanceRef = ctx.activeArgs?.abundanceRef;
+    const abundanceSpec =
+      abundanceRef === undefined ? undefined : findColumn(abundanceRef)?.getSpec();
+    const enrichmentAxisName = pCols[0]?.getSpec().axesSpec[0]?.name;
+    const allSeqCols = abundanceSpec
+      ? ColumnsCollection(["result_pool"])
           .discover({
-            anchors: { main: anchor },
+            anchors: { main: abundanceSpec },
             include: [
               { name: [{ type: "exact", value: "pl7.app/vdj/sequence" }] },
               { name: [{ type: "exact", value: "pl7.app/sequence" }] },
@@ -559,113 +579,96 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
       .filter(
         (col) => readAnnotationJson(col.getSpec(), Annotation.VDJ.IsAssemblingFeature) === false,
       )
-      .map((col) => col.withSpecs({ annotations: { "pl7.app/table/visibility": "optional" } }));
+      .map((col) =>
+        col.withSpecs({
+          annotations: { "pl7.app/table/visibility": "optional" },
+        }),
+      );
 
     // Not a parent-enrichment column as primary: those can be empty for some rows, and rows the
     // primary lacks are not shown.
-    const primary = pCols.find((c) => !c.spec.name.startsWith("pl7.app/enrichment/")) ?? pCols[0];
+    const primary =
+      pCols.find((c) => !c.getSpec().name.startsWith("pl7.app/enrichment/")) ?? pCols[0];
 
     return createPlDataTableV3(ctx, {
       // Single primary: V3 anchors label discovery per primary column, and several
       // same-axis enrichment columns collide. They share one PFrame, so joining
       // the rest as secondary is equivalent to the old inner join among core columns.
-      primaryColumns: [DataColumn.fromColumn(primary)],
-      columns: [
-        ...pCols.filter((c) => c !== primary).map((c) => DataColumn.fromColumn(c)),
-        ...mainSeqCols,
-        ...otherRegionCols,
-      ],
+      primaryColumns: [primary],
+      columns: [...pCols.filter((c) => c !== primary), ...mainSeqCols, ...otherRegionCols],
       tableState: ctx.data.tableState,
     });
   })
 
   // Returns a map of results for plot
   .outputWithStatus("bubblePf", (ctx): PFrameHandle | undefined => {
-    const pCols = ctx.outputs?.resolve("bubblePf")?.getPColumns();
+    const pCols = getOutputColumns(ctx.outputs?.resolve("bubblePf"))?.getColumns();
     if (pCols === undefined) {
       return undefined;
     }
 
-    return createPFrameForGraphs(ctx, pCols);
+    return createPFrameForGraphs(ctx, toPColumns(pCols));
   })
 
   // Returns a list pof PCols for plot defaults
   .output("bubblePCols", (ctx) => {
-    const pCols = ctx.outputs?.resolve("bubblePf")?.getPColumns();
+    const pCols = getOutputColumns(ctx.outputs?.resolve("bubblePf"))?.getColumns();
     if (pCols === undefined) {
       return undefined;
     }
 
-    return pCols.map(
-      (c) =>
-        ({
-          columnId: c.id,
-          spec: c.spec,
-        }) satisfies PColumnIdAndSpec,
-    );
+    return toIdsAndSpecs(pCols);
   })
 
   .outputWithStatus("stackedPf", (ctx): PFrameHandle | undefined => {
-    const pCols = ctx.outputs?.resolve("stackedPf")?.getPColumns();
+    const pCols = getOutputColumns(ctx.outputs?.resolve("stackedPf"))?.getColumns();
     if (pCols === undefined) {
       return undefined;
     }
 
-    return createPFrameForGraphs(ctx, pCols);
+    return createPFrameForGraphs(ctx, toPColumns(pCols));
   })
 
   .output("stackedPCols", (ctx) => {
-    const pCols = ctx.outputs?.resolve("stackedPf")?.getPColumns();
+    const pCols = getOutputColumns(ctx.outputs?.resolve("stackedPf"))?.getColumns();
     if (pCols === undefined) {
       return undefined;
     }
 
-    return pCols.map(
-      (c) =>
-        ({
-          columnId: c.id,
-          spec: c.spec,
-        }) satisfies PColumnIdAndSpec,
-    );
+    return toIdsAndSpecs(pCols);
   })
 
   .outputWithStatus("linePf", (ctx): PFrameHandle | undefined => {
-    const pCols = ctx.outputs?.resolve("linePf")?.getPColumns();
+    const pCols = getOutputColumns(ctx.outputs?.resolve("linePf"))?.getColumns();
     if (pCols === undefined) {
       return undefined;
     }
 
-    return createPFrameForGraphs(ctx, pCols);
+    return createPFrameForGraphs(ctx, toPColumns(pCols));
   })
 
   .output("isRunning", (ctx) => ctx.outputs?.getIsReadyOrError() === false)
 
   .outputWithStatus("controlScatterPf", (ctx): PFrameHandle | undefined => {
-    const pCols = ctx.outputs
-      ?.resolve({ field: "controlScatterPf", allowPermanentAbsence: true })
-      ?.getPColumns();
+    const pCols = getOutputColumns(
+      ctx.outputs?.resolve({ field: "controlScatterPf", allowPermanentAbsence: true }),
+    )?.getColumns();
     if (pCols === undefined) {
       return undefined;
     }
 
-    return createPFrameForGraphs(ctx, pCols);
+    return createPFrameForGraphs(ctx, toPColumns(pCols));
   })
 
   .output("controlScatterPCols", (ctx) => {
-    const pCols = ctx.outputs
-      ?.resolve({ field: "controlScatterPf", allowPermanentAbsence: true })
-      ?.getPColumns();
+    const pCols = getOutputColumns(
+      ctx.outputs?.resolve({ field: "controlScatterPf", allowPermanentAbsence: true }),
+    )?.getColumns();
     if (pCols === undefined) {
       return undefined;
     }
 
-    return pCols.map(
-      (c) =>
-        ({
-          columnId: c.id,
-          spec: c.spec,
-        }) satisfies PColumnIdAndSpec,
-    );
+    return toIdsAndSpecs(pCols);
   })
 
   .output("filteredTooMuch", (ctx) => {
@@ -679,9 +682,7 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
   .output(
     "modality",
     (ctx) => {
-      const spec = ctx.data.abundanceRef
-        ? ctx.resultPool.getPColumnSpecByRef(ctx.data.abundanceRef)
-        : undefined;
+      const spec = ctx.data.abundanceRef ? findColumn(ctx.data.abundanceRef)?.getSpec() : undefined;
       if (!spec) return undefined;
       for (const ax of spec.axesSpec) {
         if (ax.name === "pl7.app/variantKey") {
@@ -711,16 +712,16 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
   .output("parentNormalization", (ctx): ParentNormalization | undefined => {
     const anchor = ctx.data.abundanceRef;
     if (!anchor) return undefined;
-    const variantAxis = ctx.resultPool.getPColumnSpecByRef(anchor)?.axesSpec[1];
+    const variantAxis = findColumn(anchor)?.getSpec().axesSpec[1];
     if (!variantAxis) return undefined;
-    const halfMatched = halfMatchedParentInput(
-      ctx.resultPool.getSpecs().entries.map((e) => e.obj),
-      variantAxis,
-    );
+    const parentColumns = resultPool()
+      .filter({ include: [{ name: [exact(MUTATION_COUNT)] }, { name: [exact(PARENT_LINK)] }] })
+      .getColumns()
+      .map((column) => column.getSpec());
+    const halfMatched = halfMatchedParentInput(parentColumns, variantAxis);
 
     // A summary from a run on another dataset says nothing about this one.
-    if (JSON.stringify(ctx.activeArgs?.abundanceRef) !== JSON.stringify(anchor))
-      return { halfMatched };
+    if (ctx.activeArgs?.abundanceRef !== anchor) return { halfMatched };
     const summary = (field: string) =>
       ctx.outputs
         ?.resolve({ field, allowPermanentAbsence: true })
@@ -750,13 +751,21 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
         (ctx.data.antigenControlConfig.sequencedLibraryEnabled === true &&
           ctx.data.antigenControlConfig.controlConditionsOrder.length === 1)
       ) {
-        sections.push({ type: "link", href: "/scatter", label: "Control Scatter Plot" });
+        sections.push({
+          type: "link",
+          href: "/scatter",
+          label: "Control Scatter Plot",
+        });
       }
       if (
         ctx.data.antigenControlConfig.sequencedLibraryEnabled === false &&
         ctx.data.antigenControlConfig.controlConditionsOrder.length === 1
       ) {
-        sections.push({ type: "link", href: "/box", label: "Control Box Plot" });
+        sections.push({
+          type: "link",
+          href: "/box",
+          label: "Control Box Plot",
+        });
       }
     }
 
