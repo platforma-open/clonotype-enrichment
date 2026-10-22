@@ -1,11 +1,5 @@
 import { assertParamsObject } from "@platforma-sdk/block-kind";
-import {
-  isAnchoredPColumnId,
-  isColumnUniversalId,
-  isPlRef,
-  parseJsonSafely,
-  type SUniversalPColumnId,
-} from "@platforma-sdk/model";
+import { isColumnUniversalId, isColumnValueId } from "@platforma-sdk/model";
 import { isBoolean, isPlainObject, isString } from "es-toolkit";
 import { isArray, isNumber } from "es-toolkit/compat";
 import type {
@@ -65,17 +59,6 @@ function optional<T>(item: Guard<T>): Guard<T | undefined> {
   return (v): v is T | undefined => v === undefined || item(v);
 }
 
-/**
- * A column identifier as this block stores it: a canonically serialized JSON
- * key. `isColumnUniversalId` covers the four key forms the SDK's id encoding
- * uses, but every column id here comes from `resultPool.getCanonicalOptions`,
- * which mints an *anchored* key — a shape none of those four recognizes even
- * though the SDK types it `SUniversalPColumnId`. Both forms are accepted, or
- * the kind would refuse ids the block itself writes.
- */
-const isColumnId: Guard<SUniversalPColumnId> = (v): v is SUniversalPColumnId =>
-  isString(v) && (isColumnUniversalId(v) || isAnchoredPColumnId(parseJsonSafely(v)));
-
 const isDownsampling: Guard<DownsamplingParameters> = (v): v is DownsamplingParameters =>
   isPlainObject(v) &&
   optional(oneOf("none", "hypergeometric"))(v.type) &&
@@ -91,7 +74,7 @@ const isFilteringConfig: Guard<FilteringConfig> = (v): v is FilteringConfig =>
   oneOf("count", "frequency")(v.minAbundance.metric) &&
   isPlainObject(v.presentInRounds) &&
   isBoolean(v.presentInRounds.enabled) &&
-  arrayOf(isString)(v.presentInRounds.rounds) &&
+  arrayOf(isColumnValueId)(v.presentInRounds.rounds) &&
   oneOf("OR", "AND")(v.presentInRounds.logic) &&
   isBoolean(v.excludeSequencedLibrary);
 
@@ -99,19 +82,19 @@ const isAntigenControlConfig: Guard<AntigenControlConfig> = (v): v is AntigenCon
   isPlainObject(v) &&
   isBoolean(v.antigenEnabled) &&
   isBoolean(v.controlEnabled) &&
-  optional(isColumnId)(v.antigenColumnRef) &&
-  optional(isString)(v.targetAntigen) &&
-  arrayOf(isString)(v.negativeAntigens) &&
+  optional(isColumnUniversalId)(v.antigenColumnRef) &&
+  optional(isColumnValueId)(v.targetAntigen) &&
+  arrayOf(isColumnValueId)(v.negativeAntigens) &&
   isNumber(v.controlThreshold) &&
   isNumber(v.singleControlFrequencyThreshold) &&
-  arrayOf(isString)(v.controlConditionsOrder) &&
+  arrayOf(isColumnValueId)(v.controlConditionsOrder) &&
   isBoolean(v.sequencedLibraryEnabled) &&
-  optional(isString)(v.sequencedLibraryAntigen) &&
+  optional(isColumnValueId)(v.sequencedLibraryAntigen) &&
   isBoolean(v.hasSingleConditionNegativeControl) &&
   isBoolean(v.hasMultiConditionNegativeControl);
 
-const REF = "a reference to another block's output";
-const COLUMN_ID = "a serialized column id";
+const COLUMN_ID = "a column id of another block's output";
+const VALUE_IDS = "an array of column value ids";
 
 /**
  * The contract, field by field, at runtime.
@@ -123,12 +106,12 @@ const COLUMN_ID = "a serialized column id";
  * forgot one would otherwise return a valid `BlockParams` and say nothing.
  */
 const CONTRACT = {
-  abundanceRef: check(isPlRef, REF),
-  filterRef: check(isPlRef, REF),
+  abundanceRef: check(isColumnUniversalId, COLUMN_ID),
+  filterRef: check(isColumnUniversalId, COLUMN_ID),
 
-  conditionColumnRef: check(isColumnId, COLUMN_ID),
-  conditionOrder: check(arrayOf(isString), "an array of strings"),
-  clonotypeDefinition: check(arrayOf(isColumnId), "an array of serialized column ids"),
+  conditionColumnRef: check(isColumnUniversalId, COLUMN_ID),
+  conditionOrder: check(arrayOf(isColumnValueId), VALUE_IDS),
+  clonotypeDefinition: check(arrayOf(isColumnUniversalId), "an array of column ids"),
   downsampling: check(
     isDownsampling,
     "an object of optional type / valueChooser / n downsampling settings",

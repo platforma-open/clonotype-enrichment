@@ -1,0 +1,12 @@
+---
+"@platforma-open/milaboratories.clonotype-enrichment": major
+"@platforma-open/milaboratories.clonotype-enrichment.kind": major
+"@platforma-open/milaboratories.clonotype-enrichment.model": major
+"@platforma-open/milaboratories.clonotype-enrichment.ui": major
+"@platforma-open/milaboratories.clonotype-enrichment.workflow": major
+---
+
+Columns are stored by their result-pool column ids: the abundance and its subset, the condition and antigen columns, the clonotype-definition columns and, in cluster mode, the per-clonotype abundance. The picked conditions, rounds, control conditions and antigens are stored as column value references of the condition and antigen columns, so the block that produced the metadata knows which of its values this block uses. The model finds columns and builds the options of every column picker through the column collection API instead of the deprecated result pool API, and the workflow takes every column through a column bundle. The condition and antigen value pickers read the values of the picked columns in the UI, through a frame of each column, so a metadata column stored in any format can be picked from.
+Opening a project created before this change keeps its abundance and subset, and clears its condition and antigen columns and the values picked in them — conditions, rounds, target, negative controls, control conditions and library — since they were stored by ids anchored to the abundance column and as plain values, which name no producing block; they have to be picked again before the block runs. Clonotype-definition columns, stored by anchored ids too, are cleared as well: until they are picked again, each clonotype of the input is its own clonotype, as when none were picked. The initialization params of the kind carry the same ids and references, so templates made for an earlier version of the kind cannot be applied.
+A block whose configuration is incomplete still derives its args, and its run is blocked with the reasons listed (abundance, condition column, conditions, enrichment threshold, antigen column, target, control setup, library antigen); a desktop app that does not support such run checks refuses to open the block.
+Conditions, control conditions, antigens and exported comparisons that are no longer available stay selected and are marked as not available instead of being removed silently, with a tooltip naming the block that was to provide them, as a link to it, and what went wrong, and comparisons the current condition order does not produce are left out of the run.
