@@ -31,7 +31,7 @@ import {
   isPColumnSpec,
   readAnnotationJson,
 } from "@platforma-sdk/model";
-import { graphMakerPlugin } from "@milaboratories/graph-maker/plugin";
+import { graphMakerPlugin, transferableGraphState } from "@milaboratories/graph-maker/plugin";
 import { PRIMARY_ABUNDANCE, parseRunColumn, toColumnId } from "./abundance";
 import { getClonotypeDefinitionOptions } from "./clonotype_definition";
 import { findColumn, getOutputColumns, toIdsAndSpecs, toPColumns } from "./columns";
@@ -223,6 +223,25 @@ function toColumnIds(data: BlockDataV2): BlockDataV3 {
   };
 }
 
+// The frequency line plot is a graph-maker plugin instance. Only this chart is
+// migrated: it is the one whose frame needs a linker, because a clustered
+// dataset keys the frequencies by cluster while everything a user would
+// annotate them with is keyed by clonotype.
+const linePlugin = graphMakerPlugin.create({
+  pluginId: "line",
+  // Where a chart saved before the plugin enters the chain.
+  transferAt: "v1",
+  config: {
+    chartType: "scatterplot",
+    initialTitle: "Top enriched sequences",
+    initialTemplate: "curve_dots",
+    initialState: {
+      currentTab: null,
+      layersSettings: { curve: { smoothing: false } },
+    },
+  },
+});
+
 const dataModel = new DataModelBuilder({ kind })
   .from<BlockDataV1>("v1")
   .upgradeLegacy<OldArgs, OldUiState>(({ args, uiState }) => ({
@@ -245,6 +264,18 @@ const dataModel = new DataModelBuilder({ kind })
   .migrate<BlockData>("v4", ({ defaultBlockLabel: _, ...rest }) => ({
     ...rest,
     subtitleLabel: "",
+  }))
+  // A chart saved before the line plot became a plugin instance: hand the
+  // plugin what survives the move. The data mapping does not — the old ids
+  // name columns in a frame built the old way — so it is left to
+  // `defaultOptions`.
+  .transfer(linePlugin, (data) => ({
+    state: transferableGraphState(data.lineState),
+    selection: undefined,
+    chartType: "scatterplot" as const,
+    readonlyInputs: [],
+    allowChartDeleting: false,
+    allowTitleEditing: false,
   }))
   // `params` is absent when a block is created by hand rather than from a
   // template, so every field the contract carries keeps its own default.
@@ -333,23 +364,6 @@ const DATASET_KEY_AXES: ReadonlySet<string> = new Set([
   "pl7.app/vdj/scClonotypeKey",
   "pl7.app/variantKey",
 ]);
-
-// The frequency line plot is a graph-maker plugin instance. Only this chart is
-// migrated: it is the one whose frame needs a linker, because a clustered
-// dataset keys the frequencies by cluster while everything a user would
-// annotate them with is keyed by clonotype.
-const linePlugin = graphMakerPlugin.create({
-  pluginId: "line",
-  config: {
-    chartType: "scatterplot",
-    initialTitle: "Top enriched sequences",
-    initialTemplate: "curve_dots",
-    initialState: {
-      currentTab: null,
-      layersSettings: { curve: { smoothing: false } },
-    },
-  },
-});
 
 export const platforma = BlockModelV3.create({ dataModel, kind })
 
