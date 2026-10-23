@@ -120,12 +120,11 @@ function migrateScatterStateToUmap(state: GraphMakerState): GraphMakerState {
 // migrated: it is the one whose frame needs a linker, because a clustered
 // dataset keys the frequencies by cluster while everything a user would
 // annotate them with is keyed by clonotype.
-const linePlugin = graphMakerPlugin.create({
+const linePlugin = graphMakerPlugin("scatterplot").create({
   pluginId: "line",
   // Where a chart saved before the plugin enters the chain.
   transferAt: "v1",
   config: {
-    chartType: "scatterplot",
     initialTitle: "Top enriched sequences",
     initialTemplate: "curve_dots",
     initialState: {
