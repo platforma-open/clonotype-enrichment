@@ -157,7 +157,6 @@ const dataModel = new DataModelBuilder({ kind })
   // `defaultOptions`.
   .transfer(linePlugin, (data) => ({
     state: transferableGraphState(data.lineState),
-    selection: undefined,
     chartType: "scatterplot" as const,
     readonlyInputs: [],
     allowChartDeleting: false,
