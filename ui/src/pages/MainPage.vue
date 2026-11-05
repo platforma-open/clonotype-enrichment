@@ -36,7 +36,7 @@ import {
   usePlDataTableSettingsV2,
 } from "@platforma-sdk/ui-vue";
 import { asyncComputed } from "@vueuse/core";
-import { computed, ref, watch, watchEffect } from "vue";
+import { computed, ref, shallowRef, watch, watchEffect } from "vue";
 import { useApp } from "../app";
 import type { SampleValuesState } from "../sample_values";
 import { useSampleValues } from "../sample_values";
@@ -221,6 +221,13 @@ const libraryAntigenValues = computed(() => pickers.value?.libraryAntigens);
 
 /** Conditions of the samples of the selected negative controls. */
 const negativeControlConditionOptions = computed(() => pickers.value?.controlConditions ?? []);
+
+/** Values of the condition column among the samples of the abundance input. */
+const conditionsInData = computed(() =>
+  [...(pickers.value?.conditions ?? []), ...(pickers.value?.conditionsExcludedByTarget ?? [])].map(
+    (option) => option.value,
+  ),
+);
 
 /** Picked target and negative controls some of whose samples have no condition. */
 const antigensWithEmptyConditions = computed(
@@ -520,12 +527,13 @@ watchEffect(() => {
 });
 
 // The control order holds values of the condition column, picked by the antigen column: a change
-// of either column invalidates it.
+// of either column invalidates it. So does a condition still in the data that no negative control
+// has samples in any more, as when a negative control is removed.
 const controlColumns = () => ({
   condition: app.model.data.conditionColumnRef,
   antigen: app.model.data.antigenControlConfig.antigenColumnRef,
 });
-const controlSyncColumns = ref(controlColumns());
+const controlSyncColumns = shallowRef(controlColumns());
 watchEffect(() => {
   const columns = controlColumns();
   const synced = controlSyncColumns.value;
@@ -535,8 +543,11 @@ watchEffect(() => {
 
   if (vals.length > 0) {
     const current = app.model.data.antigenControlConfig.controlConditionsOrder;
+    const offered = new Set(vals);
+    const inData = new Set(conditionsInData.value);
+    const hasInvalidItems = current.some((v) => inData.has(v) && !offered.has(v));
 
-    if (columnsChanged || current.length === 0) {
+    if (columnsChanged || current.length === 0 || hasInvalidItems) {
       const mainOrder = app.model.data.conditionOrder;
       const orderMap = new Map(mainOrder.map((v, i) => [v, i]));
       const sorted = [...vals].sort((a, b) => {
@@ -667,23 +678,13 @@ watch(
   },
 );
 
-// Picking a target, or turning target selection on, removes the conditions that have no samples
-// of that target from the order, once the values the pickers are built from are read. Conditions
-// that leave the data on their own stay in the order and are marked as not available.
-const pruneOrderForTarget = ref(false);
-watch(
-  [
-    () => app.model.data.antigenControlConfig.targetAntigen,
-    () => app.model.data.antigenControlConfig.antigenEnabled,
-  ],
-  () => {
-    pruneOrderForTarget.value = true;
-  },
-);
+// The order holds no condition without samples of the target, once the values the pickers are
+// built from are read. A target whose samples have no condition offers none, and then the order is
+// kept. Conditions that leave the data on their own stay in the order and are marked as not
+// available.
 watchEffect(() => {
   const p = pickers.value;
-  if (!pruneOrderForTarget.value || p === undefined) return;
-  pruneOrderForTarget.value = false;
+  if (p === undefined || p.conditions.length === 0) return;
   const excluded = new Set(p.conditionsExcludedByTarget.map((option) => option.value));
   if (excluded.size === 0) return;
   const current = app.model.data.conditionOrder;

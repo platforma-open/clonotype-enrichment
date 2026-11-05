@@ -8,6 +8,7 @@ import {
   createDatasetSelection,
   createGlobalPObjectId,
   createPrimaryRef,
+  isColumnUniversalId,
   isPlRef,
   parseColumnIdSafely,
 } from "@platforma-sdk/model";
@@ -39,6 +40,16 @@ export function fromDatasetSelection(selection: DatasetSelection | undefined): A
 /** The result-pool id of the upstream output a ref points to: it names the same block and column. */
 export function toColumnId(ref: PlRef): ColumnUniversalId {
   return createGlobalPObjectId(ref.blockId, ref.name);
+}
+
+/**
+ * A column of the last run's args. A run made before columns were stored by id keeps its ref
+ * until the block runs again.
+ */
+export function parseRunColumn(value: unknown): ColumnUniversalId | undefined {
+  if (isColumnUniversalId(value)) return value;
+  if (isPlRef(value)) return toColumnId(value);
+  return undefined;
 }
 
 /** Primary raw abundances per sample: the first of exactly two axes is the sample. */

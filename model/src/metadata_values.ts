@@ -162,7 +162,7 @@ export function getAbundanceSamples(data: MetadataPicks): string[] | undefined {
   if (sampleAxisIdx < 0) return undefined;
   const keysPerAxis = getUniquePartitionKeys(columnData);
   if (keysPerAxis === undefined || sampleAxisIdx >= keysPerAxis.length) return undefined;
-  const samples = [...new Set(keysPerAxis[sampleAxisIdx].map(String))];
+  const samples = keysPerAxis[sampleAxisIdx].map(String);
   return samples.length > 0 ? samples : undefined;
 }
 

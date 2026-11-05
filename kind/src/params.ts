@@ -1,5 +1,5 @@
 import { assertParamsObject } from "@platforma-sdk/block-kind";
-import { isColumnUniversalId, isColumnValueId } from "@platforma-sdk/model";
+import { isColumnUniversalId, isColumnValueId, isGlobalPObjectId } from "@platforma-sdk/model";
 import { isBoolean, isPlainObject, isString } from "es-toolkit";
 import { isArray, isNumber } from "es-toolkit/compat";
 import type {
@@ -94,6 +94,7 @@ const isAntigenControlConfig: Guard<AntigenControlConfig> = (v): v is AntigenCon
   isBoolean(v.hasMultiConditionNegativeControl);
 
 const COLUMN_ID = "a column id of another block's output";
+const OUTPUT_ID = "the result-pool id of another block's output";
 const VALUE_IDS = "an array of column value ids";
 
 /**
@@ -106,8 +107,8 @@ const VALUE_IDS = "an array of column value ids";
  * forgot one would otherwise return a valid `BlockParams` and say nothing.
  */
 const CONTRACT = {
-  abundanceRef: check(isColumnUniversalId, COLUMN_ID),
-  filterRef: check(isColumnUniversalId, COLUMN_ID),
+  abundanceRef: check(isGlobalPObjectId, OUTPUT_ID),
+  filterRef: check(isGlobalPObjectId, OUTPUT_ID),
 
   conditionColumnRef: check(isColumnUniversalId, COLUMN_ID),
   conditionOrder: check(arrayOf(isColumnValueId), VALUE_IDS),

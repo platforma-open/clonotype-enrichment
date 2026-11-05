@@ -30,7 +30,7 @@ import {
   isPColumnSpec,
   readAnnotationJson,
 } from "@platforma-sdk/model";
-import { PRIMARY_ABUNDANCE, toColumnId } from "./abundance";
+import { PRIMARY_ABUNDANCE, parseRunColumn, toColumnId } from "./abundance";
 import { getClonotypeDefinitionOptions } from "./clonotype_definition";
 import {
   exact,
@@ -532,7 +532,7 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
     }
 
     // Pull sequence columns from result pool to show in the table
-    const abundanceRef = ctx.activeArgs?.abundanceRef;
+    const abundanceRef = parseRunColumn(ctx.activeArgs?.abundanceRef);
     const abundanceSpec =
       abundanceRef === undefined ? undefined : findColumn(abundanceRef)?.getSpec();
     const enrichmentAxisName = pCols[0]?.getSpec().axesSpec[0]?.name;
@@ -721,7 +721,7 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
     const halfMatched = halfMatchedParentInput(parentColumns, variantAxis);
 
     // A summary from a run on another dataset says nothing about this one.
-    if (ctx.activeArgs?.abundanceRef !== anchor) return { halfMatched };
+    if (parseRunColumn(ctx.activeArgs?.abundanceRef) !== anchor) return { halfMatched };
     const summary = (field: string) =>
       ctx.outputs
         ?.resolve({ field, allowPermanentAbsence: true })
