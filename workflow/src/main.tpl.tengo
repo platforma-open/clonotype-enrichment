@@ -6,7 +6,9 @@ xsv := import("@platforma-sdk/workflow-tengo:pframes.xsv")
 pframes := import("@platforma-sdk/workflow-tengo:pframes")
 render := import("@platforma-sdk/workflow-tengo:render")
 pSpec := import("@platforma-sdk/workflow-tengo:pframes.spec")
+columnValue := import("@platforma-sdk/workflow-tengo:workflow.column-value")
 json := import("json")
+ll := import("@platforma-sdk/workflow-tengo:ll")
 strings := import("@platforma-sdk/workflow-tengo:strings")
 text := import("text")
 
@@ -67,10 +69,23 @@ calculateAnnotationValues := func(inputFile, enrichmentColumn) {
 	}
 }
 
+// The upstream output a result-pool column id names, as the ref an anchor is resolved from.
+// A result-pool id is the canonical JSON of that ref.
+columnIdToRef := func(id) {
+	ref := json.decode(id)
+	if !is_map(ref) || ref.__isRef != true {
+		ll.panic("expected a result-pool column id, got %v", id)
+	}
+	return ref
+}
+
 wf.prepare(func(args){
 
+	// Every column arrives as a result-pool column id. The abundance column is also the anchor
+	// the parent-normalization inputs are matched against.
 	bundleBuilder := wf.createPBundleBuilder()
-	bundleBuilder.addAnchor("main", args.abundanceRef)
+	bundleBuilder.addAnchor("main", columnIdToRef(args.abundanceRef))
+	bundleBuilder.addSingle(args.abundanceRef)
 	bundleBuilder.addSingle(args.conditionColumnRef)
 
 	if args.antigenControlConfig.antigenEnabled && args.antigenControlConfig.antigenColumnRef != undefined {
@@ -83,11 +98,10 @@ wf.prepare(func(args){
 		}
 	}
 
-	// Cluster mode: the per-clonotype primary abundance (a plain PlRef) the model
-	// matched to the input cluster abundance, used to compute the clonotype Max
-	// Frequency score.
+	// Cluster mode: the per-clonotype primary abundance the model matched to the input cluster
+	// abundance, used to compute the clonotype Max Frequency score.
 	if args.clonotypeAbundanceRef != undefined {
-		bundleBuilder.addRef(args.clonotypeAbundanceRef)
+		bundleBuilder.addSingle(args.clonotypeAbundanceRef)
 	}
 
 	// Small per-variant columns, so awaiting their data here is cheap. No alphabet pin on the mutation
@@ -121,7 +135,7 @@ wf.prepare(func(args){
 
 	// Optional subset column picked alongside the abundance (PlDatasetSelector)
 	if !is_undefined(args.inputFilter) {
-		bundleBuilder.addRef(json.decode(args.inputFilter))
+		bundleBuilder.addSingle(args.inputFilter)
 	}
 
 	return {
@@ -134,11 +148,21 @@ wf.body(func(args) {
 	// Load input parameters and related variables
 	blockId := wf.blockId().getDataAsJson()
 	columns := args.columns
-	conditionOrder := args.conditionOrder
+	// Picked condition and antigen values arrive as column value ids; the analysis works
+	// with the plain values they carry.
+	conditionOrder := columnValue.valuesOf(args.conditionOrder)
 	abundanceSpec := columns.getSpec(args.abundanceRef)
 	downsampling:= args.downsampling
 	additionalEnrichmentExports := args.additionalEnrichmentExports
 	antigenControlConfig := args.antigenControlConfig
+	antigenControlConfig.negativeAntigens = columnValue.valuesOf(antigenControlConfig.negativeAntigens)
+	antigenControlConfig.controlConditionsOrder = columnValue.valuesOf(antigenControlConfig.controlConditionsOrder)
+	if !is_undefined(antigenControlConfig.targetAntigen) {
+		antigenControlConfig.targetAntigen = columnValue.valueOf(antigenControlConfig.targetAntigen)
+	}
+	if !is_undefined(antigenControlConfig.sequencedLibraryAntigen) {
+		antigenControlConfig.sequencedLibraryAntigen = columnValue.valueOf(antigenControlConfig.sequencedLibraryAntigen)
+	}
 
 	// safety checks
 	// Sequenced library not used if there is no target
@@ -162,6 +186,7 @@ wf.body(func(args) {
 
 	// Add filtering mode to ensure cache differentiation
 	FilteringConfig := args.FilteringConfig
+	FilteringConfig.presentInRounds.rounds = columnValue.valuesOf(FilteringConfig.presentInRounds.rounds)
 	label = label + " - Filtering: " + FilteringConfig.baseFilter
 
 	if args.pseudoCount > 0 {
@@ -173,7 +198,7 @@ wf.body(func(args) {
 	filterColumn := undefined
 	traceSpec := abundanceSpec
 	if !is_undefined(args.inputFilter) {
-		f := columns.getColumn(json.decode(args.inputFilter))
+		f := columns.getColumn(args.inputFilter)
 		filterColumn = { spec: f.spec, data: f.data }
 		traceSpec = f.spec
 	}
