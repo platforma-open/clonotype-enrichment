@@ -106,17 +106,6 @@ const abundanceSelection = computed<DatasetSelection | undefined>({
   },
 });
 
-// The subtitle names the chosen clonotype-definition columns as the result pool labels them.
-// Called only from the picker's setter, so reopening the block never rewrites it.
-function setClonotypeDefinition(clonotypeDefinition: ColumnUniversalId[]) {
-  app.model.data.clonotypeDefinition = clonotypeDefinition;
-  const options = app.model.outputs.sequenceColumnOptions ?? [];
-  app.model.data.subtitleLabel = clonotypeDefinition
-    .map((colId) => options.find((opt) => opt.value === colId)?.label)
-    .filter((label) => label !== undefined)
-    .join("-");
-}
-
 // Persist the auto-discovered per-clonotype abundance so the workflow can
 // compute the clonotype Max Frequency score (cluster input only).
 watchEffect(() => {
@@ -1247,9 +1236,8 @@ function failureOf(state: SampleValuesState | undefined): string | undefined {
       </PlNumberField>
       <PlDropdownMulti
         v-if="!isClusterId && !isWholeSequenceInput"
-        :model-value="app.model.data.clonotypeDefinition"
+        v-model="app.model.data.clonotypeDefinition"
         :options="app.model.outputs.sequenceColumnOptions"
-        @update:model-value="setClonotypeDefinition"
         label="Clonotype definition"
       >
         <template #tooltip>

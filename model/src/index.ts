@@ -117,8 +117,8 @@ type BlockDataV3 = Omit<BlockData, "subtitleLabel"> & {
 
 export type BlockData = {
   customBlockLabel: string;
-  // Labels of the chosen clonotype-definition columns as the result pool shows them. Written
-  // by the clonotype-definition picker on a user pick; feeds the subtitle only, never the workflow.
+  // Labels of the chosen clonotype-definition columns as the result pool shows them, kept in
+  // sync by the UI; feeds the subtitle only, never the workflow.
   subtitleLabel?: string;
   abundanceRef?: ColumnUniversalId;
   /** Subset column picked with the abundance in PlDatasetSelector (e.g. a Repertoire Labeling label). */
@@ -248,7 +248,7 @@ const dataModel = new DataModelBuilder({ kind })
   }))
   .migrate<BlockDataV3>("v3", toColumnIds)
   // The old label mixed clonotype-definition column labels from the result pool with settings;
-  // the settings part is recomputed from data, and the column part returns on the next pick.
+  // the settings part is recomputed from data, and the column part returns once the block is opened.
   .migrate<BlockData>("v4", ({ defaultBlockLabel: _, ...rest }) => ({
     ...rest,
     subtitleLabel: "",
