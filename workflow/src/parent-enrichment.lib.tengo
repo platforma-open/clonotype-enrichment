@@ -182,8 +182,7 @@ build := func(ctx) {
 			antigenControlConfig: ctx.antigenControlConfig,
 			enrichmentThreshold: args.enrichmentThreshold,
 			blockId: ctx.blockId,
-			customBlockLabel: args.customBlockLabel,
-			defaultBlockLabel: args.defaultBlockLabel
+			conditionOrderLabel: ctx.conditionOrderLabel
 		}
 		// Only for a subset run, so a full-data run keeps exactly its previous inputs
 		if isSubset {

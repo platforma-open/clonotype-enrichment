@@ -22,8 +22,7 @@ self.body(func(args) {
     FilteringConfig := args.FilteringConfig
     blockId := args.blockId
     specLabel := args.specLabel
-    customBlockLabel := args.customBlockLabel
-    defaultBlockLabel := args.defaultBlockLabel
+    conditionOrderLabel := args.conditionOrderLabel
 
     enrichmentImportParamsExport := undefined
     // In case of additional exports we will modify some spec values using specLabel
@@ -73,9 +72,6 @@ self.body(func(args) {
 	} else {
 		label = "Downsampling: " + downsampling.type
 	}
-    // Determine the label for condition order trace
-    conditionOrderLabel := customBlockLabel || defaultBlockLabel
-
     // Add two traces, one for the condition order and one for the downsampling.
     // A subset run roots the trace in the filter (dataset -> the block that made the subset).
     traceSpec := is_undefined(args.traceSpec) ? abundanceSpec : args.traceSpec

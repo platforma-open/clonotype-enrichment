@@ -5,12 +5,13 @@ import type {
 } from "@platforma-open/milaboratories.clonotype-enrichment.model";
 import {
   buildMetadataValuePickers,
+  defaultSubtitle,
   deriveMetadataValues,
   fromDatasetSelection,
   toDatasetSelection,
 } from "@platforma-open/milaboratories.clonotype-enrichment.model";
 import type { ColumnUniversalId, ColumnValueOption, DatasetSelection } from "@platforma-sdk/model";
-import { columnValueLabel, getRawPlatformaInstance } from "@platforma-sdk/model";
+import { getRawPlatformaInstance } from "@platforma-sdk/model";
 import type { ListOption } from "@platforma-sdk/ui-vue";
 import {
   PlAccordion,
@@ -105,55 +106,16 @@ const abundanceSelection = computed<DatasetSelection | undefined>({
   },
 });
 
-// updating defaultBlockLabel
-watchEffect(() => {
-  const conditionOrder = app.model.data.conditionOrder;
-  const clonotypeDefinition = app.model.data.clonotypeDefinition;
-  const sequenceColumnOptions = app.model.outputs.sequenceColumnOptions;
-  const baseFilter = app.model.data.FilteringConfig.baseFilter;
-
-  let label = "";
-
-  // Add clonotype definition prefix if selected
-  if (clonotypeDefinition && clonotypeDefinition.length > 0 && sequenceColumnOptions) {
-    const clonotypeLabels = clonotypeDefinition
-      .map((colId) => {
-        const option = sequenceColumnOptions.find((opt) => opt.value === colId);
-        return option?.label;
-      })
-      .filter((label) => label !== undefined);
-
-    if (clonotypeLabels.length > 0) {
-      label = clonotypeLabels.join("-");
-    }
-  }
-
-  // Add condition order
-  if (conditionOrder && conditionOrder.length > 0) {
-    const conditionLabel = conditionOrder.map(columnValueLabel).join("-");
-    label = label ? `${label}, ${conditionLabel}` : conditionLabel;
-  }
-
-  // Add target antigen if defined
-  const antigenControlConfig = app.model.data.antigenControlConfig;
-  if (antigenControlConfig.targetAntigen && antigenControlConfig.antigenEnabled) {
-    const targetLabel = columnValueLabel(antigenControlConfig.targetAntigen);
-    label = label ? `${label}, ${targetLabel}` : targetLabel;
-  }
-
-  // Add filtering mode at the end
-  if (baseFilter) {
-    const filteringLabel =
-      baseFilter === "none"
-        ? "No filtering"
-        : baseFilter === "shared"
-          ? "Shared (all conditions)"
-          : "Multiple conditions";
-    label = label ? `${label}, ${filteringLabel}` : filteringLabel;
-  }
-
-  app.model.data.defaultBlockLabel = label;
-});
+// The subtitle names the chosen clonotype-definition columns as the result pool labels them.
+// Called only from the picker's setter, so reopening the block never rewrites it.
+function setClonotypeDefinition(clonotypeDefinition: ColumnUniversalId[]) {
+  app.model.data.clonotypeDefinition = clonotypeDefinition;
+  const options = app.model.outputs.sequenceColumnOptions ?? [];
+  app.model.data.subtitleLabel = clonotypeDefinition
+    .map((colId) => options.find((opt) => opt.value === colId)?.label)
+    .filter((label) => label !== undefined)
+    .join("-");
+}
 
 // Persist the auto-discovered per-clonotype abundance so the workflow can
 // compute the clonotype Max Frequency score (cluster input only).
@@ -730,7 +692,7 @@ function failureOf(state: SampleValuesState | undefined): string | undefined {
 <template>
   <PlBlockPage
     v-model:subtitle="app.model.data.customBlockLabel"
-    :subtitle-placeholder="app.model.data.defaultBlockLabel"
+    :subtitle-placeholder="defaultSubtitle(app.model.data)"
     title="Enrichment Analysis"
   >
     <template #append>
@@ -1285,8 +1247,9 @@ function failureOf(state: SampleValuesState | undefined): string | undefined {
       </PlNumberField>
       <PlDropdownMulti
         v-if="!isClusterId && !isWholeSequenceInput"
-        v-model="app.model.data.clonotypeDefinition"
+        :model-value="app.model.data.clonotypeDefinition"
         :options="app.model.outputs.sequenceColumnOptions"
+        @update:model-value="setClonotypeDefinition"
         label="Clonotype definition"
       >
         <template #tooltip>
