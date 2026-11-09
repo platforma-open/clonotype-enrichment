@@ -1,5 +1,23 @@
 # @platforma-open/milaboratories.clonotype-enrichment.model
 
+## 5.0.1
+
+### Patch Changes
+
+- 79ab046: Compute the block label without the UI
+
+  The trace label is now built by the workflow from the native labels of the
+  clonotype-definition columns plus the conditions, target antigen and filtering mode,
+  named after the block ("Enrichment Analysis (...)"). Opening the block no longer changes
+  its arguments, and a block that was never opened still gets a meaningful label. The
+  subtitle shows the result-pool labels of the clonotype-definition columns. Existing blocks
+  show as stale once after the update. The
+  init-params contract no longer carries `defaultBlockLabel`; templates that still contain
+  it keep loading.
+
+- Updated dependencies [79ab046]
+  - @platforma-open/milaboratories.clonotype-enrichment.kind@2.1.0
+
 ## 5.0.0
 
 ### Major Changes
