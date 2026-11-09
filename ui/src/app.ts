@@ -39,17 +39,18 @@ const unwatch = watch(sdkPlugin, ({ loaded }) => {
 type AppModel = ReturnType<typeof useApp>["model"];
 
 // The subtitle names the chosen clonotype-definition columns as the result pool labels them:
-// "" when none is chosen, undefined while a chosen column's option is not loaded yet.
+// "" when none is chosen, undefined while the options are loading; a chosen column the loaded
+// options no longer list is left out.
 function syncSubtitleLabel(model: AppModel) {
   const subtitleLabel = computed<string | undefined>(() => {
+    const colIds = model.data.clonotypeDefinition;
+    if (colIds.length === 0) return "";
     const options = model.outputs.sequenceColumnOptions;
-    const labels: string[] = [];
-    for (const colId of model.data.clonotypeDefinition) {
-      const label = options?.find((opt) => opt.value === colId)?.label;
-      if (label === undefined) return undefined;
-      labels.push(label);
-    }
-    return labels.join("-");
+    if (options === undefined) return undefined;
+    return colIds
+      .map((colId) => options.find((opt) => opt.value === colId)?.label)
+      .filter(Boolean)
+      .join("-");
   });
 
   watch(

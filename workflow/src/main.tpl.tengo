@@ -19,6 +19,7 @@ clonotypeMaxFreqSw := assets.importSoftware("@platforma-open/milaboratories.clon
 
 parentInputs := import(":parent-inputs")
 parentEnrichment := import(":parent-enrichment")
+traceLabel := import(":trace-label")
 
 pfEnrichmentConv := import(":pf-enrichment-conv")
 pfFrequencyConv := import(":pf-frequency-conv")
@@ -77,36 +78,6 @@ columnIdToRef := func(id) {
 		ll.panic("expected a result-pool column id, got %v", id)
 	}
 	return ref
-}
-
-// The default block label is the block name with the native labels of the clonotype-definition
-// columns, in the order the user picked them, followed by the conditions and filtering settings.
-buildTraceLabel := func(args, columns) {
-	conditionOrderLabel := args.customBlockLabel
-	if conditionOrderLabel == "" {
-		clonotypeLabels := []
-		if args.clonotypeDefinition != undefined {
-			for columnRef in args.clonotypeDefinition {
-				annotations := columns.getSpec(columnRef).annotations
-				columnLabel := is_undefined(annotations) ? undefined : annotations["pl7.app/label"]
-				if !is_undefined(columnLabel) && columnLabel != "" {
-					clonotypeLabels = append(clonotypeLabels, columnLabel)
-				}
-			}
-		}
-		labelParts := []
-		if len(clonotypeLabels) > 0 {
-			labelParts = append(labelParts, text.join(clonotypeLabels, "-"))
-		}
-		if args.paramsLabel != "" {
-			labelParts = append(labelParts, args.paramsLabel)
-		}
-		conditionOrderLabel = "Enrichment Analysis"
-		if len(labelParts) > 0 {
-			conditionOrderLabel = "Enrichment Analysis (" + text.join(labelParts, ", ") + ")"
-		}
-	}
-	return conditionOrderLabel
 }
 
 wf.prepare(func(args){
@@ -470,7 +441,7 @@ wf.body(func(args) {
 
 	// Prepare pFrame to be exported
 	// Two traces: condition order (block label) and downsampling
-	conditionOrderLabel := buildTraceLabel(args, columns)
+	conditionOrderLabel := traceLabel.build(args, columns)
 	trace := pSpec.makeTrace(traceSpec,
 		{
 			type: "milaboratories.clonotype-enrichment.condition-order",

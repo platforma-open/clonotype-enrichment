@@ -1,0 +1,74 @@
+test := import("@platforma-sdk/workflow-tengo:test")
+traceLabel := import(":trace-label")
+
+specs := {
+	chain: {annotations: {"pl7.app/label": "TRB"}},
+	cdr3: {annotations: {"pl7.app/label": "CDR3 aa"}},
+	vGene: {annotations: {"pl7.app/label": "V gene"}},
+	unlabelled: {annotations: {}},
+	bare: {}
+}
+
+columns := {
+	getSpec: func(ref) {
+		return specs[ref]
+	}
+}
+
+args := func(overrides) {
+	res := {
+		customBlockLabel: "",
+		clonotypeDefinition: [],
+		paramsLabel: ""
+	}
+	for k, v in overrides {
+		res[k] = v
+	}
+	return res
+}
+
+Test_custom_label_is_kept_verbatim := func() {
+	test.isEqual("My run", traceLabel.build(args({
+		customBlockLabel: "My run",
+		clonotypeDefinition: ["chain"],
+		paramsLabel: "Day 0-Day 7, Multiple conditions"
+	}), columns), "custom label wins")
+}
+
+Test_default_joins_column_labels_in_picked_order_then_settings := func() {
+	test.isEqual("Enrichment Analysis (CDR3 aa-TRB-V gene, Day 0-Day 7, HER2, No filtering)", traceLabel.build(args({
+		clonotypeDefinition: ["cdr3", "chain", "vGene"],
+		paramsLabel: "Day 0-Day 7, HER2, No filtering"
+	}), columns), "column labels joined by '-' in picked order, then settings")
+}
+
+Test_settings_alone_without_clonotype_definition := func() {
+	test.isEqual("Enrichment Analysis (Day 0-Day 7, Multiple conditions)", traceLabel.build(args({
+		paramsLabel: "Day 0-Day 7, Multiple conditions"
+	}), columns), "no column part when nothing is picked")
+	test.isEqual("Enrichment Analysis (No filtering)", traceLabel.build(args({
+		clonotypeDefinition: undefined,
+		paramsLabel: "No filtering"
+	}), columns), "undefined clonotype definition is no columns")
+}
+
+Test_unlabelled_columns_are_skipped := func() {
+	test.isEqual("Enrichment Analysis (TRB-V gene, No filtering)", traceLabel.build(args({
+		clonotypeDefinition: ["chain", "unlabelled", "bare", "vGene"],
+		paramsLabel: "No filtering"
+	}), columns), "only labelled columns appear")
+	test.isEqual("Enrichment Analysis (No filtering)", traceLabel.build(args({
+		clonotypeDefinition: ["unlabelled", "bare"],
+		paramsLabel: "No filtering"
+	}), columns), "no column part when no column has a label")
+}
+
+Test_columns_without_settings := func() {
+	test.isEqual("Enrichment Analysis (TRB)", traceLabel.build(args({
+		clonotypeDefinition: ["chain"]
+	}), columns), "no trailing separator when settings are empty")
+}
+
+Test_nothing_chosen_gives_the_block_name := func() {
+	test.isEqual("Enrichment Analysis", traceLabel.build(args({}), columns), "bare block name")
+}
