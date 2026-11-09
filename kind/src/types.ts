@@ -89,6 +89,5 @@ export type BlockParams = {
   additionalEnrichmentExports?: string[];
 
   // Display naming.
-  defaultBlockLabel?: string;
   customBlockLabel?: string;
 };

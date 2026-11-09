@@ -21,6 +21,7 @@ import {
   ColumnsCollection,
   DataModelBuilder,
   buildDatasetOptions,
+  columnValueLabel,
   createPFrameForGraphs,
   createPlDataTableStateV2,
   createPlDataTableV3,
@@ -110,9 +111,15 @@ type OldUiState = {
   excludedAlertDismissedKey?: string;
 };
 
-export type BlockData = {
+type BlockDataV3 = Omit<BlockData, "subtitleLabel"> & {
   defaultBlockLabel: string;
+};
+
+export type BlockData = {
   customBlockLabel: string;
+  // Labels of the chosen clonotype-definition columns as the result pool shows them, kept in
+  // sync by the UI; feeds the subtitle only, never the workflow.
+  subtitleLabel?: string;
   abundanceRef?: ColumnUniversalId;
   /** Subset column picked with the abundance in PlDatasetSelector (e.g. a Repertoire Labeling label). */
   filterRef?: ColumnUniversalId;
@@ -140,6 +147,31 @@ export type BlockData = {
   excludedAlertDismissedKey?: string;
 };
 
+/** Settings part of the block label, shared by the trace label and the subtitle. */
+export function labelFromParams(data: BlockData): string {
+  const parts: string[] = [];
+  if (data.conditionOrder.length > 0) {
+    parts.push(data.conditionOrder.map(columnValueLabel).join("-"));
+  }
+  const { antigenEnabled, targetAntigen } = data.antigenControlConfig;
+  if (antigenEnabled && targetAntigen) {
+    parts.push(columnValueLabel(targetAntigen));
+  }
+  parts.push(FILTERING_LABELS[data.FilteringConfig.baseFilter]);
+  return parts.join(", ");
+}
+
+/** Subtitle shown when the user has not set a custom block label. */
+export function defaultSubtitle(data: BlockData): string {
+  return [data.subtitleLabel, labelFromParams(data)].filter(Boolean).join(", ");
+}
+
+const FILTERING_LABELS: Record<FilteringConfig["baseFilter"], string> = {
+  none: "No filtering",
+  shared: "Shared (all conditions)",
+  "single-sample": "Multiple conditions",
+};
+
 function migrateScatterStateToUmap(state: GraphMakerState): GraphMakerState {
   const optionsState = state?.optionsState;
   if (optionsState?.type !== "scatterplot" || optionsState.components === undefined) return state;
@@ -164,7 +196,7 @@ function migrateScatterStateToUmap(state: GraphMakerState): GraphMakerState {
  * ids and are dropped, to be picked again. So are clonotype-definition columns picked by
  * anchored ids; without them a clonotype is the abundance column's element.
  */
-function toColumnIds(data: BlockDataV2): BlockData {
+function toColumnIds(data: BlockDataV2): BlockDataV3 {
   const ref = (stored: PlRef | undefined) =>
     stored === undefined ? undefined : toColumnId(stored);
   const column = (stored: string | undefined) => (isColumnUniversalId(stored) ? stored : undefined);
@@ -214,13 +246,19 @@ const dataModel = new DataModelBuilder({ kind })
     ...data,
     scatterState: migrateScatterStateToUmap(data.scatterState),
   }))
-  .migrate<BlockData>("v3", toColumnIds)
+  .migrate<BlockDataV3>("v3", toColumnIds)
+  // The old label mixed clonotype-definition column labels from the result pool with settings;
+  // the settings part is recomputed from data, and the column part returns once the block is opened.
+  .migrate<BlockData>("v4", ({ defaultBlockLabel: _, ...rest }) => ({
+    ...rest,
+    subtitleLabel: "",
+  }))
   // `params` is absent when a block is created by hand rather than from a
   // template, so every field the contract carries keeps its own default.
   .init(({ params }) => ({
     ...params,
-    defaultBlockLabel: params?.defaultBlockLabel ?? "",
     customBlockLabel: params?.customBlockLabel ?? "",
+    subtitleLabel: "",
     conditionOrder: params?.conditionOrder ?? [],
     downsampling: params?.downsampling ?? {
       type: "none",
@@ -313,8 +351,8 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
     const producedComparisons = new Set(listPickedComparisons(data));
 
     return {
-      defaultBlockLabel: data.defaultBlockLabel,
       customBlockLabel: data.customBlockLabel,
+      paramsLabel: labelFromParams(data),
       abundanceRef: data.abundanceRef,
       conditionColumnRef: data.conditionColumnRef,
       conditionOrder: data.conditionOrder,
@@ -392,7 +430,6 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
     pseudoCount: data.pseudoCount,
     additionalEnrichmentExports: data.additionalEnrichmentExports,
 
-    defaultBlockLabel: data.defaultBlockLabel,
     customBlockLabel: data.customBlockLabel,
   }))
 
@@ -735,7 +772,7 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
 
   .title(() => "Enrichment Analysis")
 
-  .subtitle((ctx) => ctx.data.customBlockLabel || ctx.data.defaultBlockLabel)
+  .subtitle((ctx) => ctx.data.customBlockLabel || defaultSubtitle(ctx.data))
 
   .sections((ctx) => {
     const sections: Array<{ type: "link"; href: `/${string}`; label: string }> = [

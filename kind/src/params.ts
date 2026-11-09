@@ -126,6 +126,5 @@ const CONTRACT = {
   pseudoCount: check(isNumber, "a number"),
   additionalEnrichmentExports: check(arrayOf(isString), "an array of strings"),
 
-  defaultBlockLabel: check(isString, "a string"),
   customBlockLabel: check(isString, "a string"),
 } satisfies { [K in keyof BlockParams]-?: Check<NonNullable<BlockParams[K]>> };

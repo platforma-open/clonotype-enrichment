@@ -73,8 +73,8 @@ const storedAtV2 = {
 describe("v3 migration", () => {
   const migrated = () => migrate(storedAtV2, "v2");
 
-  test("lands at v3", () => {
-    expect(migrated().version).toBe("v3");
+  test("lands at v4", () => {
+    expect(migrated().version).toBe("v4");
   });
 
   test("refs to upstream outputs become their result-pool ids", () => {
@@ -116,7 +116,6 @@ describe("v3 migration", () => {
       hasMultiConditionNegativeControl: false,
     });
     expect(data).toMatchObject({
-      defaultBlockLabel: "Day 0-Day 7",
       downsampling: storedAtV2.downsampling,
       additionalEnrichmentExports: ["Day 7 vs Day 0"],
       enrichmentThreshold: 3,
@@ -162,9 +161,20 @@ describe("v3 migration", () => {
   });
 });
 
+describe("v4 migration", () => {
+  test("the old block label is dropped and the subtitle label starts empty", () => {
+    const { data } = migrate(storedAtV2, "v2");
+    expect(data).not.toHaveProperty("defaultBlockLabel");
+    expect(data.subtitleLabel).toBe("");
+    expect(data.customBlockLabel).toBe("");
+  });
+});
+
 // Internals
 
 type MigratedData = {
+  customBlockLabel: string;
+  subtitleLabel?: string;
   abundanceRef?: string;
   filterRef?: string;
   clonotypeAbundanceRef?: string;

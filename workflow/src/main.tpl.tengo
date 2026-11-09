@@ -19,6 +19,7 @@ clonotypeMaxFreqSw := assets.importSoftware("@platforma-open/milaboratories.clon
 
 parentInputs := import(":parent-inputs")
 parentEnrichment := import(":parent-enrichment")
+traceLabel := import(":trace-label")
 
 pfEnrichmentConv := import(":pf-enrichment-conv")
 pfFrequencyConv := import(":pf-frequency-conv")
@@ -440,7 +441,7 @@ wf.body(func(args) {
 
 	// Prepare pFrame to be exported
 	// Two traces: condition order (block label) and downsampling
-	conditionOrderLabel := args.customBlockLabel || args.defaultBlockLabel
+	conditionOrderLabel := traceLabel.build(args, columns)
 	trace := pSpec.makeTrace(traceSpec,
 		{
 			type: "milaboratories.clonotype-enrichment.condition-order",
@@ -496,8 +497,7 @@ wf.body(func(args) {
 			enrichmentThreshold: args.enrichmentThreshold,
 			blockId: blockId,
 			specLabel: specLabel,
-			customBlockLabel: args.customBlockLabel,
-			defaultBlockLabel: args.defaultBlockLabel
+			conditionOrderLabel: conditionOrderLabel
 		}
 		// Only for a subset run, so a full-data run keeps exactly its previous inputs
 		if !is_undefined(filterColumn) {
@@ -539,8 +539,7 @@ wf.body(func(args) {
 		antigenControlConfig: antigenControlConfig,
 		enrichmentThreshold: args.enrichmentThreshold,
 		blockId: blockId,
-		customBlockLabel: args.customBlockLabel,
-		defaultBlockLabel: args.defaultBlockLabel,
+		conditionOrderLabel: conditionOrderLabel,
 		filteredTooMuch: calculateEnrichment.getFileContent("filtered_too_much.txt")
 	}
 	// Only for a subset run, so a full-data run keeps exactly its previous inputs

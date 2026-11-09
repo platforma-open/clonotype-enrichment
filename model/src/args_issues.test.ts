@@ -144,6 +144,12 @@ describe("args issues", () => {
     });
   });
 
+  test("changing the subtitle label leaves the args unchanged", () => {
+    expect(deriveArgs(configured({ subtitleLabel: "CDR3 aa-TRB" }))).toEqual(
+      deriveArgs(configured({ subtitleLabel: "" })),
+    );
+  });
+
   test("a new block derives args and is blocked from running", () => {
     expect(deriveArgs(initialData())).toMatchObject({
       args: expect.any(Object),

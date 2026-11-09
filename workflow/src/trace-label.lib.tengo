@@ -1,0 +1,36 @@
+ll := import("@platforma-sdk/workflow-tengo:ll")
+text := import("text")
+
+// The default block label is the block name with the native labels of the clonotype-definition
+// columns, in the order the user picked them, followed by the conditions and filtering settings.
+build := func(args, columns) {
+	conditionOrderLabel := args.customBlockLabel
+	if conditionOrderLabel == "" {
+		clonotypeLabels := []
+		if args.clonotypeDefinition != undefined {
+			for columnRef in args.clonotypeDefinition {
+				annotations := columns.getSpec(columnRef).annotations
+				columnLabel := is_undefined(annotations) ? undefined : annotations["pl7.app/label"]
+				if !is_undefined(columnLabel) && columnLabel != "" {
+					clonotypeLabels = append(clonotypeLabels, columnLabel)
+				}
+			}
+		}
+		labelParts := []
+		if len(clonotypeLabels) > 0 {
+			labelParts = append(labelParts, text.join(clonotypeLabels, "-"))
+		}
+		if args.paramsLabel != "" {
+			labelParts = append(labelParts, args.paramsLabel)
+		}
+		conditionOrderLabel = "Enrichment Analysis"
+		if len(labelParts) > 0 {
+			conditionOrderLabel = "Enrichment Analysis (" + text.join(labelParts, ", ") + ")"
+		}
+	}
+	return conditionOrderLabel
+}
+
+export ll.toStrict({
+	build: build
+})

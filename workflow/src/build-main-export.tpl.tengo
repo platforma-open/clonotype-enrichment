@@ -30,8 +30,7 @@ self.body(func(args) {
         enrichmentThreshold: args.enrichmentThreshold,
         FilteringConfig: args.FilteringConfig,
         blockId: args.blockId,
-        customBlockLabel: args.customBlockLabel,
-        defaultBlockLabel: args.defaultBlockLabel
+        conditionOrderLabel: args.conditionOrderLabel
     }
     // Only for a subset run, so a full-data run keeps exactly its previous inputs
     if !is_undefined(args.subset) {
