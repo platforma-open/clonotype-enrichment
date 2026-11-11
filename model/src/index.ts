@@ -33,14 +33,7 @@ import {
 } from "@platforma-sdk/model";
 import { PRIMARY_ABUNDANCE, parseRunColumn, toColumnId } from "./abundance";
 import { getClonotypeDefinitionOptions } from "./clonotype_definition";
-import {
-  exact,
-  findColumn,
-  getOutputColumns,
-  resultPool,
-  toIdsAndSpecs,
-  toPColumns,
-} from "./columns";
+import { findColumn, getOutputColumns, toIdsAndSpecs, toPColumns } from "./columns";
 import { getMetadataOptions } from "./metadata_columns";
 import {
   getAbundanceSamples,
@@ -56,8 +49,7 @@ import type {
   DownsamplingParametersV1,
   FilteringConfigV1,
 } from "./stored_data";
-import type { ParentNormalization, ParentRunSummary } from "./parentNormalization";
-import { MUTATION_COUNT, PARENT_LINK, halfMatchedParentInput } from "./parentNormalization";
+import type { ParentInput, ParentNormalization, ParentRunSummary } from "./parentNormalization";
 export type * from "@milaboratories/helpers";
 export { fromDatasetSelection, toDatasetSelection } from "./abundance";
 export type { AbundancePick } from "./abundance";
@@ -749,22 +741,17 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
   .output("parentNormalization", (ctx): ParentNormalization | undefined => {
     const anchor = ctx.data.abundanceRef;
     if (!anchor) return undefined;
-    const variantAxis = findColumn(anchor)?.getSpec().axesSpec[1];
-    if (!variantAxis) return undefined;
-    const parentColumns = resultPool()
-      .filter({ include: [{ name: [exact(MUTATION_COUNT)] }, { name: [exact(PARENT_LINK)] }] })
-      .getColumns()
-      .map((column) => column.getSpec());
-    const halfMatched = halfMatchedParentInput(parentColumns, variantAxis);
-
-    // A summary from a run on another dataset says nothing about this one.
-    if (parseRunColumn(ctx.activeArgs?.abundanceRef) !== anchor) return { halfMatched };
+    // The workflow matches the parent columns and reports the result. A run on another dataset
+    // says nothing about this one, so wait until the last run is for the selected dataset.
+    if (parseRunColumn(ctx.activeArgs?.abundanceRef) !== anchor) return undefined;
     const summary = (field: string) =>
       ctx.outputs
         ?.resolve({ field, allowPermanentAbsence: true })
         ?.getDataAsJson<ParentRunSummary>();
     return {
-      halfMatched,
+      halfMatched: ctx.outputs
+        ?.resolve({ field: "parentMatch", allowPermanentAbsence: true })
+        ?.getDataAsJson<ParentInput>(),
       summary: summary("parentSummary"),
       proteinSummary: summary("proteinSummary"),
     };

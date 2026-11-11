@@ -5,6 +5,8 @@ ll := import("@platforma-sdk/workflow-tengo:ll")
 
 PARENT_ID_AXIS := "pl7.app/repertoire/parentId"
 ALPHABET := "pl7.app/alphabet"
+MUTATION_COUNT_NAME := "pl7.app/repertoire/mutationCount"
+PARENT_LINK_NAME := "pl7.app/repertoire/parentLink"
 
 domainOf := func(axis) {
 	return is_undefined(axis.domain) ? {} : axis.domain
@@ -93,7 +95,7 @@ isProteinLinkOf := func(ntAxis) {
  * @param candidates: {mutationCount, parentLink, aaToNt, aaMutationCounts, parentLinks}, each an array of
  *   bundle columns ({spec, data}) or undefined
  * @param variantAxis: the anchor's variant axis spec
- * @return {parentMode, mutationCount, parentLink, parentAxis,
+ * @return {parentMode, mutationCount, parentLink, parentAxis, halfMatched,
  *          pooling, proteinLinker, proteinAxis,
  *          aaParentMode, aaMutationCount, aaParentLink, aaParentAxis}
  */
@@ -110,6 +112,13 @@ resolve := func(candidates, variantAxis) {
 	if res.parentMode {
 		res.parentAxis = parentAxisOf(res.parentLink)
 	}
+
+	// Exactly one of the two parent columns found: tell the UI which one, so it can explain why no
+	// normalization happened. The model reads this instead of matching the columns a second time.
+	foundMutationCount := !is_undefined(res.mutationCount)
+	foundParentLink := !is_undefined(res.parentLink)
+	res.halfMatched = foundMutationCount != foundParentLink ?
+		(foundMutationCount ? MUTATION_COUNT_NAME : PARENT_LINK_NAME) : undefined
 
 	if domainOf(variantAxis)[ALPHABET] != "nucleotide" {
 		return res

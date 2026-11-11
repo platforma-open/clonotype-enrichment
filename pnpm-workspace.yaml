@@ -9,16 +9,16 @@ packages:
 
 catalog:
   # SDK packages - EXACT VERSIONS (no ^ or ~)
-  '@milaboratories/ts-builder': 1.7.3
-  '@milaboratories/ts-configs': 1.4.0
-  '@platforma-sdk/workflow-tengo': 6.20.0
-  '@platforma-sdk/model': 1.88.0
-  '@platforma-sdk/ui-vue': 1.88.0
-  '@platforma-sdk/tengo-builder': 4.1.16
-  '@platforma-sdk/block-tools': 2.17.3
-  '@platforma-sdk/block-kind': 1.1.0
-  '@platforma-sdk/test': 1.88.0
-  '@milaboratories/helpers': 1.14.6
+  '@milaboratories/ts-builder': 1.8.0
+  '@milaboratories/ts-configs': 1.4.1
+  '@platforma-sdk/workflow-tengo': 6.22.2
+  '@platforma-sdk/model': 1.88.16
+  '@platforma-sdk/ui-vue': 1.88.16
+  '@platforma-sdk/tengo-builder': 4.1.21
+  '@platforma-sdk/block-tools': 2.19.1
+  '@platforma-sdk/block-kind': 1.1.1
+  '@platforma-sdk/test': 1.88.16
+  '@milaboratories/helpers': 1.14.7
 
   # Block-specific dependencies
   "@milaboratories/graph-maker": 1.6.1
@@ -30,7 +30,7 @@ catalog:
   '@vueuse/core': ^13.3.0
   'vue': 3.5.44
   'typescript': ~5.6.3
-  'turbo': ^2.6.3
+  'turbo': ~2.11.10
   'vitest': ^4.0.7
   'shx': ^0.4.0
   'eslint': ^9.25.1
@@ -38,4 +38,14 @@ catalog:
   '@changesets/cli': ^2.29.8
   # pinned to the copy already in the graph, so the kind does not pull a second one
   'es-toolkit': 1.39.10
-  "@platforma-sdk/package-builder": 3.16.2
+  "@platforma-sdk/package-builder": 3.17.0
+  cross-env: ~10.1.0
+minimumReleaseAgeExclude:
+  - "@milaboratories/*"
+  - "@platforma-sdk/*"
+  - "@platforma-open/*"
+allowBuilds:
+  "@milaboratories/tengo-tester": false
+  esbuild: false
+  protobufjs: false
+  "@milaboratories/pframes-rs-node": true
