@@ -44,6 +44,7 @@ Test_resolve_nucleotide_dataset_finds_both_grains := func() {
 	test.isTrue(parentInputs.sameAxis(aa, res.proteinAxis), "protein axis is the linker's other axis")
 	test.isTrue(res.aaParentMode, "aa parent found on the protein axis only")
 	test.isTrue(parentInputs.sameAxis(aa, res.aaMutationCount.spec.axesSpec[0]), "aa mutation count of this run")
+	test.isTrue(is_undefined(res.halfMatched), "both columns found, nothing is half-matched")
 }
 
 Test_resolve_one_column_missing_turns_the_mode_off := func() {
@@ -51,6 +52,7 @@ Test_resolve_one_column_missing_turns_the_mode_off := func() {
 	test.isFalse(res.parentMode, "parent link missing")
 	test.isTrue(!is_undefined(res.mutationCount), "the resolved column is still reported")
 	test.isFalse(res.pooling, "no linker, no pooling")
+	test.isEqual("pl7.app/repertoire/mutationCount", res.halfMatched, "halfMatched names the column that was found")
 }
 
 Test_resolve_several_matches_count_as_none := func() {
@@ -61,6 +63,7 @@ Test_resolve_several_matches_count_as_none := func() {
 	}, nt)
 	test.isFalse(res.parentMode, "two parent links")
 	test.isFalse(res.pooling, "two protein linkers")
+	test.isEqual("pl7.app/repertoire/mutationCount", res.halfMatched, "duplicate parent links count as missing, so only mutation count is found")
 }
 
 Test_resolve_amino_acid_dataset_never_pools := func() {

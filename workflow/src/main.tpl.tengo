@@ -9,6 +9,7 @@ pSpec := import("@platforma-sdk/workflow-tengo:pframes.spec")
 columnValue := import("@platforma-sdk/workflow-tengo:workflow.column-value")
 json := import("json")
 ll := import("@platforma-sdk/workflow-tengo:ll")
+smart := import("@platforma-sdk/workflow-tengo:smart")
 strings := import("@platforma-sdk/workflow-tengo:strings")
 text := import("text")
 
@@ -671,6 +672,9 @@ wf.body(func(args) {
 	}
 	if inputs.pooling {
 		outputs.proteinSummary = parent.proteinSummary
+	}
+	if inputs.halfMatched != undefined {
+		outputs.parentMatch = smart.createJsonResource(inputs.halfMatched)
 	}
 
 	exportsMap := {
