@@ -1,5 +1,11 @@
 # @platforma-open/milaboratories.clonotype-enrichment
 
+## 5.0.2
+
+### Patch Changes
+
+- b76a50b: Fix stale missing parent warning for DMS
+
 ## 5.0.1
 
 ## 5.0.0
