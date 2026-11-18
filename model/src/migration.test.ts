@@ -73,8 +73,8 @@ const storedAtV2 = {
 describe("v3 migration", () => {
   const migrated = () => migrate(storedAtV2, "v2");
 
-  test("lands at v4", () => {
-    expect(migrated().version).toBe("v4");
+  test("lands at v5", () => {
+    expect(migrated().version).toBe("v5");
   });
 
   test("refs to upstream outputs become their result-pool ids", () => {
@@ -112,8 +112,6 @@ describe("v3 migration", () => {
       singleControlFrequencyThreshold: 0.02,
       controlConditionsOrder: [],
       sequencedLibraryEnabled: true,
-      hasSingleConditionNegativeControl: true,
-      hasMultiConditionNegativeControl: false,
     });
     expect(data).toMatchObject({
       downsampling: storedAtV2.downsampling,
@@ -170,6 +168,65 @@ describe("v4 migration", () => {
   });
 });
 
+describe("v5 migration", () => {
+  const condition = createGlobalPObjectId("samples", "metadata.condition");
+  const antigen = createGlobalPObjectId("samples", "metadata.antigen");
+  const value = (column: typeof condition, v: string) => createColumnValueId({ column, value: v });
+
+  const storedAtV4 = {
+    customBlockLabel: "",
+    subtitleLabel: "",
+    abundanceRef: createGlobalPObjectId("mixcr", "abundance"),
+    conditionColumnRef: condition,
+    conditionOrder: [value(condition, "Day 0"), value(condition, "Day 7")],
+    downsampling: { type: "none", valueChooser: "auto" },
+    FilteringConfig: storedAtV2.FilteringConfig,
+    clonotypeDefinition: [],
+    additionalEnrichmentExports: [],
+    antigenControlConfig: {
+      antigenEnabled: true,
+      controlEnabled: true,
+      antigenColumnRef: antigen,
+      targetAntigen: value(antigen, "HER2"),
+      negativeAntigens: [value(antigen, "BSA")],
+      controlThreshold: 1.5,
+      singleControlFrequencyThreshold: 0.02,
+      controlConditionsOrder: [value(condition, "Day 0")],
+      sequencedLibraryEnabled: false,
+      hasSingleConditionNegativeControl: true,
+      hasMultiConditionNegativeControl: false,
+    },
+    enrichmentThreshold: 3,
+    pseudoCount: 2,
+    tableState: createPlDataTableStateV2(),
+    bubbleState: graph("Enrichment", "bubble"),
+    lineState: graph("Top enriched sequences", "curve_dots"),
+    stackedState: graph("Top enriched sequences", "stackedArea"),
+    scatterState: graph("Binding specificity", "dots"),
+    boxState: graph("Control Box Plot", "box"),
+  };
+
+  const {
+    hasSingleConditionNegativeControl: _single,
+    hasMultiConditionNegativeControl: _multi,
+    ...configWithoutFlags
+  } = storedAtV4.antigenControlConfig;
+
+  test("the negative-control flags are dropped and the rest of the setup is kept", () => {
+    const { version, data } = migrate(storedAtV4, "v4");
+    expect(version).toBe("v5");
+    expect(data.antigenControlConfig).toEqual(configWithoutFlags);
+  });
+
+  test("args derived from data stored before v5 carry no negative-control flags", () => {
+    expect(deriveArgs(storedAtV4).antigenControlConfig).toEqual(configWithoutFlags);
+  });
+
+  test("args are the same before and after the migration", () => {
+    expect(deriveArgs(migrate(storedAtV4, "v4").data)).toEqual(deriveArgs(storedAtV4));
+  });
+});
+
 // Internals
 
 type MigratedData = {
@@ -199,6 +256,26 @@ function migrate(data: unknown, version: string): { version: string; data: Migra
   if (!isMigrated(result)) throw new Error(`Migration failed: ${JSON.stringify(result)}`);
   const storage = normalizeBlockStorage<MigratedData>(JSON.parse(result.newStorageJson));
   return { version: storage.__dataVersion, data: getStorageData(storage) };
+}
+
+/** Derives the args from `data` as stored, without migrating it first. */
+function deriveArgs(data: unknown): { antigenControlConfig: unknown } {
+  const derive = callbackRegistry[BlockStorageFacadeCallbacks.ArgsDerive];
+  if (derive === undefined) throw new Error("The args derive callback is not registered");
+  const result = derive(stringifyJson(createBlockStorage(data, "v5")));
+  if (!isDerived(result)) throw new Error(`Args derivation failed: ${JSON.stringify(result)}`);
+  return result.value;
+}
+
+function isDerived(result: unknown): result is { value: { antigenControlConfig: unknown } } {
+  return (
+    typeof result === "object" &&
+    result !== null &&
+    "value" in result &&
+    typeof result.value === "object" &&
+    result.value !== null &&
+    "antigenControlConfig" in result.value
+  );
 }
 
 function isMigrated(result: unknown): result is { newStorageJson: string } {

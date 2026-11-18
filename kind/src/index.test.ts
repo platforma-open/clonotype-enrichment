@@ -43,3 +43,39 @@ describe("clonotypeAbundanceRef", () => {
     );
   });
 });
+
+describe("antigenControlConfig", () => {
+  const config = {
+    antigenEnabled: true,
+    controlEnabled: false,
+    negativeAntigens: [],
+    controlThreshold: 1,
+    singleControlFrequencyThreshold: 0.01,
+    controlConditionsOrder: [],
+    sequencedLibraryEnabled: false,
+  };
+
+  test("is accepted without the negative-control flags", () => {
+    expect(parse({ antigenControlConfig: config })).toEqual({ antigenControlConfig: config });
+  });
+
+  test("is accepted with the negative-control flags earlier templates carry, which are dropped", () => {
+    const parsed = parse({
+      antigenControlConfig: {
+        ...config,
+        hasSingleConditionNegativeControl: true,
+        hasMultiConditionNegativeControl: false,
+      },
+    });
+    expect(parsed).toEqual({ antigenControlConfig: config });
+    expect(parsed.antigenControlConfig).not.toHaveProperty("hasSingleConditionNegativeControl");
+    expect(parsed.antigenControlConfig).not.toHaveProperty("hasMultiConditionNegativeControl");
+  });
+
+  test("still requires the fields the contract names", () => {
+    const { controlThreshold: _, ...incomplete } = config;
+    expect(() => parse({ antigenControlConfig: incomplete })).toThrow(
+      "'antigenControlConfig' must be an antigen and control configuration object.",
+    );
+  });
+});

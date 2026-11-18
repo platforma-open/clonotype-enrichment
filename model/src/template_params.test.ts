@@ -58,6 +58,42 @@ describe("template params", () => {
   });
 });
 
+describe("a template written while the contract carried the negative-control flags", () => {
+  const antigenControlConfig = {
+    antigenEnabled: false,
+    controlEnabled: false,
+    negativeAntigens: [],
+    controlThreshold: 1,
+    singleControlFrequencyThreshold: 0.01,
+    controlConditionsOrder: [],
+    sequencedLibraryEnabled: false,
+  };
+  const withFlags = {
+    ...exported,
+    antigenControlConfig: {
+      ...antigenControlConfig,
+      hasSingleConditionNegativeControl: false,
+      hasMultiConditionNegativeControl: true,
+    },
+  };
+
+  test("creates a block whose data, args and exported params carry no flags", () => {
+    const data = initFromParams(withFlags, blockIds);
+    expect(data.antigenControlConfig).toEqual(antigenControlConfig);
+    // The template names no condition column, so the args come with their issues, under `args`.
+    const { args } = readObject(deriveArgs(data));
+    expect(readObject(args).antigenControlConfig).toEqual(antigenControlConfig);
+    expect(deriveParams(data).antigenControlConfig).toEqual(antigenControlConfig);
+  });
+
+  test("creates the same block as the template without them", () => {
+    const { antigenControlConfig: _, ...rest } = withFlags;
+    expect(initFromParams(withFlags, blockIds)).toEqual(
+      initFromParams({ ...rest, antigenControlConfig }, blockIds),
+    );
+  });
+});
+
 // Internals
 
 /** The block data a template entry with these params creates, as the app applies it. */

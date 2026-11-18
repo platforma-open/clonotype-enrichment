@@ -14,7 +14,9 @@ import type {
  * than from typed code.
  *
  * Each field the contract names is read and checked; a key it does not name is
- * dropped by never being read, so it needs no rejection here. Params written
+ * dropped by never being read, so it needs no rejection here. One level down,
+ * `antigenControlConfig` sheds the two negative-control flags earlier versions of
+ * the contract carried; see `readAntigenControlConfig`. Params written
  * against a different version of the contract are caught by the version in the
  * template entry's `{name}@{selector}` reference, not by a key-set check.
  */
@@ -30,7 +32,9 @@ export function parseInitializationParams(value: unknown): BlockParams {
   }
   // Every value placed here passed its own field's guard, and `CONTRACT` is
   // proven exhaustive over `BlockParams` by the `satisfies` below.
-  return params as BlockParams;
+  const parsed = params as BlockParams;
+  if (parsed.antigenControlConfig === undefined) return parsed;
+  return { ...parsed, antigenControlConfig: readAntigenControlConfig(parsed.antigenControlConfig) };
 }
 
 // ---------------------------------------------------------------------------
@@ -89,9 +93,24 @@ const isAntigenControlConfig: Guard<AntigenControlConfig> = (v): v is AntigenCon
   isNumber(v.singleControlFrequencyThreshold) &&
   arrayOf(isColumnValueId)(v.controlConditionsOrder) &&
   isBoolean(v.sequencedLibraryEnabled) &&
-  optional(isColumnValueId)(v.sequencedLibraryAntigen) &&
-  isBoolean(v.hasSingleConditionNegativeControl) &&
-  isBoolean(v.hasMultiConditionNegativeControl);
+  optional(isColumnValueId)(v.sequencedLibraryAntigen);
+
+/**
+ * The antigen and control configuration without the negative-control flags.
+ *
+ * Templates exported while `hasSingleConditionNegativeControl` and
+ * `hasMultiConditionNegativeControl` were part of the contract still carry them.
+ * They are dropped here, unchecked, so such a template still creates a block and
+ * the flags reach neither its data nor its args.
+ */
+function readAntigenControlConfig(config: AntigenControlConfig): AntigenControlConfig {
+  const {
+    hasSingleConditionNegativeControl: _single,
+    hasMultiConditionNegativeControl: _multi,
+    ...rest
+  } = config as AntigenControlConfig & Record<string, unknown>;
+  return rest;
+}
 
 const COLUMN_ID = "a column id of another block's output";
 const OUTPUT_ID = "the result-pool id of another block's output";

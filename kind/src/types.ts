@@ -45,8 +45,6 @@ export type AntigenControlConfig = {
   controlConditionsOrder: ColumnValueId[];
   sequencedLibraryEnabled: boolean;
   sequencedLibraryAntigen?: ColumnValueId;
-  hasSingleConditionNegativeControl: boolean;
-  hasMultiConditionNegativeControl: boolean;
 };
 
 /**

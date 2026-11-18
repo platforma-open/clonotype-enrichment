@@ -103,7 +103,20 @@ type OldUiState = {
   excludedAlertDismissedKey?: string;
 };
 
-type BlockDataV3 = Omit<BlockData, "subtitleLabel"> & {
+/**
+ * Antigen and control setup as stored up to `v4`: also two flags telling whether one or several
+ * negative-control conditions are picked, which the UI kept in sync and nothing read.
+ */
+type AntigenControlConfigV4 = AntigenControlConfig & {
+  hasSingleConditionNegativeControl: boolean;
+  hasMultiConditionNegativeControl: boolean;
+};
+
+type BlockDataV4 = Omit<BlockData, "antigenControlConfig"> & {
+  antigenControlConfig: AntigenControlConfigV4;
+};
+
+type BlockDataV3 = Omit<BlockDataV4, "subtitleLabel"> & {
   defaultBlockLabel: string;
 };
 
@@ -163,6 +176,20 @@ const FILTERING_LABELS: Record<FilteringConfig["baseFilter"], string> = {
   shared: "Shared (all conditions)",
   "single-sample": "Multiple conditions",
 };
+
+/**
+ * The antigen and control setup without the negative-control flags data stored before `v5`
+ * carries. Args and template params go through it too, so data not yet migrated sends neither
+ * flag to the workflow nor into a template.
+ */
+function withoutNegativeControlFlags(config: AntigenControlConfig): AntigenControlConfig {
+  const {
+    hasSingleConditionNegativeControl: _single,
+    hasMultiConditionNegativeControl: _multi,
+    ...rest
+  } = config as AntigenControlConfigV4;
+  return rest;
+}
 
 function migrateScatterStateToUmap(state: GraphMakerState): GraphMakerState {
   const optionsState = state?.optionsState;
@@ -241,9 +268,15 @@ const dataModel = new DataModelBuilder({ kind })
   .migrate<BlockDataV3>("v3", toColumnIds)
   // The old label mixed clonotype-definition column labels from the result pool with settings;
   // the settings part is recomputed from data, and the column part returns once the block is opened.
-  .migrate<BlockData>("v4", ({ defaultBlockLabel: _, ...rest }) => ({
+  .migrate<BlockDataV4>("v4", ({ defaultBlockLabel: _, ...rest }) => ({
     ...rest,
     subtitleLabel: "",
+  }))
+  // The negative-control flags only mirrored the picked control conditions; the workflow derives
+  // what it needs from those conditions itself.
+  .migrate<BlockData>("v5", (data) => ({
+    ...data,
+    antigenControlConfig: withoutNegativeControlFlags(data.antigenControlConfig),
   }))
   // `params` is absent when a block is created by hand rather than from a
   // template, so every field the contract carries keeps its own default.
@@ -282,8 +315,6 @@ const dataModel = new DataModelBuilder({ kind })
       controlConditionsOrder: [],
       sequencedLibraryEnabled: false,
       sequencedLibraryAntigen: undefined,
-      hasSingleConditionNegativeControl: false,
-      hasMultiConditionNegativeControl: false,
     },
     enrichmentThreshold: params?.enrichmentThreshold ?? 2.0,
     pseudoCount: params?.pseudoCount ?? 1,
@@ -355,7 +386,7 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
       additionalEnrichmentExports: data.additionalEnrichmentExports.filter((comparison) =>
         producedComparisons.has(comparison),
       ),
-      antigenControlConfig: data.antigenControlConfig,
+      antigenControlConfig: withoutNegativeControlFlags(data.antigenControlConfig),
       enrichmentThreshold: data.enrichmentThreshold,
       pseudoCount: data.pseudoCount,
       // The subset's canonical column id, which the workflow stamps as the outputs'
@@ -420,7 +451,7 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
     clonotypeDefinition: data.clonotypeDefinition,
     downsampling: data.downsampling,
     FilteringConfig: data.FilteringConfig,
-    antigenControlConfig: data.antigenControlConfig,
+    antigenControlConfig: withoutNegativeControlFlags(data.antigenControlConfig),
     enrichmentThreshold: data.enrichmentThreshold,
     pseudoCount: data.pseudoCount,
     additionalEnrichmentExports: data.additionalEnrichmentExports,

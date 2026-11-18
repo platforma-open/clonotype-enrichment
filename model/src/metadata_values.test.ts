@@ -275,8 +275,6 @@ function picks(
       singleControlFrequencyThreshold: 0.01,
       controlConditionsOrder: [],
       sequencedLibraryEnabled: false,
-      hasSingleConditionNegativeControl: false,
-      hasMultiConditionNegativeControl: false,
       ...overrides.antigenControlConfig,
     },
   };
