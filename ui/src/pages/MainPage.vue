@@ -572,19 +572,6 @@ watch(
   },
 );
 
-// Sync control flags to model
-watchEffect(() => {
-  const controls = pickers.value?.negativeControls;
-  if (controls === undefined) return;
-  const config = app.model.data.antigenControlConfig;
-  if (config.hasSingleConditionNegativeControl !== controls.single) {
-    config.hasSingleConditionNegativeControl = controls.single;
-  }
-  if (config.hasMultiConditionNegativeControl !== controls.multi) {
-    config.hasMultiConditionNegativeControl = controls.multi;
-  }
-});
-
 // Clear sequenced library antigen when the available options change due to user action
 // (target or negative control selection changed), but NOT on component remount.
 const librarySyncKey = ref(
