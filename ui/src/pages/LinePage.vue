@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { PredefinedGraphOption } from "@milaboratories/graph-maker";
-import { GraphMaker } from "@milaboratories/graph-maker";
+import { GraphMakerPlugin } from "@milaboratories/graph-maker";
 import type { PColumnSpec } from "@platforma-sdk/model";
 import { computed } from "vue";
 import { useApp } from "../app";
@@ -68,12 +68,9 @@ const metaColumnPredicate = (spec: PColumnSpec) =>
 </script>
 
 <template>
-  <GraphMaker
-    v-model="app.model.data.lineState"
-    chartType="scatterplot"
-    :p-frame="app.model.outputs.linePf"
+  <GraphMakerPlugin
+    :handle="app.plugins.line.handle"
     :default-options="defaultOptions"
-    default-palette="bright"
     :dataColumnPredicate="dataColumnPredicate"
     :meta-column-predicate="metaColumnPredicate"
   />

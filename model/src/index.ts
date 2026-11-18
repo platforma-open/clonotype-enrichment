@@ -31,6 +31,7 @@ import {
   isPColumnSpec,
   readAnnotationJson,
 } from "@platforma-sdk/model";
+import { graphMakerPlugin } from "@milaboratories/graph-maker/plugin";
 import { PRIMARY_ABUNDANCE, parseRunColumn, toColumnId } from "./abundance";
 import { getClonotypeDefinitionOptions } from "./clonotype_definition";
 import { findColumn, getOutputColumns, toIdsAndSpecs, toPColumns } from "./columns";
@@ -222,6 +223,24 @@ function toColumnIds(data: BlockDataV2): BlockDataV3 {
   };
 }
 
+// The frequency line plot is a graph-maker plugin instance. Only this chart is
+// migrated: it is the one whose frame needs a linker, because a clustered
+// dataset keys the frequencies by cluster while everything a user would
+// annotate them with is keyed by clonotype.
+const linePlugin = graphMakerPlugin("scatterplot").create({
+  pluginId: "line",
+  // Where a chart saved before the plugin enters the chain.
+  transferAt: "v1",
+  config: {
+    initialTitle: "Top enriched sequences",
+    initialTemplate: "curve_dots",
+    initialState: {
+      currentTab: null,
+      layersSettings: { curve: { smoothing: false } },
+    },
+  },
+});
+
 const dataModel = new DataModelBuilder({ kind })
   .from<BlockDataV1>("v1")
   .upgradeLegacy<OldArgs, OldUiState>(({ args, uiState }) => ({
@@ -245,6 +264,21 @@ const dataModel = new DataModelBuilder({ kind })
     ...rest,
     subtitleLabel: "",
   }))
+  // A chart saved before the line plot became a plugin instance moves over
+  // whole: the plugin's frame registers a column under the same id the old one
+  // did, so the saved data mapping still names real columns.
+  .transfer(linePlugin, (data) => ({
+    state: data.lineState,
+    chartType: "scatterplot" as const,
+    readonlyInputs: [],
+    allowChartDeleting: false,
+    allowTitleEditing: false,
+  }))
+  // The data is unchanged; the version bump is the point. `DataModel.migrate`
+  // takes a fast path when the stored version is already the latest one, and
+  // that path returns no transfers at all — so without a step to run, the
+  // chart above would be handed nothing and start from its config defaults.
+  .migrate<BlockData>("v5", (data) => data)
   // `params` is absent when a block is created by hand rather than from a
   // template, so every field the contract carries keeps its own default.
   .init(({ params }) => ({
@@ -334,6 +368,11 @@ const DATASET_KEY_AXES: ReadonlySet<string> = new Set([
 ]);
 
 export const platforma = BlockModelV3.create({ dataModel, kind })
+
+  .plugin(linePlugin, {
+    anchorColumns: (ctx) => ctx.outputs?.resolve("linePf")?.getPColumns(),
+    defaultPalette: () => "bright" as const,
+  })
 
   // Built even from an incomplete configuration; `argsIssues` decides whether it may run.
   .args((data) => {
@@ -668,15 +707,6 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
     }
 
     return toIdsAndSpecs(pCols);
-  })
-
-  .outputWithStatus("linePf", (ctx): PFrameHandle | undefined => {
-    const pCols = getOutputColumns(ctx.outputs?.resolve("linePf"))?.getColumns();
-    if (pCols === undefined) {
-      return undefined;
-    }
-
-    return createPFrameForGraphs(ctx, toPColumns(pCols));
   })
 
   .output("isRunning", (ctx) => ctx.outputs?.getIsReadyOrError() === false)
