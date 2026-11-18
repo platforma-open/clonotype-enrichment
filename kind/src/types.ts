@@ -70,12 +70,23 @@ export type AntigenControlConfig = {
  * a template exists to reproduce — and whether a given id still resolves after
  * the template lands is settled by the block's own outputs and `argsIssues`,
  * the same as after any upstream change.
+ *
+ * `clonotypeAbundanceRef` is the exception: the user never picks it, the UI
+ * derives it from the abundance. It travels anyway because it feeds the
+ * workflow's args — a block created without it would run without it, and the
+ * UI filling it in on the first open would change the args of a block that has
+ * already run.
  */
 export type BlockParams = {
   // Input wiring — column ids a template engine points at an earlier entry's outputs.
   abundanceRef?: ColumnUniversalId;
   /** A subset column (`pl7.app/isSubset`) the input is restricted to before the analysis. */
   filterRef?: ColumnUniversalId;
+  /**
+   * Cluster input only: the per-clonotype (or per-variant) primary abundance the
+   * cluster abundance was built from, as the UI discovers it.
+   */
+  clonotypeAbundanceRef?: ColumnUniversalId;
 
   // Analysis configuration — the recipe a template exists to reproduce.
   conditionColumnRef?: ColumnUniversalId;

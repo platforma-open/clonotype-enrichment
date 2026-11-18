@@ -109,6 +109,7 @@ const VALUE_IDS = "an array of column value ids";
 const CONTRACT = {
   abundanceRef: check(isGlobalPObjectId, OUTPUT_ID),
   filterRef: check(isGlobalPObjectId, OUTPUT_ID),
+  clonotypeAbundanceRef: check(isGlobalPObjectId, OUTPUT_ID),
 
   conditionColumnRef: check(isColumnUniversalId, COLUMN_ID),
   conditionOrder: check(arrayOf(isColumnValueId), VALUE_IDS),
