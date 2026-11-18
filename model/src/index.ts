@@ -405,12 +405,15 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
 
   // Inverse of `init` — the same fields, projected back out for template export.
   // Table state, the five graph states and the dismissed-alert key are view
-  // state and never cross the boundary. `clonotypeAbundanceRef` is left out too:
-  // it is not picked by the user but written from the `discoveredClonotypeAbundance`
-  // output, and the UI re-derives it against whatever input the template lands on.
+  // state and never cross the boundary. `clonotypeAbundanceRef` crosses although the
+  // user never picks it — the UI derives it from the `discoveredClonotypeAbundance`
+  // output — because it feeds the args: a block created without it runs without it,
+  // and the UI writing it on the first open changes the args of a block that has
+  // already run, making it and every block below it stale.
   .templateParams((data) => ({
     abundanceRef: data.abundanceRef,
     filterRef: data.filterRef,
+    clonotypeAbundanceRef: data.clonotypeAbundanceRef,
 
     conditionColumnRef: data.conditionColumnRef,
     conditionOrder: data.conditionOrder,
