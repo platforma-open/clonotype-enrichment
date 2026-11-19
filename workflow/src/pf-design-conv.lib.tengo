@@ -1,0 +1,87 @@
+// Import parameters for the design enrichment results (draft).
+// One column per plan comparison (c1, c2, ...) and one per score (s1, s2, ...).
+// Only the score columns are marked as scores (spec draft "Enrichment exports one score column
+// per target arm"). As in classic mode, the table shows the summary (the scores) and keeps the
+// per-comparison columns in the column picker. Both follow plan order, so an arm's columns sit
+// together.
+ll := import("@platforma-sdk/workflow-tengo:ll")
+maps := import("@platforma-sdk/workflow-tengo:maps")
+
+getColumns := func(abundanceSpec, plan, blockId, enrichmentThreshold) {
+	baseDomain := {
+		"pl7.app/blockId": blockId,
+		"pl7.app/design/designId": plan.designId,
+		"pl7.app/design/comparison": plan.comparison
+	}
+
+	columns := []
+	for i, c in plan.comparisons {
+		domain := maps.merge(baseDomain, {
+			"pl7.app/enrichment/type": "designComparison",
+			"pl7.app/design/column": c.id
+		})
+		columns = append(columns, {
+			column: c.id,
+			id: c.id,
+			allowNA: true,
+			spec: {
+				name: "pl7.app/enrichment",
+				valueType: "Double",
+				domain: domain,
+				annotations: {
+					"pl7.app/label": c.label,
+					"pl7.app/design/group": c.group,
+					"pl7.app/table/visibility": "optional",
+					"pl7.app/table/orderPriority": string(9000 - i),
+					"pl7.app/format": ".2f"
+				}
+			}
+		})
+	}
+	for i, s in plan.scores {
+		domain := maps.merge(baseDomain, {
+			"pl7.app/enrichment/type": "designScore",
+			"pl7.app/design/column": s.id
+		})
+		columns = append(columns, {
+			column: s.id,
+			id: s.id,
+			allowNA: true,
+			spec: {
+				name: "pl7.app/enrichment",
+				valueType: "Double",
+				domain: domain,
+				annotations: {
+					"pl7.app/label": s.label,
+					"pl7.app/design/group": s.group || s.arm,
+					"pl7.app/isScore": "true",
+					"pl7.app/score/rankValues": "increasing",
+					"pl7.app/score/defaultCutoff": string(enrichmentThreshold),
+					"pl7.app/table/visibility": "default",
+					"pl7.app/table/orderPriority": string(95000 - i),
+					"pl7.app/format": ".2f"
+				}
+			}
+		})
+	}
+
+	return {
+		axes: [
+			{
+				column: "elementId",
+				spec: maps.deepMerge(abundanceSpec.axesSpec[1], {
+					annotations: {
+						"pl7.app/table/visibility": "default"
+					}
+				})
+			}
+		],
+		columns: columns,
+		storageFormat: "Parquet",
+		partitionKeyLength: 0
+	}
+}
+
+export ll.toStrict({
+	getColumns: getColumns
+})

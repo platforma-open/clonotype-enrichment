@@ -25,6 +25,20 @@ import {
   getUniquePartitionKeys,
   readAnnotationJson,
 } from "@platforma-sdk/model";
+import {
+  LABELS_COLUMN_NAME,
+  Names,
+  TENSOR_COLUMN_NAME,
+  TENSOR_SAMPLE_AXIS_ANNOTATION,
+  buildPlan,
+  comparisonOptions,
+  readDesigns,
+  sameAxisId,
+  type Design,
+  type JsonColumnData,
+  type Plan,
+} from "./design";
+export * from "./design";
 export type * from "@milaboratories/helpers";
 
 // The analysis-configuration shapes are the block's init-params contract, so
@@ -89,7 +103,26 @@ export type BlockData = {
   scatterState: GraphMakerState;
   boxState: GraphMakerState;
   excludedAlertDismissedKey?: string;
+
+  // ---- Experiment design (draft) ----
+  // Set when the user picks a design in the abundance dropdown. When
+  // `designId` is set, the condition column, condition order and antigen /
+  // control settings are not used: the comparisons come from the design.
+  /** The `pl7.app/design/tensors` column the design came from. */
+  designTensorsRef?: PlRef;
+  designId?: string;
+  /** Tensor id of the chosen comparison (a panel or a trajectory). */
+  designComparison?: string;
+  /** Split names of the panel arms marked as controls. */
+  designControlArms?: string[];
+  /** Partition tensor id -> chosen target piece (see `posKey`). */
+  designTargetPieces?: Record<string, string>;
+  /** The plan built from the choices above; written by the UI from `designView.plan`. */
+  designPlan?: Plan;
 };
+
+/** Value of one entry in the combined abundance / design dropdown. */
+export type InputChoice = { abundanceRef: PlRef; designTensorsRef?: PlRef; designId?: string };
 
 function migrateScatterStateToUmap(state: GraphMakerState): GraphMakerState {
   const optionsState = state?.optionsState;
@@ -210,6 +243,27 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
     const { abundanceRef, conditionColumnRef, conditionOrder, antigenControlConfig } = data;
 
     if (!abundanceRef) throw new Error("Abundance is required");
+    if (data.enrichmentThreshold < 0.6) throw new Error("Enrichment threshold must be ≥ 0.6");
+
+    // With a design, the comparisons come from the plan, not from metadata.
+    if (data.designId !== undefined) {
+      const plan = data.designPlan;
+      if (!plan || plan.designId !== data.designId || plan.comparison !== data.designComparison)
+        throw new Error("Finish the design settings");
+      if (plan.comparisons.length === 0) throw new Error("The design gives no comparisons");
+      return {
+        defaultBlockLabel: data.defaultBlockLabel,
+        customBlockLabel: data.customBlockLabel,
+        abundanceRef,
+        downsampling: data.downsampling,
+        FilteringConfig: data.FilteringConfig,
+        clonotypeDefinition: data.clonotypeDefinition,
+        enrichmentThreshold: data.enrichmentThreshold,
+        pseudoCount: data.pseudoCount,
+        design: plan,
+      };
+    }
+
     if (!conditionColumnRef) throw new Error("Condition column is required");
     if (!conditionOrder.length) throw new Error("Conditions are required");
     if (data.enrichmentThreshold < 0.6) throw new Error("Enrichment threshold must be ≥ 0.6");
@@ -293,6 +347,116 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
       { includeNativeLabel: true },
     ),
   )
+
+  // Abundances plus, under each, the designs whose sample axis matches it.
+  // Values are JSON-encoded InputChoice objects.
+  .output("inputOptions", (ctx) => {
+    const abundances = ctx.resultPool.getOptions(
+      [
+        {
+          axes: [{ name: "pl7.app/sampleId" }, {}],
+          annotations: {
+            "pl7.app/isAbundance": "true",
+            "pl7.app/abundance/normalized": "false",
+            "pl7.app/abundance/isPrimary": "true",
+          },
+        },
+      ],
+      { includeNativeLabel: true },
+    );
+    const tensorColumns = ctx.resultPool
+      .getOptions((spec) => spec.kind === "PColumn" && spec.name === TENSOR_COLUMN_NAME)
+      .map((opt) => {
+        const spec = ctx.resultPool.getPColumnSpecByRef(opt.ref);
+        let axis;
+        try {
+          axis = JSON.parse(spec?.annotations?.[TENSOR_SAMPLE_AXIS_ANNOTATION] ?? "null");
+        } catch {
+          axis = undefined;
+        }
+        const content = ctx.resultPool
+          .getPColumnByRef(opt.ref)
+          ?.data?.getDataAsJsonOrUndefined<JsonColumnData>();
+        return { ref: opt.ref, axis, designs: readDesigns(content) };
+      });
+
+    const withDesign: { value: string; label: string }[] = [];
+    const plain: { value: string; label: string }[] = [];
+    for (const a of abundances) {
+      plain.push({ value: JSON.stringify({ abundanceRef: a.ref }), label: a.label });
+      const sampleAxis = ctx.resultPool.getPColumnSpecByRef(a.ref)?.axesSpec?.[0];
+      for (const t of tensorColumns) {
+        if (!sameAxisId(t.axis, sampleAxis)) continue;
+        for (const d of t.designs)
+          withDesign.push({
+            value: JSON.stringify({
+              abundanceRef: a.ref,
+              designTensorsRef: t.ref,
+              designId: d.designId,
+            } satisfies InputChoice),
+            label: `${a.label} / ${d.name}`,
+          });
+      }
+    }
+    return { withDesign, plain };
+  })
+
+  // Comparison options, questions and the plan for the selected design.
+  .output("designView", (ctx) => {
+    const { designTensorsRef, designId, abundanceRef } = ctx.data;
+    if (!designTensorsRef || designId === undefined || !abundanceRef) return undefined;
+    const content = ctx.resultPool
+      .getPColumnByRef(designTensorsRef)
+      ?.data?.getDataAsJsonOrUndefined<JsonColumnData>();
+    // The labels column published next to the tensors: same block, same axes.
+    type Axed = { axesSpec?: { domain?: Record<string, string> }[] };
+    const blockOf = (spec: unknown) =>
+      (spec as Axed | undefined)?.axesSpec?.[0]?.domain?.["pl7.app/blockId"];
+    const tensorsBlock = blockOf(ctx.resultPool.getPColumnSpecByRef(designTensorsRef));
+    const labelsRef = ctx.resultPool.getOptions(
+      (spec) =>
+        spec.kind === "PColumn" &&
+        spec.name === LABELS_COLUMN_NAME &&
+        blockOf(spec) === tensorsBlock,
+    )[0]?.ref;
+    const labelContent = labelsRef
+      ? ctx.resultPool.getPColumnByRef(labelsRef)?.data?.getDataAsJsonOrUndefined<JsonColumnData>()
+      : undefined;
+    const design: Design | undefined = readDesigns(content, labelContent).find(
+      (d) => d.designId === designId,
+    );
+    if (!design) return { error: "The design is not available" };
+
+    const sampleAxis = ctx.resultPool.getPColumnSpecByRef(abundanceRef)?.axesSpec?.[0];
+    const labels = sampleAxis ? (ctx.resultPool.findLabels(sampleAxis) ?? {}) : {};
+    const label = (ids: string[]) => ids.map((id) => labels[id] ?? id).join(" + ");
+
+    const comparisons = comparisonOptions(design, label);
+    const chosen = ctx.data.designComparison;
+    const tensor = chosen ? design.tensors[chosen] : undefined;
+    const names = new Names(design, label);
+    const arms =
+      tensor?.type === "panel"
+        ? tensor.arms.map((a) => ({ split: a.split, name: names.arm(tensor, a.split) }))
+        : [];
+    const result = buildPlan(
+      design,
+      {
+        comparison: chosen,
+        controlArms: ctx.data.designControlArms ?? [],
+        targetPieces: ctx.data.designTargetPieces ?? {},
+      },
+      label,
+    );
+    return {
+      designName: design.name,
+      comparisons,
+      arms,
+      questions: result.questions,
+      plan: result.plan,
+      error: result.error,
+    };
+  })
 
   .output("sequenceColumnOptions", (ctx) => {
     const anchor = ctx.data.abundanceRef;
@@ -451,7 +615,9 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
 
   // Get all enrichment statistics
   .output("enrichmentStats", (ctx) => {
-    const statsObj = ctx.outputs?.resolve("outStats")?.getDataAsJson();
+    const statsObj = ctx.outputs
+      ?.resolve({ field: "outStats", allowPermanentAbsence: true })
+      ?.getDataAsJson();
     if (!statsObj) return undefined;
 
     const result: Record<string, string> = {};
@@ -535,7 +701,9 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
 
   // Returns a map of results for plot
   .outputWithStatus("bubblePf", (ctx): PFrameHandle | undefined => {
-    const pCols = ctx.outputs?.resolve("bubblePf")?.getPColumns();
+    const pCols = ctx.outputs
+      ?.resolve({ field: "bubblePf", allowPermanentAbsence: true })
+      ?.getPColumns();
     if (pCols === undefined) {
       return undefined;
     }
@@ -545,7 +713,9 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
 
   // Returns a list pof PCols for plot defaults
   .output("bubblePCols", (ctx) => {
-    const pCols = ctx.outputs?.resolve("bubblePf")?.getPColumns();
+    const pCols = ctx.outputs
+      ?.resolve({ field: "bubblePf", allowPermanentAbsence: true })
+      ?.getPColumns();
     if (pCols === undefined) {
       return undefined;
     }
@@ -560,7 +730,9 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
   })
 
   .outputWithStatus("stackedPf", (ctx): PFrameHandle | undefined => {
-    const pCols = ctx.outputs?.resolve("stackedPf")?.getPColumns();
+    const pCols = ctx.outputs
+      ?.resolve({ field: "stackedPf", allowPermanentAbsence: true })
+      ?.getPColumns();
     if (pCols === undefined) {
       return undefined;
     }
@@ -569,7 +741,9 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
   })
 
   .output("stackedPCols", (ctx) => {
-    const pCols = ctx.outputs?.resolve("stackedPf")?.getPColumns();
+    const pCols = ctx.outputs
+      ?.resolve({ field: "stackedPf", allowPermanentAbsence: true })
+      ?.getPColumns();
     if (pCols === undefined) {
       return undefined;
     }
@@ -584,7 +758,9 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
   })
 
   .outputWithStatus("linePf", (ctx): PFrameHandle | undefined => {
-    const pCols = ctx.outputs?.resolve("linePf")?.getPColumns();
+    const pCols = ctx.outputs
+      ?.resolve({ field: "linePf", allowPermanentAbsence: true })
+      ?.getPColumns();
     if (pCols === undefined) {
       return undefined;
     }
@@ -623,7 +799,9 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
   })
 
   .output("filteredTooMuch", (ctx) => {
-    const filteredTooMuch = ctx.outputs?.resolve("filteredTooMuch")?.getDataAsJson() as object;
+    const filteredTooMuch = ctx.outputs
+      ?.resolve({ field: "filteredTooMuch", allowPermanentAbsence: true })
+      ?.getDataAsJson() as object;
     if (typeof filteredTooMuch === "boolean") {
       return filteredTooMuch;
     }

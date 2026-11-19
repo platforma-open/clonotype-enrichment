@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { PlRef, SUniversalPColumnId } from "@platforma-sdk/model";
+import type { InputChoice } from "@platforma-open/milaboratories.clonotype-enrichment.model";
 import { getRawPlatformaInstance, getSingleColumnData, type PObjectId } from "@platforma-sdk/model";
 import type { ListOption } from "@platforma-sdk/ui-vue";
 import {
@@ -14,7 +15,6 @@ import {
   PlDialogModal,
   PlDropdown,
   PlDropdownMulti,
-  PlDropdownRef,
   PlElementList,
   PlMaskIcon24,
   PlNumberField,
@@ -28,6 +28,7 @@ import {
 import { asyncComputed } from "@vueuse/core";
 import { computed, ref, watch, watchEffect } from "vue";
 import { useApp } from "../app";
+import DesignSettings from "./DesignSettings.vue";
 
 const app = useApp();
 
@@ -43,6 +44,95 @@ const mapToOptions = (values?: string[]) => values?.map((v) => ({ value: v, labe
 function setInput(inputRef?: PlRef) {
   app.model.data.abundanceRef = inputRef;
 }
+
+// ---- Experiment design (draft) ----
+// The abundance dropdown lists plain abundances and, above them, each design
+// that matches an abundance. A choice is a JSON-encoded InputChoice.
+const designMode = computed(() => app.model.data.designId !== undefined);
+
+const inputOptions = computed(() => {
+  const o = app.model.outputs.inputOptions;
+  if (!o) return undefined;
+  return [
+    ...o.withDesign.map((x) => ({ ...x, group: "With a design" })),
+    ...o.plain.map((x) => ({ ...x, group: "Abundances" })),
+  ];
+});
+
+const inputValue = computed(() => {
+  const d = app.model.data;
+  if (!d.abundanceRef) return undefined;
+  const want =
+    d.designId !== undefined
+      ? JSON.stringify({
+          abundanceRef: d.abundanceRef,
+          designTensorsRef: d.designTensorsRef,
+          designId: d.designId,
+        })
+      : JSON.stringify({ abundanceRef: d.abundanceRef });
+  // Match on the parsed value: refs from the model may order keys differently.
+  const options = inputOptions.value ?? [];
+  const same = (a: string, b: string) => {
+    try {
+      const x = JSON.parse(a);
+      const y = JSON.parse(b);
+      return (
+        JSON.stringify(x.abundanceRef?.blockId) === JSON.stringify(y.abundanceRef?.blockId) &&
+        x.abundanceRef?.name === y.abundanceRef?.name &&
+        x.designId === y.designId &&
+        x.designTensorsRef?.blockId === y.designTensorsRef?.blockId &&
+        x.designTensorsRef?.name === y.designTensorsRef?.name
+      );
+    } catch {
+      return false;
+    }
+  };
+  return options.find((o) => same(o.value, want))?.value ?? want;
+});
+
+function setInputChoice(value?: string) {
+  const d = app.model.data;
+  if (!value) {
+    setInput(undefined);
+    d.designId = undefined;
+    d.designTensorsRef = undefined;
+    return;
+  }
+  const choice = JSON.parse(value) as InputChoice;
+  setInput(choice.abundanceRef);
+  if (choice.designId !== d.designId) {
+    d.designComparison = undefined;
+    d.designControlArms = [];
+    d.designTargetPieces = {};
+    d.designPlan = undefined;
+  }
+  d.designId = choice.designId;
+  d.designTensorsRef = choice.designTensorsRef;
+}
+
+// Default comparison: the first panel, else the first path. Also replaces a saved choice the
+// design no longer offers. Written with updateData, as it reacts to an output (see below).
+watchEffect(() => {
+  const view = app.model.outputs.designView;
+  if (!designMode.value || !view?.comparisons?.length) return;
+  const current = app.model.data.designComparison;
+  if (current && view.comparisons.some((c) => c.value === current)) return;
+  const first = view.comparisons[0].value;
+  void app.updateData((d) => ({ ...d, designComparison: first }));
+});
+
+// The args lambda has no access to the result pool, so the plan built by the
+// `designView` output is copied into the block data, as is done for
+// `clonotypeAbundanceRef`.
+// Written with updateData: a plain assignment made in reaction to an output change falls in
+// the SDK's ignored update window and is not saved until the next unrelated edit.
+watchEffect(() => {
+  if (!designMode.value) return;
+  const plan = app.model.outputs.designView?.plan;
+  const next = plan === undefined ? undefined : JSON.parse(JSON.stringify(plan));
+  if (JSON.stringify(next) !== JSON.stringify(app.model.data.designPlan))
+    void app.updateData((d) => ({ ...d, designPlan: next }));
+});
 
 // updating defaultBlockLabel
 watchEffect(() => {
@@ -268,6 +358,14 @@ watch(conditionsExcludedAlertKey, (key) => {
 
 /** Options for condition order list and present-in-rounds filter (current order). */
 const conditionOrderOptions = computed(() => mapToOptions([...app.model.data.conditionOrder]));
+
+/** Present-in-rounds options: the design's positions in design mode, else the conditions.
+ *  Undefined while the design plan is not built yet. */
+const roundOptions = computed(() => {
+  if (!designMode.value) return conditionOrderOptions.value;
+  const plan = app.model.data.designPlan;
+  return plan ? mapToOptions(plan.positions.map((p) => p.label)) : undefined;
+});
 
 /** Antigens map to their conditions. */
 const antigenConditionsMap = computed(() => {
@@ -759,14 +857,21 @@ watch(validComparisonsKey, () => {
   }
 });
 
-// Drop stale "present in rounds" selections when the condition order changes.
-const conditionOrderKey = computed(() => app.model.data.conditionOrder.join(","));
-watch(conditionOrderKey, () => {
-  const validSet = new Set(app.model.data.conditionOrder);
+// Drop stale "present in rounds" selections when the conditions or design positions change.
+const roundOptionsKey = computed(() => roundOptions.value?.map((o) => o.value).join(","));
+watch(roundOptionsKey, (key) => {
+  if (key === undefined) return;
+  const validSet = new Set(roundOptions.value?.map((o) => o.value));
   const current = app.model.data.FilteringConfig.presentInRounds.rounds;
   const filtered = current.filter((v) => validSet.has(v));
   if (filtered.length !== current.length) {
-    app.model.data.FilteringConfig.presentInRounds.rounds = filtered;
+    void app.updateData((d) => ({
+      ...d,
+      FilteringConfig: {
+        ...d.FilteringConfig,
+        presentInRounds: { ...d.FilteringConfig.presentInRounds, rounds: filtered },
+      },
+    }));
   }
 });
 
@@ -821,71 +926,74 @@ const isControlOrderOpen = ref(true); // Open by default
 
   <PlSlideModal v-model="settingsAreShown">
     <template #title>Settings</template>
-    <PlDropdownRef
-      v-model="app.model.data.abundanceRef"
-      :options="app.model.outputs.abundanceOptions"
+    <PlDropdown
+      :model-value="inputValue"
+      :options="inputOptions"
       label="Select abundance"
       clearable
       required
-      @update:model-value="setInput"
+      @update:model-value="setInputChoice"
     />
-    <PlDropdown
-      v-model="app.model.data.conditionColumnRef"
-      :options="app.model.outputs.metadataOptions"
-      label="Condition column"
-      required
-    />
+    <DesignSettings v-if="designMode" />
+    <template v-if="!designMode">
+      <PlDropdown
+        v-model="app.model.data.conditionColumnRef"
+        :options="app.model.outputs.metadataOptions"
+        label="Condition column"
+        required
+      />
 
-    <PlAlert v-if="antigensWithEmptyConditions.length > 0" type="error">
-      Some samples matching the <b>{{ antigensWithEmptyConditions.join(", ") }}</b> antigen have
-      empty values in the condition column. Please provide valid condition names in your metadata to
-      include these samples in the analysis.
-    </PlAlert>
+      <PlAlert v-if="antigensWithEmptyConditions.length > 0" type="error">
+        Some samples matching the <b>{{ antigensWithEmptyConditions.join(", ") }}</b> antigen have
+        empty values in the condition column. Please provide valid condition names in your metadata
+        to include these samples in the analysis.
+      </PlAlert>
 
-    <PlAccordion multiple>
-      <PlAccordionSection v-model="isConditionOrderOpen" label="Condition Order">
-        <div style="display: flex; margin-bottom: -15px">
-          Define condition order
-          <PlTooltip class="info">
-            <template #label>Define condition order</template>
-            <template #tooltip>
-              <div>
-                <strong>Order aware selection:</strong> Calculates contrast between an element
-                (numerator) and each of its preceding elements (denominators). <br /><br />
-                <strong>Example:</strong> If you select "Cond 1", "Cond 2" and "Cond 3", the
-                contrasts will be:
-                <ul>
-                  <li>Cond 2 vs Cond 1</li>
-                  <li>Cond 3 vs Cond 1</li>
-                  <li>Cond 3 vs Cond 2</li>
-                </ul>
-                The block will export the highest Enrichment value from all comparisons.
-              </div>
+      <PlAccordion multiple>
+        <PlAccordionSection v-model="isConditionOrderOpen" label="Condition Order">
+          <div style="display: flex; margin-bottom: -15px">
+            Define condition order
+            <PlTooltip class="info">
+              <template #label>Define condition order</template>
+              <template #tooltip>
+                <div>
+                  <strong>Order aware selection:</strong> Calculates contrast between an element
+                  (numerator) and each of its preceding elements (denominators). <br /><br />
+                  <strong>Example:</strong> If you select "Cond 1", "Cond 2" and "Cond 3", the
+                  contrasts will be:
+                  <ul>
+                    <li>Cond 2 vs Cond 1</li>
+                    <li>Cond 3 vs Cond 1</li>
+                    <li>Cond 3 vs Cond 2</li>
+                  </ul>
+                  The block will export the highest Enrichment value from all comparisons.
+                </div>
+              </template>
+            </PlTooltip>
+          </div>
+          <PlElementList v-model:items="app.model.data.conditionOrder">
+            <template #item-title="{ item }">
+              {{ item }}
             </template>
-          </PlTooltip>
-        </div>
-        <PlElementList v-model:items="app.model.data.conditionOrder">
-          <template #item-title="{ item }">
-            {{ item }}
-          </template>
-        </PlElementList>
-        <PlBtnGhost v-if="availableToAdd.length > 0" @click="resetConditionOrder">
-          Reset to default
-          <template #append>
-            <PlMaskIcon24 name="reverse" />
-          </template>
-        </PlBtnGhost>
-        <PlAlert
-          v-if="conditionsExcludedByTarget.length > 0"
-          v-model="conditionsExcludedAlertVisible"
-          type="warn"
-          closeable
-        >
-          When <strong>Target</strong> is defined, only target-specific conditions are allowed.
-          Removed: {{ conditionsExcludedByTarget.join(", ") }}.
-        </PlAlert>
-      </PlAccordionSection>
-    </PlAccordion>
+          </PlElementList>
+          <PlBtnGhost v-if="availableToAdd.length > 0" @click="resetConditionOrder">
+            Reset to default
+            <template #append>
+              <PlMaskIcon24 name="reverse" />
+            </template>
+          </PlBtnGhost>
+          <PlAlert
+            v-if="conditionsExcludedByTarget.length > 0"
+            v-model="conditionsExcludedAlertVisible"
+            type="warn"
+            closeable
+          >
+            When <strong>Target</strong> is defined, only target-specific conditions are allowed.
+            Removed: {{ conditionsExcludedByTarget.join(", ") }}.
+          </PlAlert>
+        </PlAccordionSection>
+      </PlAccordion>
+    </template>
 
     <PlNumberField
       v-model="app.model.data.enrichmentThreshold"
@@ -928,187 +1036,189 @@ const isControlOrderOpen = ref(true); // Open by default
       </template>
     </PlNumberField>
 
-    <PlRow>
-      <div style="display: flex; align-items: center; gap: 4px">
-        <PlCheckbox
-          v-model="app.model.data.antigenControlConfig.antigenEnabled"
-          :disabled="app.model.data.antigenControlConfig.controlEnabled"
-        >
-          Multiple target dataset
-        </PlCheckbox>
-        <PlTooltip class="info">
-          <template #tooltip>
-            <div>Enable specific target selection for dedicated enrichment analysis.</div>
-          </template>
-        </PlTooltip>
-      </div>
-
-      <div style="display: flex; align-items: center; gap: 4px">
-        <PlCheckbox v-model="app.model.data.antigenControlConfig.controlEnabled">
-          Use negative controls
-        </PlCheckbox>
-        <PlTooltip class="info">
-          <template #tooltip>
-            <div>
-              Enables specificity analysis by comparing your target against control samples.<br /><br />
-              You can select multiple negative controls (e.g., irrelevant antigens). The analysis
-              calculates enrichment for each one independently and uses the
-              <strong>maximum value</strong> found across all controls as a baseline for background
-              binding. This helps filter out "sticky" or non-specific sequences that appear in your
-              control samples.
-            </div>
-          </template>
-        </PlTooltip>
-      </div>
-    </PlRow>
-    <PlDropdown
-      v-if="app.model.data.antigenControlConfig.antigenEnabled"
-      v-model="app.model.data.antigenControlConfig.antigenColumnRef"
-      :options="app.model.outputs.metadataOptions"
-      label="Antigen column"
-      required
-    />
-    <PlDropdown
-      v-if="
-        app.model.data.antigenControlConfig.antigenEnabled &&
-        !app.model.data.antigenControlConfig.controlEnabled
-      "
-      v-model="app.model.data.antigenControlConfig.targetAntigen"
-      :options="antigenValues"
-      label="Target"
-    />
-    <PlRow v-if="app.model.data.antigenControlConfig.controlEnabled">
-      <PlDropdown
-        v-model="app.model.data.antigenControlConfig.targetAntigen"
-        :options="antigenValues"
-        label="Target"
-      />
-      <PlDropdownMulti
-        v-model="app.model.data.antigenControlConfig.negativeAntigens"
-        :style="{ minWidth: '148px' }"
-        :options="negativeAntigenValues"
-        label="Negative control(s)"
-      />
-    </PlRow>
-    <div style="display: flex; align-items: center; gap: 4px">
-      <PlCheckbox
-        v-if="app.model.data.antigenControlConfig.antigenEnabled"
-        v-model="app.model.data.antigenControlConfig.sequencedLibraryEnabled"
-      >
-        Sequenced Library
-      </PlCheckbox>
-      <PlTooltip v-if="app.model.data.antigenControlConfig.antigenEnabled" class="info">
-        <template #tooltip>
-          <div>
-            When enabled, you can select the library from the antigen column values. The samples
-            associated with this library will be used as the reference (baseline) for enrichment
-            fold-change calculations, for both the target antigen and negative controls.
-          </div>
-        </template>
-      </PlTooltip>
-    </div>
-    <PlDropdown
-      v-if="
-        app.model.data.antigenControlConfig.antigenEnabled &&
-        app.model.data.antigenControlConfig.sequencedLibraryEnabled &&
-        (libraryAntigenValues.length > 0 || !metadataFetched.value)
-      "
-      v-model="app.model.data.antigenControlConfig.sequencedLibraryAntigen"
-      :options="libraryAntigenValues"
-      label="Library"
-    />
-    <PlAlert
-      v-if="
-        app.model.data.antigenControlConfig.antigenEnabled &&
-        app.model.data.antigenControlConfig.sequencedLibraryEnabled &&
-        libraryAntigenValues.length === 0 &&
-        metadataFetched.value
-      "
-      type="error"
-      icon
-    >
-      No options available. Only antigen column values not used as target or negative controls are
-      shown.
-    </PlAlert>
-    <PlAccordion multiple>
-      <PlAccordionSection
-        v-if="app.model.data.antigenControlConfig.controlEnabled && hasMultiSampleNegativeControl"
-        v-model="isControlOrderOpen"
-        label="Negative Condition Order"
-      >
-        <div style="display: flex; margin-bottom: -15px">
-          Define negative condition order
+    <template v-if="!designMode">
+      <PlRow>
+        <div style="display: flex; align-items: center; gap: 4px">
+          <PlCheckbox
+            v-model="app.model.data.antigenControlConfig.antigenEnabled"
+            :disabled="app.model.data.antigenControlConfig.controlEnabled"
+          >
+            Multiple target dataset
+          </PlCheckbox>
           <PlTooltip class="info">
-            <template #label>Define condition order</template>
+            <template #tooltip>
+              <div>Enable specific target selection for dedicated enrichment analysis.</div>
+            </template>
+          </PlTooltip>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 4px">
+          <PlCheckbox v-model="app.model.data.antigenControlConfig.controlEnabled">
+            Use negative controls
+          </PlCheckbox>
+          <PlTooltip class="info">
             <template #tooltip>
               <div>
-                <strong>Order aware selection:</strong> Calculates contrast between an element
-                (numerator) and each of its preceding elements (denominators). <br /><br />
-                <strong>Example:</strong> If you select "Cond 1", "Cond 2" and "Cond 3", the
-                contrasts will be:
-                <ul>
-                  <li>Cond 2 vs Cond 1</li>
-                  <li>Cond 3 vs Cond 1</li>
-                  <li>Cond 3 vs Cond 2</li>
-                </ul>
+                Enables specificity analysis by comparing your target against control samples.<br /><br />
+                You can select multiple negative controls (e.g., irrelevant antigens). The analysis
+                calculates enrichment for each one independently and uses the
+                <strong>maximum value</strong> found across all controls as a baseline for
+                background binding. This helps filter out "sticky" or non-specific sequences that
+                appear in your control samples.
               </div>
             </template>
           </PlTooltip>
         </div>
-        <PlElementList v-model:items="app.model.data.antigenControlConfig.controlConditionsOrder">
-          <template #item-title="{ item }">
-            {{ item }}
+      </PlRow>
+      <PlDropdown
+        v-if="app.model.data.antigenControlConfig.antigenEnabled"
+        v-model="app.model.data.antigenControlConfig.antigenColumnRef"
+        :options="app.model.outputs.metadataOptions"
+        label="Antigen column"
+        required
+      />
+      <PlDropdown
+        v-if="
+          app.model.data.antigenControlConfig.antigenEnabled &&
+          !app.model.data.antigenControlConfig.controlEnabled
+        "
+        v-model="app.model.data.antigenControlConfig.targetAntigen"
+        :options="antigenValues"
+        label="Target"
+      />
+      <PlRow v-if="app.model.data.antigenControlConfig.controlEnabled">
+        <PlDropdown
+          v-model="app.model.data.antigenControlConfig.targetAntigen"
+          :options="antigenValues"
+          label="Target"
+        />
+        <PlDropdownMulti
+          v-model="app.model.data.antigenControlConfig.negativeAntigens"
+          :style="{ minWidth: '148px' }"
+          :options="negativeAntigenValues"
+          label="Negative control(s)"
+        />
+      </PlRow>
+      <div style="display: flex; align-items: center; gap: 4px">
+        <PlCheckbox
+          v-if="app.model.data.antigenControlConfig.antigenEnabled"
+          v-model="app.model.data.antigenControlConfig.sequencedLibraryEnabled"
+        >
+          Sequenced Library
+        </PlCheckbox>
+        <PlTooltip v-if="app.model.data.antigenControlConfig.antigenEnabled" class="info">
+          <template #tooltip>
+            <div>
+              When enabled, you can select the library from the antigen column values. The samples
+              associated with this library will be used as the reference (baseline) for enrichment
+              fold-change calculations, for both the target antigen and negative controls.
+            </div>
           </template>
-        </PlElementList>
-        <PlBtnGhost v-if="availableToAddToControl.length > 0" @click="resetControlConditionOrder">
-          Reset to default
-          <template #append>
-            <PlMaskIcon24 name="reverse" />
-          </template>
-        </PlBtnGhost>
-      </PlAccordionSection>
-    </PlAccordion>
-    <PlRow
-      v-if="
-        app.model.data.antigenControlConfig.controlEnabled &&
-        hasMultiSampleNegativeControl &&
-        !(
-          app.model.data.antigenControlConfig.sequencedLibraryEnabled === false &&
-          app.model.data.antigenControlConfig.controlConditionsOrder.length === 1
-        )
-      "
-    >
-      <PlNumberField
-        v-model="app.model.data.antigenControlConfig.controlThreshold"
-        label="Control threshold"
-        :minValue="0"
-        :step="0.1"
-        placeholder="1.0"
+        </PlTooltip>
+      </div>
+      <PlDropdown
+        v-if="
+          app.model.data.antigenControlConfig.antigenEnabled &&
+          app.model.data.antigenControlConfig.sequencedLibraryEnabled &&
+          (libraryAntigenValues.length > 0 || !metadataFetched.value)
+        "
+        v-model="app.model.data.antigenControlConfig.sequencedLibraryAntigen"
+        :options="libraryAntigenValues"
+        label="Library"
+      />
+      <PlAlert
+        v-if="
+          app.model.data.antigenControlConfig.antigenEnabled &&
+          app.model.data.antigenControlConfig.sequencedLibraryEnabled &&
+          libraryAntigenValues.length === 0 &&
+          metadataFetched.value
+        "
+        type="error"
+        icon
       >
-        <template #tooltip>
-          <div>
-            Log2 Fold Change (Log2FC) thresholds used to define
-            <strong>Enriched negative control sequences</strong>.<br />
-            A sequence is considered enriched if its Log2FC value between conditions is equal or
-            greater than the threshold. This threshold in combination with
-            <strong>Enrichment threshold</strong> is used to define
-            <strong>Binding Specificity</strong> categories: <br /><br />
-            Target<sub>Max</sub> and Control<sub>Max</sub> are the maximum Log2FC values for the
-            target and control conditions, respectively: <br /><br />
-            - <strong>Antigen-Specific:</strong> Target<sub>Max</sub> ≥ Enrichment Threshold and
-            Control<sub>Max</sub> &lt; Control Threshold.
-            <br />
-            - <strong>Non-Specific:</strong> Target<sub>Max</sub> ≥ Enrichment Threshold and
-            Control<sub>Max</sub> ≥ Control Threshold (indicates "sticky" binders).
-            <br />
-            - <strong>Negative-Control:</strong> Target<sub>Max</sub> &lt; Enrichment Threshold and
-            Control<sub>Max</sub> ≥ Control Threshold.
-            <br />
-            - <strong>Not-Enriched:</strong> Both below thresholds.
+        No options available. Only antigen column values not used as target or negative controls are
+        shown.
+      </PlAlert>
+      <PlAccordion multiple>
+        <PlAccordionSection
+          v-if="app.model.data.antigenControlConfig.controlEnabled && hasMultiSampleNegativeControl"
+          v-model="isControlOrderOpen"
+          label="Negative Condition Order"
+        >
+          <div style="display: flex; margin-bottom: -15px">
+            Define negative condition order
+            <PlTooltip class="info">
+              <template #label>Define condition order</template>
+              <template #tooltip>
+                <div>
+                  <strong>Order aware selection:</strong> Calculates contrast between an element
+                  (numerator) and each of its preceding elements (denominators). <br /><br />
+                  <strong>Example:</strong> If you select "Cond 1", "Cond 2" and "Cond 3", the
+                  contrasts will be:
+                  <ul>
+                    <li>Cond 2 vs Cond 1</li>
+                    <li>Cond 3 vs Cond 1</li>
+                    <li>Cond 3 vs Cond 2</li>
+                  </ul>
+                </div>
+              </template>
+            </PlTooltip>
           </div>
-        </template>
-      </PlNumberField>
-    </PlRow>
+          <PlElementList v-model:items="app.model.data.antigenControlConfig.controlConditionsOrder">
+            <template #item-title="{ item }">
+              {{ item }}
+            </template>
+          </PlElementList>
+          <PlBtnGhost v-if="availableToAddToControl.length > 0" @click="resetControlConditionOrder">
+            Reset to default
+            <template #append>
+              <PlMaskIcon24 name="reverse" />
+            </template>
+          </PlBtnGhost>
+        </PlAccordionSection>
+      </PlAccordion>
+      <PlRow
+        v-if="
+          app.model.data.antigenControlConfig.controlEnabled &&
+          hasMultiSampleNegativeControl &&
+          !(
+            app.model.data.antigenControlConfig.sequencedLibraryEnabled === false &&
+            app.model.data.antigenControlConfig.controlConditionsOrder.length === 1
+          )
+        "
+      >
+        <PlNumberField
+          v-model="app.model.data.antigenControlConfig.controlThreshold"
+          label="Control threshold"
+          :minValue="0"
+          :step="0.1"
+          placeholder="1.0"
+        >
+          <template #tooltip>
+            <div>
+              Log2 Fold Change (Log2FC) thresholds used to define
+              <strong>Enriched negative control sequences</strong>.<br />
+              A sequence is considered enriched if its Log2FC value between conditions is equal or
+              greater than the threshold. This threshold in combination with
+              <strong>Enrichment threshold</strong> is used to define
+              <strong>Binding Specificity</strong> categories: <br /><br />
+              Target<sub>Max</sub> and Control<sub>Max</sub> are the maximum Log2FC values for the
+              target and control conditions, respectively: <br /><br />
+              - <strong>Antigen-Specific:</strong> Target<sub>Max</sub> ≥ Enrichment Threshold and
+              Control<sub>Max</sub> &lt; Control Threshold.
+              <br />
+              - <strong>Non-Specific:</strong> Target<sub>Max</sub> ≥ Enrichment Threshold and
+              Control<sub>Max</sub> ≥ Control Threshold (indicates "sticky" binders).
+              <br />
+              - <strong>Negative-Control:</strong> Target<sub>Max</sub> &lt; Enrichment Threshold
+              and Control<sub>Max</sub> ≥ Control Threshold.
+              <br />
+              - <strong>Not-Enriched:</strong> Both below thresholds.
+            </div>
+          </template>
+        </PlNumberField>
+      </PlRow>
+    </template>
 
     <PlAccordionSection label="Downsampling">
       <PlBtnGroup
@@ -1255,8 +1365,8 @@ const isControlOrderOpen = ref(true); // Open by default
       <PlRow v-if="app.model.data.FilteringConfig.presentInRounds.enabled">
         <PlDropdownMulti
           v-model="app.model.data.FilteringConfig.presentInRounds.rounds"
-          label="Conditions"
-          :options="conditionOrderOptions"
+          :label="designMode ? 'Samples' : 'Conditions'"
+          :options="roundOptions"
         />
         <PlDropdown
           v-model="app.model.data.FilteringConfig.presentInRounds.logic"

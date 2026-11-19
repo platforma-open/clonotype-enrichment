@@ -159,6 +159,24 @@ def filter_clonotypes_by_criteria(
         return aggregated_df
 
 
+def apply_clonotype_definition(
+    df: pl.DataFrame,
+    clonotype_def_df: pl.DataFrame,
+    group_col: str,
+    value_col: str,
+) -> pl.DataFrame:
+    """Give each element the summed abundance of all elements sharing its clonotype definition,
+    within each `group_col` value. Shared by the condition and design paths."""
+    df = df.join(clonotype_def_df, on='elementId', how='left')
+    def_cols = [col for col in df.collect_schema().names() if col.startswith('clonotypeDefinition_')]
+    if not def_cols:
+        return df
+    grouped = df.group_by(def_cols + [group_col]).agg(
+        pl.col(value_col).sum().alias('new_abundance'))
+    df = df.join(grouped, on=def_cols + [group_col], how='left')
+    return df.with_columns(pl.col('new_abundance').alias(value_col)).drop('new_abundance')
+
+
 def create_empty_outputs(
     condition_order: List[str],
     enrichment_csv: str,
@@ -341,35 +359,10 @@ def hybrid_enrichment_analysis(
         return
 
     if clonotype_definition_csv:
-        clonotype_def_df = pl.scan_csv(clonotype_definition_csv)
-
-        # Eagerly collect to perform join
-        input_df = input_df.collect()
-        clonotype_def_df = clonotype_def_df.collect()
-
-        # Join with main data
-        input_df = input_df.join(clonotype_def_df, on='elementId', how='left')
-
-        clonotype_def_cols = [
-            col for col in input_df.collect_schema().names() if col.startswith('clonotypeDefinition_')]
-
-        if clonotype_def_cols:
-            # Calculate new abundance
-            grouped_abundance = input_df.group_by(clonotype_def_cols + ['condition']).agg(
-                pl.col('downsampledAbundance').sum().alias('new_abundance')
-            )
-
-            # Join back to get the new abundance for each row
-            input_df = input_df.join(
-                grouped_abundance, on=clonotype_def_cols + ['condition'], how='left')
-
-            # Replace original abundance
-            input_df = input_df.with_columns(
-                pl.col('new_abundance').alias('downsampledAbundance')
-            ).drop('new_abundance')
-
-        # Continue with lazy evaluation
-        input_df = input_df.lazy()
+        clonotype_def_df = pl.scan_csv(clonotype_definition_csv).collect()
+        input_df = apply_clonotype_definition(
+            input_df.collect(), clonotype_def_df, 'condition', 'downsampledAbundance'
+        ).lazy()
 
     # Rename and validate columns
     if "abundance" in input_df.collect_schema().names():
