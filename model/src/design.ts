@@ -264,7 +264,11 @@ export type DesignChoices = {
   targetPieces: Record<string, string>;
 };
 
-export type PlanPosition = { id: string; label: string; samples: string[] };
+/** `label` is the samples' labels (unique); `name` is the derived display name. */
+export type PlanPosition = { id: string; label: string; name: string; samples: string[] };
+/** One trajectory of the comparison, for the frequency plots: its positions in order, and the
+ *  comparison group (arm) it belongs to. */
+export type PlanTrack = { label: string; group: string; positions: string[] };
 export type PlanComparison = {
   id: string;
   label: string;
@@ -298,6 +302,7 @@ export type Plan = {
   comparisons: PlanComparison[];
   scores: PlanScore[];
   arms: PlanArm[];
+  tracks: PlanTrack[];
 };
 export type PlanResult = {
   /** Questions the design cannot answer. Shown in the settings. */
@@ -519,6 +524,24 @@ export function buildPlan(design: Design, choices: DesignChoices, label: Labeler
     if (ends.length === 0) armOut.push({ split: arm.split, name: g.group, role: "target" });
   }
 
+  // Tracks: every trajectory of the comparison (target pieces and their siblings alike), so the
+  // frequency plots can follow each one. An arm with no trajectory is its baseline then its pieces.
+  const tracks: PlanTrack[] = [];
+  for (const arm of arms) {
+    const group = groupOf(arm).group;
+    const name = tensor.type === "trajectory" ? "Path" : group;
+    const pathsOf = arm.segments.length
+      ? arm.segments.map((s) => s.trajectory.positions)
+      : [[...(baseline ? [baseline] : []), ...arm.firstPositions]];
+    for (const ps of pathsOf) {
+      const live = ps.filter((p) => p.length);
+      if (live.length === 0) continue;
+      let label = pathsOf.length > 1 ? `${name} · ${names.pos(live[live.length - 1])}` : name;
+      if (tracks.some((t) => t.label === label)) label = `${label} (${tracks.length + 1})`;
+      tracks.push({ label, group, positions: live.map((p) => b.pos(p)) });
+    }
+  }
+
   return {
     questions,
     plan: {
@@ -529,6 +552,7 @@ export function buildPlan(design: Design, choices: DesignChoices, label: Labeler
       comparisons: b.comparisons,
       scores: b.scores,
       arms: armOut,
+      tracks,
     },
   };
 }
@@ -556,7 +580,12 @@ class PlanBuilder {
     if (!id) {
       id = `p${this.positions.length + 1}`;
       this.posIds.set(k, id);
-      this.positions.push({ id, label: this.names.fallback(p), samples: [...p].sort() });
+      this.positions.push({
+        id,
+        label: this.names.fallback(p),
+        name: this.names.pos(p),
+        samples: [...p].sort(),
+      });
     }
     return id;
   }

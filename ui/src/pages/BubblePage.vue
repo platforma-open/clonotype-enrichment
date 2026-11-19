@@ -62,7 +62,8 @@ const inputElementAxis = computed(() => {
 const dataColumnPredicate = (spec: PColumnSpec) =>
   inputElementAxis.value !== undefined &&
   spec.axesSpec.length === 3 &&
-  spec.axesSpec[2].name === "pl7.app/Baseline-condition" &&
+  // classic: by baseline condition; design mode: by arm
+  ["pl7.app/Baseline-condition", "pl7.app/design/arm"].includes(spec.axesSpec[2].name) &&
   !["pl7.app/maxEnrichment", "pl7.app/maxNegControlEnrichment"].includes(spec.name);
 
 const metaColumnPredicate = (spec: PColumnSpec) =>

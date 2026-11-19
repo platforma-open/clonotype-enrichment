@@ -22,6 +22,7 @@ pfStackedConv := import(":pf-stacked-conv")
 pfControlScatterConv := import(":pf-control-scatter-conv")
 pfClonotypeFrequencyConv := import(":pf-clonotype-frequency-conv")
 pfDesignConv := import(":pf-design-conv")
+pfDesignPlots := import(":pf-design-plots")
 designEnrichmentSw := assets.importSoftware("@platforma-open/milaboratories.clonotype-enrichment.software:calculate-design-enrichment")
 
 // Label for a per-element entity carried on the pl7.app/variantKey axis.
@@ -167,7 +168,13 @@ designBody := func(args) {
 		arg("--plan").arg("plan.json").
 		arg("--output").arg("design_enrichment.csv").
 		arg("--filtered_too_much").arg("filtered_too_much.txt").
-		arg("--pseudo_count").arg(string(args.pseudoCount))
+		arg("--pseudo_count").arg(string(args.pseudoCount)).
+		arg("--plot_freq").arg("plot_freq.csv").
+		arg("--plot_bubble").arg("plot_bubble.csv").
+		arg("--plot_control").arg("plot_control.csv").
+		arg("--stats").arg("stats.json").
+		arg("--enrichment_threshold").arg(string(args.enrichmentThreshold)).
+		arg("--control_threshold").arg(string(args.controlThreshold))
 	clonotypeDefinitionFile := buildClonotypeDefinitionFile(columns, args, abundanceSpec)
 	if clonotypeDefinitionFile != undefined {
 		cmd = cmd.addFile("clonotypeDefinition.csv", clonotypeDefinitionFile).
@@ -175,7 +182,11 @@ designBody := func(args) {
 	}
 	run := addFilterArgs(cmd, args.FilteringConfig, false).
 		saveFile("design_enrichment.csv").
+		saveFile("plot_freq.csv").
+		saveFile("plot_bubble.csv").
+		saveFile("plot_control.csv").
 		saveFileContent("filtered_too_much.txt").
+		saveFileContent("stats.json").
 		printErrStreamToStdout().
 		saveStdoutContent().
 		run()
@@ -201,11 +212,29 @@ designBody := func(args) {
 		exports.add(c.id, trace.inject(designPf[c.id + ".spec"]), designPf[c.id + ".data"])
 	}
 
+	// Plot data. The line and bar plots read the same frame, as in classic mode
+	importPlot := func(file, params) {
+		return pframes.exportFrame(xsv.importFile(run.getFile(file), "csv", params, { cpu: 1, mem: "16GiB" }))
+	}
+	freqPf := importPlot("plot_freq.csv", pfDesignPlots.freqColumns(abundanceSpec))
+	outputs := {
+		enrichmentPf: pframes.exportFrame(designPf),
+		filteredTooMuch: run.getFileContent("filtered_too_much.txt"),
+		outStats: run.getFileContent("stats.json"),
+		bubblePf: importPlot("plot_bubble.csv", pfDesignPlots.bubbleColumns(abundanceSpec)),
+		linePf: freqPf,
+		stackedPf: freqPf
+	}
+	// The control scatter only when some score has controls
+	for s in plan.scores {
+		if len(s.controls) > 0 {
+			outputs.controlScatterPf = importPlot("plot_control.csv", pfDesignPlots.controlColumns(abundanceSpec))
+			break
+		}
+	}
+
 	return {
-		outputs: {
-			enrichmentPf: pframes.exportFrame(designPf),
-			filteredTooMuch: run.getFileContent("filtered_too_much.txt")
-		},
+		outputs: outputs,
 		exports: {
 			design: exports.build()
 		}

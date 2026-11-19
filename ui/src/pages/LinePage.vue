@@ -43,6 +43,9 @@ const defaultOptions = computed((): PredefinedGraphOption<"scatterplot">[] | nul
       selectedSource: frequencyColSpec,
     },
   ];
+  // Design mode adds a path axis: one tab per path
+  const pathAxis = frequencyColSpec.axesSpec[2];
+  if (pathAxis) defaults.push({ inputName: "tabBy", selectedSource: pathAxis });
   return defaults;
 });
 
@@ -56,7 +59,8 @@ const inputElementAxis = computed(() => {
 
 const dataColumnPredicate = (spec: PColumnSpec) =>
   inputElementAxis.value !== undefined &&
-  spec.axesSpec.length === 2 &&
+  (spec.axesSpec.length === 2 ||
+    (spec.axesSpec.length === 3 && spec.axesSpec[2].name === "pl7.app/design/track")) &&
   spec.axesSpec[0].name === inputElementAxis.value &&
   spec.axesSpec[1].name === "pl7.app/condition" &&
   (spec.name === "pl7.app/frequency" || spec.name === "pl7.app/enrichmentVsBaseline");

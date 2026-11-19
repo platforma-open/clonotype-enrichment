@@ -46,6 +46,9 @@ const defaultOptions = computed((): PredefinedGraphOption<"scatterplot-umap">[] 
       selectedSource: frequencySpec.axesSpec[0],
     },
   ];
+  // Design mode adds a score axis: one tab per score
+  const scoreAxis = frequencySpec.axesSpec[1];
+  if (scoreAxis) defaults.push({ inputName: "tabBy", selectedSource: scoreAxis });
   return defaults;
 });
 
@@ -59,7 +62,8 @@ const inputElementAxis = computed(() => {
 
 const dataColumnPredicate = (spec: PColumnSpec) =>
   inputElementAxis.value !== undefined &&
-  spec.axesSpec.length === 1 &&
+  (spec.axesSpec.length === 1 ||
+    (spec.axesSpec.length === 2 && spec.axesSpec[1].name === "pl7.app/design/score")) &&
   spec.axesSpec[0].name === inputElementAxis.value &&
   spec.annotations?.["pl7.app/toPlot"] === "true";
 

@@ -35,6 +35,9 @@ const defaultOptions = computed((): PredefinedGraphOption<"discrete">[] | null =
       selectedSource: frequencyColSpec.axesSpec[1],
     },
   ];
+  // Design mode adds a path axis: one tab per path
+  const pathAxis = frequencyColSpec.axesSpec[2];
+  if (pathAxis) defaults.push({ inputName: "tabBy", selectedSource: pathAxis });
   return defaults;
 });
 
@@ -48,7 +51,8 @@ const inputElementAxis = computed(() => {
 
 const dataColumnPredicate = (spec: PColumnSpec) =>
   inputElementAxis.value !== undefined &&
-  spec.axesSpec.length === 2 &&
+  (spec.axesSpec.length === 2 ||
+    (spec.axesSpec.length === 3 && spec.axesSpec[2].name === "pl7.app/design/track")) &&
   spec.axesSpec[0].name === inputElementAxis.value &&
   spec.axesSpec[1].name === "pl7.app/condition" &&
   !["pl7.app/maxEnrichment", "pl7.app/maxNegControlEnrichment"].includes(spec.name);

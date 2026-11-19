@@ -259,6 +259,7 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
         FilteringConfig: data.FilteringConfig,
         clonotypeDefinition: data.clonotypeDefinition,
         enrichmentThreshold: data.enrichmentThreshold,
+        controlThreshold: data.antigenControlConfig.controlThreshold,
         pseudoCount: data.pseudoCount,
         design: plan,
       };
@@ -852,7 +853,11 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
       { type: "link", href: "/stacked", label: "Frequency Bar Plot" },
     ];
 
-    if (ctx.data.antigenControlConfig.controlEnabled) {
+    // Design mode: a control scatter when some score has controls (control arms or sibling pieces)
+    if (ctx.data.designId !== undefined) {
+      if (ctx.data.designPlan?.scores.some((s) => s.controls.length > 0))
+        sections.push({ type: "link", href: "/scatter", label: "Control Scatter Plot" });
+    } else if (ctx.data.antigenControlConfig.controlEnabled) {
       if (
         ctx.data.antigenControlConfig.controlConditionsOrder.length > 1 ||
         (ctx.data.antigenControlConfig.sequencedLibraryEnabled === true &&
