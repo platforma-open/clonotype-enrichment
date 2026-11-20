@@ -2,7 +2,7 @@
 //
 // Reads the design tensors published in the result pool (column
 // `pl7.app/design/tensors`, axes [designId, tensorId], one JSON tensor per
-// cell) and turns the user's choices into an analysis plan that the workflow
+// cell, its STEP 3 label inside) and turns the user's choices into an analysis plan that the workflow
 // computes. The tensor shape follows the spec draft "Each tensor is a JSON
 // object with a fixed shape" (schemaVersion 1).
 //
@@ -10,15 +10,18 @@
 // by the UI.
 
 export const TENSOR_COLUMN_NAME = "pl7.app/design/tensors";
-/** Labels of the tensors (tensor_derivation STEP 3), same axes, one JSON label per cell. */
-export const LABELS_COLUMN_NAME = "pl7.app/design/labels";
 export const TENSOR_SAMPLE_AXIS_ANNOTATION = "pl7.app/design/sampleAxis";
 export const SUPPORTED_SCHEMA_VERSION = 1;
 
 export type Position = string[];
 export type StepKind = "selection" | "piece" | "portion" | "timecourse";
 
-type TensorBase = { schemaVersion: number; designName: string; datasets: string[] };
+type TensorBase = {
+  schemaVersion: number;
+  designName: string;
+  datasets: string[];
+  label?: TensorLabel;
+};
 
 export type TrajectoryTensor = TensorBase & {
   type: "trajectory";
@@ -41,7 +44,6 @@ export type Tensor = TrajectoryTensor | PartitionTensor | RecurrenceTensor | Pan
 export type LabelColumn = { cols: string[]; values: (string[] | null)[] };
 /** STEP 3 label of a tensor. Groups are its positions; for a panel, its arms. */
 export type TensorLabel = {
-  schemaVersion: number;
   axes: LabelColumn[];
   mixed: LabelColumn[];
   within: string[];
@@ -59,12 +61,8 @@ export type Design = {
 /** Content of a `PColumnData/Json` resource: keys are JSON arrays of axis values. */
 export type JsonColumnData = { keyLength: number; data: Record<string, unknown> };
 
-/** Groups the cells of a tensor column into designs, with their labels when given.
- *  Unknown schema versions are skipped. */
-export function readDesigns(
-  content: JsonColumnData | undefined,
-  labelContent?: JsonColumnData,
-): Design[] {
+/** Groups the cells of a tensor column into designs. Unknown schema versions are skipped. */
+export function readDesigns(content: JsonColumnData | undefined): Design[] {
   if (!content?.data) return [];
   const byId = new Map<string, Design>();
   for (const [key, value] of Object.entries(content.data)) {
@@ -82,17 +80,7 @@ export function readDesigns(
       byId.set(designId, d);
     }
     d.tensors[tensorId] = tensor;
-  }
-  for (const [key, value] of Object.entries(labelContent?.data ?? {})) {
-    try {
-      const [designId, tensorId] = JSON.parse(key) as [string, string];
-      const label = (typeof value === "string" ? JSON.parse(value) : value) as TensorLabel;
-      const d = byId.get(designId);
-      if (d?.tensors[tensorId] && label?.schemaVersion === SUPPORTED_SCHEMA_VERSION)
-        d.labels[tensorId] = label;
-    } catch {
-      continue;
-    }
+    if (tensor.label) d.labels[tensorId] = tensor.label;
   }
   return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
 }

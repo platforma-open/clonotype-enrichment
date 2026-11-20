@@ -26,7 +26,6 @@ import {
   readAnnotationJson,
 } from "@platforma-sdk/model";
 import {
-  LABELS_COLUMN_NAME,
   Names,
   TENSOR_COLUMN_NAME,
   TENSOR_SAMPLE_AXIS_ANNOTATION,
@@ -409,23 +408,7 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
     const content = ctx.resultPool
       .getPColumnByRef(designTensorsRef)
       ?.data?.getDataAsJsonOrUndefined<JsonColumnData>();
-    // The labels column published next to the tensors: same block, same axes.
-    type Axed = { axesSpec?: { domain?: Record<string, string> }[] };
-    const blockOf = (spec: unknown) =>
-      (spec as Axed | undefined)?.axesSpec?.[0]?.domain?.["pl7.app/blockId"];
-    const tensorsBlock = blockOf(ctx.resultPool.getPColumnSpecByRef(designTensorsRef));
-    const labelsRef = ctx.resultPool.getOptions(
-      (spec) =>
-        spec.kind === "PColumn" &&
-        spec.name === LABELS_COLUMN_NAME &&
-        blockOf(spec) === tensorsBlock,
-    )[0]?.ref;
-    const labelContent = labelsRef
-      ? ctx.resultPool.getPColumnByRef(labelsRef)?.data?.getDataAsJsonOrUndefined<JsonColumnData>()
-      : undefined;
-    const design: Design | undefined = readDesigns(content, labelContent).find(
-      (d) => d.designId === designId,
-    );
+    const design: Design | undefined = readDesigns(content).find((d) => d.designId === designId);
     if (!design) return { error: "The design is not available" };
 
     const sampleAxis = ctx.resultPool.getPColumnSpecByRef(abundanceRef)?.axesSpec?.[0];
