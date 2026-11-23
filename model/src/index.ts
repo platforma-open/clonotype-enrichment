@@ -370,7 +370,7 @@ const DATASET_KEY_AXES: ReadonlySet<string> = new Set([
 export const platforma = BlockModelV3.create({ dataModel, kind })
 
   .plugin(linePlugin, {
-    anchorColumns: (ctx) => ctx.outputs?.resolve("linePf")?.getPColumns(),
+    anchorColumns: (ctx) => ctx.outputs?.resolve("linePf"),
     defaultPalette: () => "bright" as const,
   })
 
