@@ -4,6 +4,7 @@
 // not asked: only the comparison, the control arms and, where trajectories end
 // in different pieces of one separation, the target piece.
 import type {
+  DesignBaselineMode,
   DesignControlMode,
   DesignThresholdMode,
 } from "@platforma-open/milaboratories.clonotype-enrichment.model";
@@ -77,8 +78,20 @@ function setThreshold(end: string, value: number | undefined) {
   app.model.data.designThresholds = next;
 }
 
-/** Each end point is measured against the material it came from; this overrides that choice. */
+/** Each end point is measured against the material it came from; these override that choice. */
 const baselines = computed(() => view.value?.plan?.baselines ?? []);
+
+/** Inferred for every end point, or set by hand. Overrides already made survive switching back. */
+const baselineMode = computed({
+  get: () =>
+    app.model.data.designBaselineMode ??
+    (Object.keys(app.model.data.designBaselines ?? {}).length ? "endpoint" : "inferred"),
+  set: (v: DesignBaselineMode) => (app.model.data.designBaselineMode = v),
+});
+const baselineModeOptions = [
+  { value: "inferred" as const, label: "From the design" },
+  { value: "endpoint" as const, label: "Per end point" },
+];
 
 function setBaseline(end: string, value: string | undefined) {
   const next = { ...(app.model.data.designBaselines ?? {}) };
@@ -152,7 +165,19 @@ function setBaseline(end: string, value: string | undefined) {
     />
   </template>
 
-  <PlAccordionSection v-if="baselines.length > 0" label="Baselines">
+  <PlBtnGroup
+    v-if="baselines.length > 0"
+    v-model="baselineMode"
+    :options="baselineModeOptions"
+    label="Baseline"
+    :compact="true"
+  >
+    <template #tooltip>
+      Each end point is measured against the material it came from: a panel's sequenced anchor, or a
+      time course's own first collection. Set them by hand where that is not what was done.
+    </template>
+  </PlBtnGroup>
+  <template v-if="baselineMode === 'endpoint'">
     <PlDropdown
       v-for="bl in baselines"
       :key="bl.end"
@@ -162,7 +187,7 @@ function setBaseline(end: string, value: string | undefined) {
       required
       @update:model-value="(v: string | undefined) => setBaseline(bl.end, v)"
     />
-  </PlAccordionSection>
+  </template>
 
   <PlAlert v-if="view?.error" type="warn" icon>{{ view.error }}</PlAlert>
 </template>
