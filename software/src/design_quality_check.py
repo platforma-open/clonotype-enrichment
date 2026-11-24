@@ -45,7 +45,6 @@ def check_run() -> None:
         ],
         "arms": [{"split": "arm", "name": "arm", "role": "target", "score": "s1"}],
         "tracks": [{"label": "arm", "group": "arm", "positions": ["p1", "p2"]}],
-        "baselines": [],
     }
     rows = [("s_lib", "winner", 10.0), ("s_r1", "winner", 900.0), ("s_lib", "dud", 500.0), ("s_r1", "dud", 5.0)]
     with tempfile.TemporaryDirectory() as tmp:

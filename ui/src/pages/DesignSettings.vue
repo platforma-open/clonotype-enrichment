@@ -4,7 +4,6 @@
 // not asked: only the comparison, the control arms and, where trajectories end
 // in different pieces of one separation, the target piece.
 import type {
-  DesignBaselineMode,
   DesignControlMode,
   DesignThresholdMode,
 } from "@platforma-open/milaboratories.clonotype-enrichment.model";
@@ -95,30 +94,8 @@ function setThreshold(end: string, value: number | undefined) {
   app.model.data.designThresholds = next;
 }
 
-/** Each end point is measured against the material it came from; these override that choice. */
-const baselines = sticky(() => view.value?.plan?.baselines);
-
 /** The target-fraction questions blink with everything else, so they are kept the same way. */
 const questions = sticky(() => view.value?.questions);
-
-/** Inferred for every end point, or set by hand. Overrides already made survive switching back. */
-const baselineMode = computed({
-  get: () =>
-    app.model.data.designBaselineMode ??
-    (Object.keys(app.model.data.designBaselines ?? {}).length ? "endpoint" : "inferred"),
-  set: (v: DesignBaselineMode) => (app.model.data.designBaselineMode = v),
-});
-const baselineModeOptions = [
-  { value: "inferred" as const, label: "From the design" },
-  { value: "endpoint" as const, label: "Per end point" },
-];
-
-function setBaseline(end: string, value: string | undefined) {
-  const next = { ...(app.model.data.designBaselines ?? {}) };
-  if (value === undefined) delete next[end];
-  else next[end] = value;
-  app.model.data.designBaselines = next;
-}
 </script>
 
 <template>
@@ -180,30 +157,6 @@ function setBaseline(end: string, value: string | undefined) {
       :min-value="0.6"
       :step="0.1"
       @update:model-value="(v: number | undefined) => setThreshold(e.end, v)"
-    />
-  </template>
-
-  <PlBtnGroup
-    v-if="baselines.length > 0"
-    v-model="baselineMode"
-    :options="baselineModeOptions"
-    label="Baseline"
-    :compact="true"
-  >
-    <template #tooltip>
-      Each end point is measured against the material it came from: a panel's sequenced anchor, or a
-      time course's own first collection. Set them by hand where that is not what was done.
-    </template>
-  </PlBtnGroup>
-  <template v-if="baselineMode === 'endpoint'">
-    <PlDropdown
-      v-for="bl in baselines"
-      :key="bl.end"
-      :model-value="bl.current"
-      :options="bl.options"
-      :label="bl.label"
-      required
-      @update:model-value="(v: string | undefined) => setBaseline(bl.end, v)"
     />
   </template>
 

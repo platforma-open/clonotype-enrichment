@@ -215,7 +215,7 @@ export function comparisonOptions(design: Design, label: Labeler): ComparisonOpt
 
 /**
  * How wide a panel is and what its arms run over: "3 arms over round". The arms are named by the
- * settings below it and every end point states its own baseline, so neither is repeated here.
+ * settings below it, so that is not repeated here.
  */
 function panelSummary(design: Design, t: PanelTensor): string {
   const over = [
@@ -241,12 +241,6 @@ export type DesignChoices = {
   controlArms: string[];
   /** Partition tensor id -> key of the chosen target piece (see posKey). */
   targetPieces: Record<string, string>;
-  /**
-   * End point key -> key of the position to measure it against, overriding the inferred baseline.
-   * A time course is inferred from its own first position and a panel arm from the anchor, which is
-   * right unless the material an arm started from was sequenced without being a fork.
-   */
-  baselines?: Record<string, string>;
   /** End point key -> its own enrichment cutoff, where the run's global one does not fit it. */
   thresholds?: Record<string, number>;
 };
@@ -291,16 +285,6 @@ export type TargetQuestion = {
   label: string;
   options: { value: string; label: string }[];
 };
-/** One end point's baseline, and what else it could be measured against. Optional, unlike a
- *  TargetQuestion: the plan is complete without an answer. */
-export type BaselineChoice = {
-  /** posKey of the end point. */
-  end: string;
-  label: string;
-  /** posKey of the baseline in force, inferred or chosen. */
-  current: string;
-  options: { value: string; label: string }[];
-};
 export type Plan = {
   designId: string;
   designName: string;
@@ -310,8 +294,6 @@ export type Plan = {
   scores: PlanScore[];
   arms: PlanArm[];
   tracks: PlanTrack[];
-  /** Only end points with a choice to make: two or more candidate baselines. */
-  baselines: BaselineChoice[];
 };
 export type PlanResult = {
   /** Questions the design cannot answer. Shown in the settings. */
@@ -350,17 +332,6 @@ type Segment = {
  * separation, the design cannot tell which piece is the target, so the user
  * is asked.
  */
-/**
- * Positions an end point of `t` can be measured against: everything upstream of it on its own
- * trajectory, plus a panel's sequenced anchor. Pieces of one separation are left out, since a
- * baseline has to be the material the end point came from, not a sibling of it.
- */
-function baselineCandidates(tensor: Tensor, t: TrajectoryTensor): Position[] {
-  const out = t.positions.slice(0, -1).filter((p) => p.length > 0);
-  const anchor = tensor.type === "panel" ? tensor.anchor.reads : [];
-  if (anchor.length && !out.some((p) => posKey(p) === posKey(anchor))) out.unshift(anchor);
-  return out;
-}
 
 export function buildPlan(design: Design, choices: DesignChoices, label: Labeler): PlanResult {
   const tensor = choices.comparison ? design.tensors[choices.comparison] : undefined;
@@ -472,7 +443,6 @@ export function buildPlan(design: Design, choices: DesignChoices, label: Labeler
   const armComparisons = new Map<string, string[]>();
   // What tells one end point from another: the arm it ran in, then the position it ends at. Either
   // alone repeats itself once a design has several arms ending in the same round.
-  const armName = (split: string) => arms.find((a) => a.split === split)?.name ?? "";
   const endName = (arm: string, end: Position) => {
     const where = names.pos(end);
     return [arm, arm === where ? "" : where].filter((part) => part !== "").join(" · ") || where;
@@ -505,23 +475,14 @@ export function buildPlan(design: Design, choices: DesignChoices, label: Labeler
     }
     for (const s of segs) {
       const t = s.trajectory;
-      // The user's own baseline for this end point wins over every inference below.
-      const endKey = posKey(t.positions[t.positions.length - 1]!);
-      const wanted = choices.baselines?.[endKey];
-      const fixed = wanted
-        ? baselineCandidates(tensor, t).find((p) => posKey(p) === wanted)
-        : undefined;
-      const fixedIdx = fixed ? t.positions.findIndex((p) => posKey(p) === posKey(fixed)) : -1;
-      const armBase = fixed ?? baseline ?? t.positions[s.from];
-      const first = fixedIdx >= 0 ? fixedIdx + 1 : baseline ? s.from : s.from + 1;
+      const armBase = baseline ?? t.positions[s.from];
+      const first = baseline ? s.from : s.from + 1;
       const segSteps: string[] = [];
       let tcStart: Position | undefined;
       let base = armBase;
       for (let i = first; i < t.positions.length; i++) {
         const step = t.steps[i - 1];
-        if (fixed) {
-          base = fixed;
-        } else if (step === "timecourse") {
+        if (step === "timecourse") {
           tcStart ??= t.positions[i - 1];
           base = tcStart;
         } else if (step === "portion" && tcStart) {
@@ -620,24 +581,6 @@ export function buildPlan(design: Design, choices: DesignChoices, label: Labeler
     }
   }
 
-  // Per-end-point baselines, offered only where the end point has more than one candidate.
-  const baselines: BaselineChoice[] = [];
-  for (const e of armEnds) {
-    if (!e.t || !e.base) continue;
-    const options = baselineCandidates(tensor, e.t).map((p) => ({
-      value: posKey(p),
-      label: names.pos(p),
-    }));
-    const end = posKey(e.end);
-    if (options.length < 2 || baselines.some((x) => x.end === end)) continue;
-    baselines.push({
-      end,
-      label: `Baseline, ${endName(armName(e.split), e.end)}`,
-      current: posKey(e.base),
-      options,
-    });
-  }
-
   return {
     questions,
     plan: {
@@ -649,7 +592,6 @@ export function buildPlan(design: Design, choices: DesignChoices, label: Labeler
       scores: b.scores,
       arms: armOut,
       tracks,
-      baselines,
     },
   };
 }

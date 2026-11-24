@@ -82,9 +82,6 @@ export type DesignControlMode = "none" | "pooled";
 /** Whether one cutoff covers the whole run, or each end point carries its own. */
 export type DesignThresholdMode = "global" | "endpoint";
 
-/** Whether baselines are read from the design, or set per end point by hand. */
-export type DesignBaselineMode = "inferred" | "endpoint";
-
 /** The mode in force. Drafts saved before the switch existed keep the arms they had picked. */
 export function designControlMode(data: {
   designControlMode?: DesignControlMode;
@@ -135,10 +132,6 @@ export type BlockData = {
   designControlArms?: string[];
   /** Partition tensor id -> chosen target piece (see `posKey`). */
   designTargetPieces?: Record<string, string>;
-  /** Whether the baselines come from the design or were set per end point. */
-  designBaselineMode?: DesignBaselineMode;
-  /** End point -> the position to measure it against, overriding the inferred baseline. */
-  designBaselines?: Record<string, string>;
   /** Whether the enrichment cutoff is one value for the run or one per end point. */
   designThresholdMode?: DesignThresholdMode;
   /** End point -> its own enrichment cutoff; read only in "endpoint" mode. */
@@ -457,8 +450,6 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
         controlArms:
           designControlMode(ctx.data) === "pooled" ? (ctx.data.designControlArms ?? []) : [],
         targetPieces: ctx.data.designTargetPieces ?? {},
-        baselines:
-          ctx.data.designBaselineMode === "inferred" ? {} : (ctx.data.designBaselines ?? {}),
         thresholds:
           ctx.data.designThresholdMode === "endpoint" ? (ctx.data.designThresholds ?? {}) : {},
       },
