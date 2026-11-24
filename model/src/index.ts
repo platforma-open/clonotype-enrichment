@@ -76,6 +76,17 @@ type OldUiState = {
   excludedAlertDismissedKey?: string;
 };
 
+/** Whether an experiment's control end points are judged against, or left out of, the scores. */
+export type DesignControlMode = "none" | "pooled";
+
+/** The mode in force. Drafts saved before the switch existed keep the arms they had picked. */
+export function designControlMode(data: {
+  designControlMode?: DesignControlMode;
+  designControlArms?: string[];
+}): DesignControlMode {
+  return data.designControlMode ?? (data.designControlArms?.length ? "pooled" : "none");
+}
+
 export type BlockData = {
   defaultBlockLabel: string;
   customBlockLabel: string;
@@ -112,6 +123,8 @@ export type BlockData = {
   designId?: string;
   /** Tensor id of the chosen comparison (a panel or a trajectory). */
   designComparison?: string;
+  /** Whether the end points marked as controls are used at all. */
+  designControlMode?: DesignControlMode;
   /** Split names of the panel arms marked as controls. */
   designControlArms?: string[];
   /** Partition tensor id -> chosen target piece (see `posKey`). */
@@ -429,7 +442,8 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
       design,
       {
         comparison: chosen,
-        controlArms: ctx.data.designControlArms ?? [],
+        controlArms:
+          designControlMode(ctx.data) === "pooled" ? (ctx.data.designControlArms ?? []) : [],
         targetPieces: ctx.data.designTargetPieces ?? {},
         baselines: ctx.data.designBaselines ?? {},
       },

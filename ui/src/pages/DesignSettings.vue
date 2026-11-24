@@ -3,7 +3,15 @@
 // selected in the abundance dropdown (draft). Everything the design answers is
 // not asked: only the comparison, the control arms and, where trajectories end
 // in different pieces of one separation, the target piece.
-import { PlAccordionSection, PlAlert, PlCheckboxGroup, PlDropdown } from "@platforma-sdk/ui-vue";
+import type { DesignControlMode } from "@platforma-open/milaboratories.clonotype-enrichment.model";
+import { designControlMode } from "@platforma-open/milaboratories.clonotype-enrichment.model";
+import {
+  PlAccordionSection,
+  PlAlert,
+  PlBtnGroup,
+  PlCheckboxGroup,
+  PlDropdown,
+} from "@platforma-sdk/ui-vue";
 import { computed } from "vue";
 import { useApp } from "../app";
 
@@ -27,6 +35,16 @@ const controlArms = computed({
   get: () => app.model.data.designControlArms ?? [],
   set: (v: string[]) => (app.model.data.designControlArms = v),
 });
+
+/** No control at all, or every ticked end point pooled into one veto. */
+const controlMode = computed({
+  get: () => designControlMode(app.model.data),
+  set: (v: DesignControlMode) => (app.model.data.designControlMode = v),
+});
+const controlModeOptions = [
+  { value: "none" as const, label: "No control" },
+  { value: "pooled" as const, label: "Pooled control" },
+];
 
 function setTarget(partition: string, value: string | undefined) {
   const next = { ...(app.model.data.designTargetPieces ?? {}) };
@@ -61,8 +79,18 @@ function setBaseline(end: string, value: string | undefined) {
   </template>
 
   <template v-if="armOptions.length > 0">
-    <div class="design-label">Control arms</div>
-    <PlCheckboxGroup v-model="controlArms" :options="armOptions" />
+    <PlBtnGroup v-model="controlMode" :options="controlModeOptions" label="Control" :compact="true">
+      <template #tooltip>
+        A pooled control is one veto: an end point only counts as a hit where no control it is
+        judged against came up enriched too.
+      </template>
+    </PlBtnGroup>
+    <PlCheckboxGroup
+      v-if="controlMode === 'pooled'"
+      v-model="controlArms"
+      :options="armOptions"
+      label="Control arms"
+    />
   </template>
 
   <PlDropdown
