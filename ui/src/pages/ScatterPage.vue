@@ -46,9 +46,10 @@ const defaultOptions = computed((): PredefinedGraphOption<"scatterplot-umap">[] 
       selectedSource: frequencySpec.axesSpec[0],
     },
   ];
-  // Design mode adds a score axis: one tab per score
+  // Design mode adds a score axis, faceted rather than tabbed: every end point's specificity is
+  // worth seeing at once, and one end point alone would leave a dropdown of one.
   const scoreAxis = frequencySpec.axesSpec[1];
-  if (scoreAxis) defaults.push({ inputName: "tabBy", selectedSource: scoreAxis });
+  if (scoreAxis) defaults.push({ inputName: "facetBy", selectedSource: scoreAxis });
   return defaults;
 });
 

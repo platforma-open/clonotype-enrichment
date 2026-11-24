@@ -43,9 +43,10 @@ const defaultOptions = computed((): PredefinedGraphOption<"scatterplot">[] | nul
       selectedSource: frequencyColSpec,
     },
   ];
-  // Design mode adds a path axis: one tab per path
+  // Design mode adds a path axis. Faceted, not tabbed: the paths hold different positions, so
+  // they cannot share an x axis, and side by side a target path reads against its control.
   const pathAxis = frequencyColSpec.axesSpec[2];
-  if (pathAxis) defaults.push({ inputName: "tabBy", selectedSource: pathAxis });
+  if (pathAxis) defaults.push({ inputName: "facetBy", selectedSource: pathAxis });
   return defaults;
 });
 
