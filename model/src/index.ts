@@ -457,7 +457,8 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
         controlArms:
           designControlMode(ctx.data) === "pooled" ? (ctx.data.designControlArms ?? []) : [],
         targetPieces: ctx.data.designTargetPieces ?? {},
-        baselines: ctx.data.designBaselineMode === "inferred" ? {} : (ctx.data.designBaselines ?? {}),
+        baselines:
+          ctx.data.designBaselineMode === "inferred" ? {} : (ctx.data.designBaselines ?? {}),
         thresholds:
           ctx.data.designThresholdMode === "endpoint" ? (ctx.data.designThresholds ?? {}) : {},
       },
