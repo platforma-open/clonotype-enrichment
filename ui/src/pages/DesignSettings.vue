@@ -123,6 +123,8 @@ function setBaseline(end: string, value: string | undefined) {
 
 <template>
   <!-- A choice only when the design offers more than one comparison; else a read-only summary -->
+  <!-- Only where the design holds more than one: with a single comparison there is nothing to pick
+       and nothing to say, since Samples & Data has already shown what the design is. -->
   <PlDropdown
     v-if="comparisonOptions.length > 1"
     v-model="app.model.data.designComparison"
@@ -130,12 +132,6 @@ function setBaseline(end: string, value: string | undefined) {
     label="Comparison"
     required
   />
-  <!-- With one comparison there is nothing to pick; how wide it is only says something once it
-       has arms to tell apart. -->
-  <template v-else-if="comparisonOptions.length === 1 && armOptions.length > 1">
-    <div class="design-label">Comparison</div>
-    <div>{{ comparisonOptions[0].label }}</div>
-  </template>
 
   <template v-if="armOptions.length > 0">
     <PlBtnGroup v-model="controlMode" :options="controlModeOptions" label="Control" :compact="true">
@@ -213,10 +209,3 @@ function setBaseline(end: string, value: string | undefined) {
 
   <PlAlert v-if="view?.error" type="warn" icon>{{ view.error }}</PlAlert>
 </template>
-
-<style scoped>
-.design-label {
-  font-weight: 500;
-  margin-bottom: -8px;
-}
-</style>
