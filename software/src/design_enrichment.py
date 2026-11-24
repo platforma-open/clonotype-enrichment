@@ -138,8 +138,19 @@ def main() -> None:
             score_exprs.append((pl.col(s["target"]) - ctrl).alias(s["id"]))
         else:
             score_exprs.append(pl.col(s["target"]).alias(s["id"]))
+        # Max Log2FC: the best single step on this end point's own path.
+        score_exprs.append(
+            pl.max_horizontal([pl.col(c) for c in s["steps"]]).alias(f"{s['id']}_max")
+        )
+        # The frequency its quality is judged on, taken over the same path.
+        score_exprs.append(
+            pl.max_horizontal([freq[p] for p in s["path"] if p in freq]).alias(f"{s['id']}_freq")
+        )
     if score_exprs:
         out = out.with_columns(score_exprs)
+        out = out.with_columns(
+            [quality(out, s, args.enrichment_threshold) for s in plan["scores"]]
+        )
 
     out.sort("elementId").write_csv(args.output)
 
@@ -147,6 +158,35 @@ def main() -> None:
     write_plots(args, plan, out.join(freqs, on="elementId", how="left"))
     print(f"design enrichment: {out.height} of {n} elements, "
           f"{len(plan['comparisons'])} comparisons, {len(plan['scores'])} scores")
+
+
+def quality(out: pl.DataFrame, s: dict, threshold: float) -> pl.Expr:
+    """
+    Enrichment Quality for one end point, as classic mode calls it: the cutoffs are percentiles of
+    this run, so a clone is judged against the others in the same experiment, not an absolute scale.
+    "Non Binder" comes first here; classic mode computes it last and overrides, which is the same
+    answer. It needs a control, as in classic mode: with nothing to judge specificity against, a
+    clone that ends low is a Rescuer or a Weak Binder, never a non-binder.
+    """
+    mx, fq, overall = pl.col(f"{s['id']}_max"), pl.col(f"{s['id']}_freq"), pl.col(s["target"])
+    q = lambda e, p: out.select(e.fill_null(0.0).quantile(p)).item()
+    high = max(threshold, q(mx, 0.75))
+    stable = max(threshold, q(overall, 0.50))
+    low, freq_cut = q(mx, 0.25), q(fq, 0.75)
+
+    not_binder = (overall < threshold) if s["controls"] else pl.lit(False)
+    return (
+        pl.when(not_binder)
+        .then(pl.lit("Non Binder"))
+        .when((mx >= high) & (overall >= stable))
+        .then(pl.lit("Stable Binder"))
+        .when((mx >= high) & (overall < stable))
+        .then(pl.lit("Rescuer"))
+        .when((mx < low) & (fq >= freq_cut))
+        .then(pl.lit("Parasite"))
+        .otherwise(pl.lit("Weak Binder"))
+        .alias(f"{s['id']}_quality")
+    )
 
 
 def write_plots(args, plan: dict, res: pl.DataFrame) -> None:

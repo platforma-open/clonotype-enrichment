@@ -281,6 +281,10 @@ export type PlanScore = {
   group: string;
   target: string;
   controls: string[];
+  /** Step comparisons along this end point's own path, for its Max Log2FC. */
+  steps: string[];
+  /** Position ids along the same path, for the frequency its quality is judged on. */
+  path: string[];
 };
 export type PlanArm = { split: string; name: string; role: "target" | "control"; score?: string };
 export type TargetQuestion = {
@@ -463,6 +467,8 @@ export function buildPlan(design: Design, choices: DesignChoices, label: Labeler
     base: Position;
     t: TrajectoryTensor;
     i: number;
+    steps: string[];
+    path: string[];
   }[] = [];
   const armComparisons = new Map<string, string[]>();
   // Comparison labels in an arm start with the arm's derived name; the column group is that name.
@@ -480,7 +486,15 @@ export function buildPlan(design: Design, choices: DesignChoices, label: Labeler
         if (!baseline) continue;
         const id = b.step(g, p, baseline);
         if (id) ids.push(id);
-        armEnds.push({ split: arm.split, end: p, base: baseline, t: undefined as never, i: -1 });
+        armEnds.push({
+          split: arm.split,
+          end: p,
+          base: baseline,
+          t: undefined as never,
+          i: -1,
+          steps: id ? [id] : [],
+          path: [b.pos(baseline), b.pos(p)],
+        });
       }
     }
     for (const s of segs) {
@@ -494,6 +508,7 @@ export function buildPlan(design: Design, choices: DesignChoices, label: Labeler
       const fixedIdx = fixed ? t.positions.findIndex((p) => posKey(p) === posKey(fixed)) : -1;
       const armBase = fixed ?? baseline ?? t.positions[s.from];
       const first = fixedIdx >= 0 ? fixedIdx + 1 : baseline ? s.from : s.from + 1;
+      const segSteps: string[] = [];
       let tcStart: Position | undefined;
       let base = armBase;
       for (let i = first; i < t.positions.length; i++) {
@@ -514,12 +529,26 @@ export function buildPlan(design: Design, choices: DesignChoices, label: Labeler
         let id: string | undefined;
         if (step === "portion") id = b.check(g, t.positions[i], t.positions[i - 1]);
         else id = b.step(g, t.positions[i], base);
-        if (id) ids.push(id);
+        if (id) {
+          ids.push(id);
+          if (b.kindOf(id) === "step") segSteps.push(id);
+        }
         const pref = b.preference(g, t, i);
         if (pref) ids.push(pref);
       }
       const last = t.positions.length - 1;
-      armEnds.push({ split: arm.split, end: t.positions[last], base, t, i: last });
+      armEnds.push({
+        split: arm.split,
+        end: t.positions[last],
+        base,
+        t,
+        i: last,
+        steps: segSteps,
+        // the baseline first, then everything the material passed through on the way to the end
+        path: [armBase, ...t.positions.slice(first)]
+          .filter((p) => p.length > 0)
+          .map((p) => b.pos(p)),
+      });
     }
     armComparisons.set(arm.split, ids);
   }
@@ -549,7 +578,16 @@ export function buildPlan(design: Design, choices: DesignChoices, label: Labeler
         ends.length > 1
           ? `Specific enrichment, ${g.group} · ${names.pos(e.end)}`
           : `Specific enrichment, ${g.group}`;
-      const sid = b.score(name, arm.split, g.group, target, [...controlIds, ...sibControls]);
+      const sid = b.score(
+        name,
+        arm.split,
+        g.group,
+        target,
+        [...controlIds, ...sibControls],
+        // the end point's own comparison counts towards its Max Log2FC, and `score` dedupes
+        [...e.steps, target],
+        e.path,
+      );
       armOut.push({ split: arm.split, name: g.group, role: "target", score: sid });
     }
     if (ends.length === 0) armOut.push({ split: arm.split, name: g.group, role: "target" });
@@ -707,9 +745,26 @@ class PlanBuilder {
     });
   }
 
-  score(label: string, arm: string, group: string, target: string, controls: string[]) {
+  score(
+    label: string,
+    arm: string,
+    group: string,
+    target: string,
+    controls: string[],
+    steps: string[],
+    path: string[],
+  ) {
     const id = `s${this.scores.length + 1}`;
-    this.scores.push({ id, label, arm, group, target, controls: [...new Set(controls)] });
+    this.scores.push({
+      id,
+      label,
+      arm,
+      group,
+      target,
+      controls: [...new Set(controls)],
+      steps: [...new Set(steps)],
+      path,
+    });
     return id;
   }
 }
