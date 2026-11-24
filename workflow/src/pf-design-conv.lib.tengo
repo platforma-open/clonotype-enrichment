@@ -51,8 +51,12 @@ getColumns := func(abundanceSpec, plan, blockId, enrichmentThreshold) {
 	}
 	for i, s in plan.scores {
 		group := s.group || s.arm
+		cutoff := enrichmentThreshold
+		if s.threshold != undefined {
+			cutoff = s.threshold
+		}
 		add(s.id, s.id, "Double", "designScore", s.label, group, 95000 - i, maps.merge(asScore, {
-			"pl7.app/score/defaultCutoff": string(enrichmentThreshold)
+			"pl7.app/score/defaultCutoff": string(cutoff)
 		}))
 		add(s.id + "_max", s.id, "Double", "designMax", "Max Log2FC, " + group, group, 94000 - i, asScore)
 		add(s.id + "_quality", s.id, "String", "designQuality", "Enrichment Quality, " + group, group, 93000 - i, {

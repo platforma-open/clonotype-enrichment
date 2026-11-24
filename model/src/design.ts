@@ -256,6 +256,8 @@ export type DesignChoices = {
    * right unless the material an arm started from was sequenced without being a fork.
    */
   baselines?: Record<string, string>;
+  /** End point key -> its own enrichment cutoff, where the run's global one does not fit it. */
+  thresholds?: Record<string, number>;
 };
 
 /** `label` is the samples' labels (unique); `name` is the derived display name. */
@@ -285,6 +287,12 @@ export type PlanScore = {
   steps: string[];
   /** Position ids along the same path, for the frequency its quality is judged on. */
   path: string[];
+  /** posKey of the end point, the key its own settings are stored under. */
+  end: string;
+  /** What names this end point apart from the others: its arm, then where it ends. */
+  endName: string;
+  /** Set only where this end point's cutoff differs from the run's. */
+  threshold?: number;
 };
 export type PlanArm = { split: string; name: string; role: "target" | "control"; score?: string };
 export type TargetQuestion = {
@@ -471,6 +479,13 @@ export function buildPlan(design: Design, choices: DesignChoices, label: Labeler
     path: string[];
   }[] = [];
   const armComparisons = new Map<string, string[]>();
+  // What tells one end point from another: the arm it ran in, then the position it ends at. Either
+  // alone repeats itself once a design has several arms ending in the same round.
+  const armName = (split: string) => arms.find((a) => a.split === split)?.name ?? "";
+  const endName = (arm: string, end: Position) => {
+    const where = names.pos(end);
+    return [arm, arm === where ? "" : where].filter((part) => part !== "").join(" · ") || where;
+  };
   // Comparison labels in an arm start with the arm's derived name; the column group is that name.
   const groupOf = (arm: ArmIn): Group => ({
     group: arm.name || arm.split,
@@ -587,6 +602,9 @@ export function buildPlan(design: Design, choices: DesignChoices, label: Labeler
         // the end point's own comparison counts towards its Max Log2FC, and `score` dedupes
         [...e.steps, target],
         e.path,
+        posKey(e.end),
+        endName(g.group, e.end),
+        choices.thresholds?.[posKey(e.end)],
       );
       armOut.push({ split: arm.split, name: g.group, role: "target", score: sid });
     }
@@ -623,7 +641,7 @@ export function buildPlan(design: Design, choices: DesignChoices, label: Labeler
     if (options.length < 2 || baselines.some((x) => x.end === end)) continue;
     baselines.push({
       end,
-      label: `Baseline, ${names.pos(e.end)}`,
+      label: `Baseline, ${endName(armName(e.split), e.end)}`,
       current: posKey(e.base),
       options,
     });
@@ -753,6 +771,9 @@ class PlanBuilder {
     controls: string[],
     steps: string[],
     path: string[],
+    end: string,
+    endName: string,
+    threshold?: number,
   ) {
     const id = `s${this.scores.length + 1}`;
     this.scores.push({
@@ -764,6 +785,9 @@ class PlanBuilder {
       controls: [...new Set(controls)],
       steps: [...new Set(steps)],
       path,
+      end,
+      endName,
+      ...(threshold !== undefined && { threshold }),
     });
     return id;
   }

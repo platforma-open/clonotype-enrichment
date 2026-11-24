@@ -149,7 +149,10 @@ def main() -> None:
     if score_exprs:
         out = out.with_columns(score_exprs)
         out = out.with_columns(
-            [quality(out, s, args.enrichment_threshold) for s in plan["scores"]]
+            [
+                quality(out, s, s.get("threshold", args.enrichment_threshold))
+                for s in plan["scores"]
+            ]
         )
 
     out.sort("elementId").write_csv(args.output)

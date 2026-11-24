@@ -3,7 +3,10 @@
 // selected in the abundance dropdown (draft). Everything the design answers is
 // not asked: only the comparison, the control arms and, where trajectories end
 // in different pieces of one separation, the target piece.
-import type { DesignControlMode } from "@platforma-open/milaboratories.clonotype-enrichment.model";
+import type {
+  DesignControlMode,
+  DesignThresholdMode,
+} from "@platforma-open/milaboratories.clonotype-enrichment.model";
 import { designControlMode } from "@platforma-open/milaboratories.clonotype-enrichment.model";
 import {
   PlAccordionSection,
@@ -11,9 +14,11 @@ import {
   PlBtnGroup,
   PlCheckboxGroup,
   PlDropdown,
+  PlNumberField,
 } from "@platforma-sdk/ui-vue";
 import { computed } from "vue";
 import { useApp } from "../app";
+import EnrichmentThreshold from "./EnrichmentThreshold.vue";
 
 const app = useApp();
 const view = computed(() => app.model.outputs.designView);
@@ -51,6 +56,25 @@ function setTarget(partition: string, value: string | undefined) {
   if (value === undefined) delete next[partition];
   else next[partition] = value;
   app.model.data.designTargetPieces = next;
+}
+
+/** One cutoff for the run, or one per end point. The run's own field stays in the main settings. */
+const thresholdMode = computed({
+  get: () => app.model.data.designThresholdMode ?? "global",
+  set: (v: DesignThresholdMode) => (app.model.data.designThresholdMode = v),
+});
+const thresholdModeOptions = [
+  { value: "global" as const, label: "Global" },
+  { value: "endpoint" as const, label: "Per end point" },
+];
+/** One field per end point, falling back to the run's cutoff until it is given its own. */
+const endpoints = computed(() => view.value?.plan?.scores ?? []);
+
+function setThreshold(end: string, value: number | undefined) {
+  const next = { ...(app.model.data.designThresholds ?? {}) };
+  if (value === undefined) delete next[end];
+  else next[end] = value;
+  app.model.data.designThresholds = next;
 }
 
 /** Each end point is measured against the material it came from; this overrides that choice. */
@@ -103,6 +127,31 @@ function setBaseline(end: string, value: string | undefined) {
     @update:model-value="(v: string | undefined) => setTarget(q.partition, v)"
   />
 
+  <PlBtnGroup
+    v-if="endpoints.length > 1"
+    v-model="thresholdMode"
+    :options="thresholdModeOptions"
+    label="Enrichment cutoff"
+    :compact="true"
+  >
+    <template #tooltip>
+      Rounds, stringency and baseline differ between end points, so one cutoff does not always suit
+      all of them.
+    </template>
+  </PlBtnGroup>
+  <EnrichmentThreshold v-if="thresholdMode === 'global'" />
+  <template v-else>
+    <PlNumberField
+      v-for="e in endpoints"
+      :key="e.end"
+      :model-value="app.model.data.designThresholds?.[e.end] ?? app.model.data.enrichmentThreshold"
+      :label="e.endName"
+      :min-value="0.6"
+      :step="0.1"
+      @update:model-value="(v: number | undefined) => setThreshold(e.end, v)"
+    />
+  </template>
+
   <PlAccordionSection v-if="baselines.length > 0" label="Baselines">
     <PlDropdown
       v-for="bl in baselines"
@@ -116,19 +165,11 @@ function setBaseline(end: string, value: string | undefined) {
   </PlAccordionSection>
 
   <PlAlert v-if="view?.error" type="warn" icon>{{ view.error }}</PlAlert>
-  <div v-else-if="view?.plan" class="design-note">
-    {{ view.plan.comparisons.length }} comparisons, {{ view.plan.scores.length }} score column(s)
-    from {{ view.designName }}.
-  </div>
 </template>
 
 <style scoped>
 .design-label {
   font-weight: 500;
   margin-bottom: -8px;
-}
-.design-note {
-  color: var(--txt-03, #6b6b7b);
-  font-size: 13px;
 }
 </style>

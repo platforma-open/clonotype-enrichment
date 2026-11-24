@@ -79,6 +79,9 @@ type OldUiState = {
 /** Whether an experiment's control end points are judged against, or left out of, the scores. */
 export type DesignControlMode = "none" | "pooled";
 
+/** Whether one cutoff covers the whole run, or each end point carries its own. */
+export type DesignThresholdMode = "global" | "endpoint";
+
 /** The mode in force. Drafts saved before the switch existed keep the arms they had picked. */
 export function designControlMode(data: {
   designControlMode?: DesignControlMode;
@@ -131,6 +134,10 @@ export type BlockData = {
   designTargetPieces?: Record<string, string>;
   /** End point -> the position to measure it against, overriding the inferred baseline. */
   designBaselines?: Record<string, string>;
+  /** Whether the enrichment cutoff is one value for the run or one per end point. */
+  designThresholdMode?: DesignThresholdMode;
+  /** End point -> its own enrichment cutoff; read only in "endpoint" mode. */
+  designThresholds?: Record<string, number>;
   /** The plan built from the choices above; written by the UI from `designView.plan`. */
   designPlan?: Plan;
 };
@@ -446,6 +453,8 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
           designControlMode(ctx.data) === "pooled" ? (ctx.data.designControlArms ?? []) : [],
         targetPieces: ctx.data.designTargetPieces ?? {},
         baselines: ctx.data.designBaselines ?? {},
+        thresholds:
+          ctx.data.designThresholdMode === "endpoint" ? (ctx.data.designThresholds ?? {}) : {},
       },
       label,
     );
