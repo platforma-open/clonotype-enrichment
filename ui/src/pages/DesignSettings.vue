@@ -17,15 +17,31 @@ import {
   PlDropdown,
   PlNumberField,
 } from "@platforma-sdk/ui-vue";
-import { computed } from "vue";
+import { computed, shallowRef, watchEffect } from "vue";
 import { useApp } from "../app";
 import EnrichmentThreshold from "./EnrichmentThreshold.vue";
 
 const app = useApp();
 const view = computed(() => app.model.outputs.designView);
 
+/**
+ * `designView` is an output, so it reads as undefined for as long as the model takes to rebuild
+ * it, and every setting here is a change that triggers a rebuild. Taken straight, the fields would
+ * empty out on each click and come back when the output lands. These keep the last list the model
+ * gave: the settings stay put, and are replaced the moment a new list arrives.
+ */
+function sticky<T>(pick: () => readonly T[] | undefined) {
+  const last = shallowRef<readonly T[]>([]);
+  watchEffect(() => {
+    const next = pick();
+    if (next !== undefined) last.value = next;
+  });
+  return last;
+}
+
+const comparisons = sticky(() => view.value?.comparisons);
 const comparisonOptions = computed(() =>
-  (view.value?.comparisons ?? []).map((c) => ({
+  comparisons.value.map((c) => ({
     value: c.value,
     label: c.label,
     group: c.kind === "panel" ? "Panels" : "Paths",
@@ -33,8 +49,9 @@ const comparisonOptions = computed(() =>
 );
 
 /** One checkbox per arm, labelled by its name. */
+const arms = sticky(() => view.value?.arms);
 const armOptions = computed(() =>
-  (view.value?.arms ?? []).map(({ split, name }) => ({ value: split, label: name })),
+  arms.value.map(({ split, name }) => ({ value: split, label: name })),
 );
 
 const controlArms = computed({
@@ -69,7 +86,7 @@ const thresholdModeOptions = [
   { value: "endpoint" as const, label: "Per end point" },
 ];
 /** One field per end point, falling back to the run's cutoff until it is given its own. */
-const endpoints = computed(() => view.value?.plan?.scores ?? []);
+const endpoints = sticky(() => view.value?.plan?.scores);
 
 function setThreshold(end: string, value: number | undefined) {
   const next = { ...(app.model.data.designThresholds ?? {}) };
@@ -79,7 +96,10 @@ function setThreshold(end: string, value: number | undefined) {
 }
 
 /** Each end point is measured against the material it came from; these override that choice. */
-const baselines = computed(() => view.value?.plan?.baselines ?? []);
+const baselines = sticky(() => view.value?.plan?.baselines);
+
+/** The target-fraction questions blink with everything else, so they are kept the same way. */
+const questions = sticky(() => view.value?.questions);
 
 /** Inferred for every end point, or set by hand. Overrides already made survive switching back. */
 const baselineMode = computed({
@@ -133,7 +153,7 @@ function setBaseline(end: string, value: string | undefined) {
   </template>
 
   <PlDropdown
-    v-for="q in view?.questions ?? []"
+    v-for="q in questions"
     :key="q.partition"
     :model-value="app.model.data.designTargetPieces?.[q.partition]"
     :options="q.options"
@@ -160,7 +180,7 @@ function setBaseline(end: string, value: string | undefined) {
       v-for="e in endpoints"
       :key="e.end"
       :model-value="app.model.data.designThresholds?.[e.end] ?? app.model.data.enrichmentThreshold"
-      :label="e.endName"
+      :label="e.endName || e.label"
       :min-value="0.6"
       :step="0.1"
       @update:model-value="(v: number | undefined) => setThreshold(e.end, v)"
