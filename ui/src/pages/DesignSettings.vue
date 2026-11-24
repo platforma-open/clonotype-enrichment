@@ -3,7 +3,7 @@
 // selected in the abundance dropdown (draft). Everything the design answers is
 // not asked: only the comparison, the control arms and, where trajectories end
 // in different pieces of one separation, the target piece.
-import { PlAlert, PlCheckboxGroup, PlDropdown } from "@platforma-sdk/ui-vue";
+import { PlAccordionSection, PlAlert, PlCheckboxGroup, PlDropdown } from "@platforma-sdk/ui-vue";
 import { computed } from "vue";
 import { useApp } from "../app";
 
@@ -33,6 +33,16 @@ function setTarget(partition: string, value: string | undefined) {
   if (value === undefined) delete next[partition];
   else next[partition] = value;
   app.model.data.designTargetPieces = next;
+}
+
+/** Each end point is measured against the material it came from; this overrides that choice. */
+const baselines = computed(() => view.value?.plan?.baselines ?? []);
+
+function setBaseline(end: string, value: string | undefined) {
+  const next = { ...(app.model.data.designBaselines ?? {}) };
+  if (value === undefined) delete next[end];
+  else next[end] = value;
+  app.model.data.designBaselines = next;
 }
 </script>
 
@@ -64,6 +74,18 @@ function setTarget(partition: string, value: string | undefined) {
     required
     @update:model-value="(v: string | undefined) => setTarget(q.partition, v)"
   />
+
+  <PlAccordionSection v-if="baselines.length > 0" label="Baselines">
+    <PlDropdown
+      v-for="bl in baselines"
+      :key="bl.end"
+      :model-value="bl.current"
+      :options="bl.options"
+      :label="bl.label"
+      required
+      @update:model-value="(v: string | undefined) => setBaseline(bl.end, v)"
+    />
+  </PlAccordionSection>
 
   <PlAlert v-if="view?.error" type="warn" icon>{{ view.error }}</PlAlert>
   <div v-else-if="view?.plan" class="design-note">

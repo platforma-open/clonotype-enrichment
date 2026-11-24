@@ -116,6 +116,8 @@ export type BlockData = {
   designControlArms?: string[];
   /** Partition tensor id -> chosen target piece (see `posKey`). */
   designTargetPieces?: Record<string, string>;
+  /** End point -> the position to measure it against, overriding the inferred baseline. */
+  designBaselines?: Record<string, string>;
   /** The plan built from the choices above; written by the UI from `designView.plan`. */
   designPlan?: Plan;
 };
@@ -429,6 +431,7 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
         comparison: chosen,
         controlArms: ctx.data.designControlArms ?? [],
         targetPieces: ctx.data.designTargetPieces ?? {},
+        baselines: ctx.data.designBaselines ?? {},
       },
       label,
     );
