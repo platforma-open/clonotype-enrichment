@@ -127,7 +127,18 @@ def main() -> None:
             .otherwise(None)
             .alias(c["id"])
         )
-    out = wide.select("elementId", *exprs)
+    # The frequency each end point's quality is judged on, over the positions of its own path. It
+    # is taken here because the frequencies are built on the position columns, which only `wide`
+    # has: `out` holds the comparisons computed from them.
+    freq_exprs = []
+    for s in plan["scores"]:
+        on_path = [freq[p] for p in s["path"] if p in freq]
+        freq_exprs.append(
+            (pl.max_horizontal(on_path) if on_path else pl.lit(None, pl.Float64)).alias(
+                f"{s['id']}_freq"
+            )
+        )
+    out = wide.select("elementId", *exprs, *freq_exprs)
 
     score_exprs = []
     for s in plan["scores"]:
@@ -142,10 +153,6 @@ def main() -> None:
         score_exprs.append(
             pl.max_horizontal([pl.col(c) for c in s["steps"]]).alias(f"{s['id']}_max")
         )
-        # The frequency its quality is judged on, taken over the same path.
-        score_exprs.append(
-            pl.max_horizontal([freq[p] for p in s["path"] if p in freq]).alias(f"{s['id']}_freq")
-        )
     if score_exprs:
         out = out.with_columns(score_exprs)
         out = out.with_columns(
@@ -155,7 +162,10 @@ def main() -> None:
             ]
         )
 
-    out.sort("elementId").write_csv(args.output)
+    # the per-path frequency is only there to judge quality against; the export does not read it
+    out.drop([f"{s['id']}_freq" for s in plan["scores"]], strict=False).sort("elementId").write_csv(
+        args.output
+    )
 
     freqs = wide.select("elementId", *[freq[pid].alias(f"f_{pid}") for pid in pos_ids])
     write_plots(args, plan, out.join(freqs, on="elementId", how="left"))

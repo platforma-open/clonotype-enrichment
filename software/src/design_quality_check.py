@@ -1,16 +1,82 @@
 """
-Self-check for the Enrichment Quality classes in design mode: `python3 design_quality_check.py`.
-The cutoffs are percentiles of the run, so the four clones below are written to sit on either
-side of each other rather than at fixed values.
+Self-check for design mode's extra columns: `python3 design_quality_check.py`.
+Two parts: the quality classes on a hand-made frame, then a whole run over a tiny design, which is
+what catches a column being read off the wrong frame.
 """
 
+import json
 import sys
+import tempfile
 from pathlib import Path
 
 import polars as pl
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import design_enrichment  # noqa: E402
 from design_enrichment import quality  # noqa: E402
+
+
+def check_run() -> None:
+    """One library, one round, one end point: the columns must line up end to end."""
+    plan = {
+        "designId": "D",
+        "designName": "check",
+        "comparison": "panel-1",
+        "positions": [
+            {"id": "p1", "label": "lib", "name": "lib", "samples": ["s_lib"]},
+            {"id": "p2", "label": "r1", "name": "r1", "samples": ["s_r1"]},
+        ],
+        "comparisons": [
+            {"id": "c1", "label": "r1 / lib", "group": "arm", "kind": "step", "num": "p2", "den": "p1"}
+        ],
+        "scores": [
+            {
+                "id": "s1",
+                "label": "Specific enrichment, arm",
+                "arm": "arm",
+                "group": "arm",
+                "target": "c1",
+                "controls": [],
+                "steps": ["c1"],
+                "path": ["p1", "p2"],
+                "end": '["s_r1"]',
+                "endName": "arm · r1",
+            }
+        ],
+        "arms": [{"split": "arm", "name": "arm", "role": "target", "score": "s1"}],
+        "tracks": [{"label": "arm", "group": "arm", "positions": ["p1", "p2"]}],
+        "baselines": [],
+    }
+    rows = [("s_lib", "winner", 10.0), ("s_r1", "winner", 900.0), ("s_lib", "dud", 500.0), ("s_r1", "dud", 5.0)]
+    with tempfile.TemporaryDirectory() as tmp:
+        d = Path(tmp)
+        pl.DataFrame(rows, schema=["sampleId", "elementId", "abundance"], orient="row").write_csv(
+            d / "in.csv"
+        )
+        (d / "plan.json").write_text(json.dumps(plan))
+        argv = sys.argv
+        sys.argv = [
+            "design_enrichment.py",
+            *("--input", str(d / "in.csv")),
+            *("--plan", str(d / "plan.json")),
+            *("--output", str(d / "out.csv")),
+            *("--filtered_too_much", str(d / "ftm.txt")),
+            *("--plot_freq", str(d / "freq.csv")),
+            *("--plot_bubble", str(d / "bubble.csv")),
+            *("--plot_control", str(d / "control.csv")),
+            *("--stats", str(d / "stats.json")),
+        ]
+        try:
+            design_enrichment.main()
+        finally:
+            sys.argv = argv
+        got = pl.read_csv(d / "out.csv")
+
+    assert set(got.columns) == {"elementId", "c1", "s1", "s1_max", "s1_quality"}, got.columns
+    by = {r["elementId"]: r for r in got.iter_rows(named=True)}
+    assert by["winner"]["s1"] > 0 > by["dud"]["s1"], by
+    assert by["winner"]["s1_max"] == by["winner"]["c1"], by
+    print("design run: OK")
 
 
 def main() -> None:
@@ -43,6 +109,7 @@ def main() -> None:
     assert got["stable"] == "Stable Binder", got
     assert got["rescuer"] == got["dud"] == "Non Binder", got
     print("design quality: OK")
+    check_run()
 
 
 if __name__ == "__main__":
