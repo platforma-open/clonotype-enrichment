@@ -147,8 +147,10 @@ const questions = sticky(() => view.value?.questions);
     :compact="true"
   >
     <template #tooltip>
-      Rounds, stringency and baseline differ between end points, so one cutoff does not always suit
-      all of them.
+      The cutoff is the Log2FC a sequence has to reach to count as enriched. End points can run
+      through a different number of rounds, or start from a different baseline, so the same fold
+      change does not mean the same thing in all of them. Per end point gives each one its own
+      cutoff, each starting at the global one until you change it.
     </template>
   </PlBtnGroup>
   <EnrichmentThreshold v-if="thresholdMode === 'global'" />
