@@ -200,7 +200,7 @@ export function comparisonOptions(design: Design, label: Labeler): ComparisonOpt
   for (const [id, t] of entries) {
     if (t.type !== "panel") continue;
     for (const a of t.arms) for (const tid of a.trajectories) covered.add(tid);
-    out.push({ value: id, kind: "panel", label: panelSummary(design, id, t, names) });
+    out.push({ value: id, kind: "panel", label: panelSummary(design, t) });
   }
   for (const [id, t] of entries) {
     if (t.type !== "trajectory" || covered.has(id)) continue;
@@ -214,16 +214,10 @@ export function comparisonOptions(design: Design, label: Labeler): ComparisonOpt
 }
 
 /**
- * A panel described by its STEP 3 label: the columns its arms differ by, the columns its arms'
- * trajectories run over, and the anchor's samples as the baseline. Without a label, the arms are
- * listed by name.
+ * How wide a panel is and what its arms run over: "3 arms over round". The arms are named by the
+ * settings below it and every end point states its own baseline, so neither is repeated here.
  */
-function panelSummary(design: Design, id: string, t: PanelTensor, names: Names): string {
-  const cols = (l: TensorLabel | undefined) => (l?.axes ?? []).map((a) => a.cols.join(" + "));
-  const by = cols(design.labels[id]);
-  const arms = by.length
-    ? `${t.arms.length} arms by ${by.join(" · ")}`
-    : `${t.arms.length} arms: ${t.arms.map((a) => names.arm(t, a.split)).join(", ")}`;
+function panelSummary(design: Design, t: PanelTensor): string {
   const over = [
     ...new Set(
       t.arms.flatMap((a) =>
@@ -231,12 +225,9 @@ function panelSummary(design: Design, id: string, t: PanelTensor, names: Names):
       ),
     ),
   ];
-  const baseline = t.anchor.reads.length
-    ? names.fallback(t.anchor.reads)
-    : `${t.anchor.material} (not sequenced)`;
-  return [arms, over.length ? `over ${over.join(", ")}` : "", `baseline ${baseline}`]
+  return [`${t.arms.length} arms`, over.length ? `over ${over.join(", ")}` : ""]
     .filter(Boolean)
-    .join(", ");
+    .join(" ");
 }
 
 // ---------------------------------------------------------------------------
