@@ -1,11 +1,10 @@
 // Import parameters for the design-mode plot data (draft). Same column names as the classic
 // plots (pf-stacked-conv, pf-bubble-conv, pf-control-scatter-conv), so the plot pages find them,
-// with a path, arm or score axis where a design has several.
+// with a path or score axis where a design has several.
 ll := import("@platforma-sdk/workflow-tengo:ll")
 maps := import("@platforma-sdk/workflow-tengo:maps")
 
 PATH_AXIS := "pl7.app/design/track"
-ARM_AXIS := "pl7.app/design/arm"
 COMPARISON_AXIS := "pl7.app/design/comparisonName"
 SCORE_AXIS := "pl7.app/design/score"
 
@@ -48,13 +47,14 @@ freqColumns := func(abundanceSpec) {
 	}
 }
 
-// Bubble plot: top clones' enrichment in each comparison, by arm
+// Bubble plot: top clones' enrichment in every comparison of the plan. The arm is part of each
+// comparison's label rather than an axis of its own: one chart holding a target arm beside its
+// control says more than a dropdown that shows one arm at a time.
 bubbleColumns := func(abundanceSpec) {
 	return {
 		axes: [
 			{ column: "elementId", spec: abundanceSpec.axesSpec[1] },
-			stringAxis("Comparison", COMPARISON_AXIS, "Comparison"),
-			stringAxis("Arm", ARM_AXIS, "Arm")
+			stringAxis("Comparison", COMPARISON_AXIS, "Comparison")
 		],
 		columns: [
 			doubleColumn("Frequency_Numerator", "NumeratorFrequency", "pl7.app/numerator-frequency",
@@ -99,7 +99,6 @@ controlColumns := func(abundanceSpec) {
 
 export ll.toStrict({
 	PATH_AXIS: PATH_AXIS,
-	ARM_AXIS: ARM_AXIS,
 	SCORE_AXIS: SCORE_AXIS,
 	freqColumns: freqColumns,
 	bubbleColumns: bubbleColumns,

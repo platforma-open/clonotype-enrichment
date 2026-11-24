@@ -31,10 +31,10 @@ const defaultOptions = computed((): PredefinedGraphOption<"bubble">[] | null => 
       inputName: "y",
       selectedSource: enrichmentCol.axesSpec[1],
     },
-    {
-      inputName: "tabBy",
-      selectedSource: enrichmentCol.axesSpec[2],
-    },
+    // Only the classic frame tabs: a design's chart carries every comparison at once.
+    ...(enrichmentCol.axesSpec.length > 2
+      ? [{ inputName: "tabBy" as const, selectedSource: enrichmentCol.axesSpec[2] }]
+      : []),
     {
       inputName: "valueColor",
       selectedSource: enrichmentCol,
@@ -61,9 +61,10 @@ const inputElementAxis = computed(() => {
 
 const dataColumnPredicate = (spec: PColumnSpec) =>
   inputElementAxis.value !== undefined &&
-  spec.axesSpec.length === 3 &&
-  // classic: by baseline condition; design mode: by arm
-  ["pl7.app/Baseline-condition", "pl7.app/design/arm"].includes(spec.axesSpec[2].name) &&
+  // classic tabs by baseline condition; a design holds every comparison in one chart
+  (spec.axesSpec.length === 3
+    ? spec.axesSpec[2].name === "pl7.app/Baseline-condition"
+    : spec.axesSpec.length === 2 && spec.axesSpec[1].name === "pl7.app/design/comparisonName") &&
   !["pl7.app/maxEnrichment", "pl7.app/maxNegControlEnrichment"].includes(spec.name);
 
 const metaColumnPredicate = (spec: PColumnSpec) =>

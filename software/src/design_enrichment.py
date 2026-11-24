@@ -13,7 +13,7 @@ Output:
   Plot data (top clones are picked per arm), in the shapes enrichment.py gives the classic plots, with an arm, path or score
   in place of the condition where a design has several:
   --plot_freq     top clones' frequency along each track (path) of the plan
-  --plot_bubble   top clones' enrichment in each comparison, by arm
+  --plot_bubble   top clones' enrichment in each comparison of the plan
   --plot_control  every clone's target vs highest control enrichment, by score (scores with
                   controls only)
   --stats         JSON: min, max, mean, median and 75th percentile of the score values
@@ -249,16 +249,13 @@ def write_plots(args, plan: dict, res: pl.DataFrame) -> None:
         tops = {g: top_of(g) for g in dict.fromkeys(c["group"] for c in plan["comparisons"])}
         for c in plan["comparisons"]:
             top = tops[c["group"]]
-            prefix = f"{c['group']}: "
-            label = c["label"][len(prefix):] if c["label"].startswith(prefix) else c["label"]
             parts.append(top.select(
                 "elementId",
-                pl.lit(c["group"]).alias("Arm"),
-                pl.lit(label).alias("Comparison"),
+                pl.lit(c["label"]).alias("Comparison"),
                 pl.col(c["id"]).alias("Enrichment"),
                 pl.col(f"f_{c['num']}").alias("Frequency_Numerator"),
             ).filter(pl.col("Enrichment").is_not_null()))
-        frame(parts, {"elementId": pl.Utf8, "Arm": pl.Utf8, "Comparison": pl.Utf8,
+        frame(parts, {"elementId": pl.Utf8, "Comparison": pl.Utf8,
                       "Enrichment": pl.Float64, "Frequency_Numerator": pl.Float64}
               ).write_csv(args.plot_bubble)
 

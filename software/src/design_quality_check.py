@@ -70,8 +70,12 @@ def check_run() -> None:
         finally:
             sys.argv = argv
         got = pl.read_csv(d / "out.csv")
+        # The plot frames name their axes in pf-design-plots.lib.tengo; a column added or dropped
+        # on one side only makes the import fail in the app, not here.
+        bubble = pl.read_csv(d / "bubble.csv").columns
 
     assert set(got.columns) == {"elementId", "c1", "s1", "s1_max", "s1_quality"}, got.columns
+    assert set(bubble) == {"elementId", "Comparison", "Enrichment", "Frequency_Numerator"}, bubble
     by = {r["elementId"]: r for r in got.iter_rows(named=True)}
     assert by["winner"]["s1"] > 0 > by["dud"]["s1"], by
     assert by["winner"]["s1_max"] == by["winner"]["c1"], by
