@@ -31,6 +31,7 @@ import {
   TENSOR_SAMPLE_AXIS_ANNOTATION,
   buildPlan,
   comparisonOptions,
+  designSamples,
   readDesigns,
   sameAxisId,
   type Design,
@@ -400,14 +401,38 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
         return { ref: opt.ref, axis, designs: readDesigns(content) };
       });
 
+    // Sample ids behind an abundance column: its partition keys on the sample axis, the same
+    // notion of "this sample has data" the rest of the block uses.
+    const samplesOf = (ref: PlRef): Set<string> | undefined => {
+      const pCol = ctx.resultPool.getPColumnByRef(ref);
+      const idx = pCol?.spec.axesSpec.findIndex((a) => a.name === "pl7.app/sampleId") ?? -1;
+      if (!pCol || idx < 0) return undefined;
+      const keys = getUniquePartitionKeys(pCol.data);
+      return keys && idx < keys.length ? new Set(keys[idx].map((v) => String(v))) : undefined;
+    };
+
     const withDesign: { value: string; label: string }[] = [];
     const plain: { value: string; label: string }[] = [];
+    // Designs the chosen abundance does not cover, as counts only: the names are of no use when
+    // the point is that the data is missing.
+    const hidden: { missing: number; total: number }[] = [];
+    const chosen = ctx.data.abundanceRef;
     for (const a of abundances) {
       plain.push({ value: JSON.stringify({ abundanceRef: a.ref }), label: a.label });
       const sampleAxis = ctx.resultPool.getPColumnSpecByRef(a.ref)?.axesSpec?.[0];
+      const samples = samplesOf(a.ref);
       for (const t of tensorColumns) {
         if (!sameAxisId(t.axis, sampleAxis)) continue;
-        for (const d of t.designs)
+        for (const d of t.designs) {
+          // Strict containment: every sample the design names must carry abundance here, so a
+          // plan never reaches the workflow with a position that has no data behind it.
+          const want = designSamples(d);
+          const missing = samples ? want.filter((s) => !samples.has(s)).length : 0;
+          if (missing > 0) {
+            if (a.ref.blockId === chosen?.blockId && a.ref.name === chosen?.name)
+              hidden.push({ missing, total: want.length });
+            continue;
+          }
           withDesign.push({
             value: JSON.stringify({
               abundanceRef: a.ref,
@@ -416,9 +441,10 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
             } satisfies InputChoice),
             label: `${a.label} / ${d.name}`,
           });
+        }
       }
     }
-    return { withDesign, plain };
+    return { withDesign, plain, hidden };
   })
 
   // Comparison options, questions and the plan for the selected design.

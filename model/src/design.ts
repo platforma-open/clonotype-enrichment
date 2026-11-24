@@ -85,6 +85,18 @@ export function readDesigns(content: JsonColumnData | undefined): Design[] {
   return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
+/** Every sample the design's tensors name. A design can only be analysed where all of these
+ *  carry abundance, so this is what the input dropdown checks the abundance against. */
+export function designSamples(design: Design): string[] {
+  const out = new Set<string>();
+  for (const t of Object.values(design.tensors)) {
+    const positions = t.type === "panel" ? t.arms.flatMap((a) => a.positions) : t.positions;
+    for (const p of positions) for (const s of p) out.add(s);
+    if (t.type === "panel") for (const s of t.anchor.reads) out.add(s);
+  }
+  return [...out];
+}
+
 /**
  * Name of group `i` of a tensor, read from its STEP 3 label: the values of every axis, blanks
  * left out. Two or more axes are a confound (the table cannot say which one varies), so all
