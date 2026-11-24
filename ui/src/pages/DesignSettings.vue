@@ -113,8 +113,12 @@ const questions = sticky(() => view.value?.questions);
   <template v-if="armOptions.length > 0">
     <PlBtnGroup v-model="controlMode" :options="controlModeOptions" label="Control" :compact="true">
       <template #tooltip>
-        A pooled control is one veto: an end point only counts as a hit where no control it is
-        judged against came up enriched too.
+        Enables specificity analysis by comparing your target against control arms.<br /><br />
+        You can select multiple negative controls (e.g. irrelevant antigens). The analysis
+        calculates enrichment for each one independently and subtracts the
+        <strong>maximum value</strong> found across all controls, as a baseline for background
+        binding. This discounts "sticky" or non-specific sequences that appear in your control
+        arms.
       </template>
     </PlBtnGroup>
     <PlCheckboxGroup
