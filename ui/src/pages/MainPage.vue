@@ -189,7 +189,8 @@ watchEffect(() => {
     label = label ? `${label}, ${filteringLabel}` : filteringLabel;
   }
 
-  app.model.data.defaultBlockLabel = label;
+  // uncommitted: marks the experiment-design build apart in the project sidebar
+  app.model.data.defaultBlockLabel = label ? `(exp design) ${label}` : "(exp design)";
 });
 
 // Persist the auto-discovered per-clonotype abundance so the workflow can
@@ -897,7 +898,7 @@ const isControlOrderOpen = ref(true); // Open by default
   <PlBlockPage
     v-model:subtitle="app.model.data.customBlockLabel"
     :subtitle-placeholder="app.model.data.defaultBlockLabel"
-    title="Enrichment Analysis"
+    title="Enrichment Analysis (exp design)"
   >
     <template #append>
       <PlBtnGhost @click.stop="() => (statsOpen = true)">
@@ -943,8 +944,8 @@ const isControlOrderOpen = ref(true); // Open by default
     />
     <PlAlert v-if="hiddenDesigns.length > 0" v-model="hiddenShown" type="info" icon closeable>
       <div v-for="(h, i) in hiddenDesigns" :key="i">
-        A design is not offered here: {{ h.missing }} of its {{ h.total }} samples have no abundance
-        in this column.
+        <b>{{ h.name }}</b> is not offered here: {{ h.missing }} of its {{ h.total }} samples have
+        no abundance in this column.
       </div>
     </PlAlert>
     <DesignSettings v-if="designMode" />
