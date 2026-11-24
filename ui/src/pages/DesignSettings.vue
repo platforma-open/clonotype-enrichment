@@ -117,8 +117,7 @@ const questions = sticky(() => view.value?.questions);
         You can select multiple negative controls (e.g. irrelevant antigens). The analysis
         calculates enrichment for each one independently and subtracts the
         <strong>maximum value</strong> found across all controls, as a baseline for background
-        binding. This discounts "sticky" or non-specific sequences that appear in your control
-        arms.
+        binding. This discounts "sticky" or non-specific sequences that appear in your control arms.
       </template>
     </PlBtnGroup>
     <PlCheckboxGroup
