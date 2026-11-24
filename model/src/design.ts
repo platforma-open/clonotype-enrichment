@@ -347,7 +347,14 @@ type Segment = {
 
 export function buildPlan(design: Design, choices: DesignChoices, label: Labeler): PlanResult {
   const tensor = choices.comparison ? design.tensors[choices.comparison] : undefined;
-  if (!tensor) return { questions: [], error: "Choose a comparison" };
+  // No comparison yet means the UI has not written the default back; the alert would only blink.
+  if (!tensor)
+    return {
+      questions: [],
+      error: comparisonOptions(design, label).length
+        ? undefined
+        : "This design has nothing to compare",
+    };
   if (tensor.type !== "panel" && tensor.type !== "trajectory")
     return { questions: [], error: "This comparison type is not supported yet" };
 
