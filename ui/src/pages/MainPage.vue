@@ -60,11 +60,11 @@ const inputOptions = computed(() => {
   ];
 });
 
-/** Designs left out of the dropdown because this abundance misses some of their samples.
- *  Closable, and shown again whenever the counts change (a different abundance, say). */
-const hiddenDesigns = computed(() => app.model.outputs.inputOptions?.hidden ?? []);
-const hiddenShown = ref(true);
-watch(hiddenDesigns, () => (hiddenShown.value = true));
+/** Set when the design in the input is one this abundance does not cover, so the input reads
+ *  empty. Closable, and shown again whenever the counts change (a different abundance, say). */
+const uncovered = computed(() => app.model.outputs.inputOptions?.uncovered);
+const uncoveredShown = ref(true);
+watch(uncovered, () => (uncoveredShown.value = true));
 
 const inputValue = computed(() => {
   const d = app.model.data;
@@ -942,11 +942,9 @@ const isControlOrderOpen = ref(true); // Open by default
       required
       @update:model-value="setInputChoice"
     />
-    <PlAlert v-if="hiddenDesigns.length > 0" v-model="hiddenShown" type="info" icon closeable>
-      <div v-for="(h, i) in hiddenDesigns" :key="i">
-        <b>{{ h.name }}</b> is not offered here: {{ h.missing }} of its {{ h.total }} samples have
-        no abundance in this column.
-      </div>
+    <PlAlert v-if="uncovered" v-model="uncoveredShown" type="info" icon closeable>
+      This design is not offered here: {{ uncovered.missing }} of its {{ uncovered.total }} samples
+      have no abundance in this column.
     </PlAlert>
     <DesignSettings v-if="designMode" />
     <template v-if="!designMode">

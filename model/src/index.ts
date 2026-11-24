@@ -413,11 +413,9 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
 
     const withDesign: { value: string; label: string }[] = [];
     const plain: { value: string; label: string }[] = [];
-    // Designs the chosen abundance does not cover. Named, since a project holds several and two
-    // unnamed notes read as the same note twice; by design id, since one design can reach the
-    // pool through more than one tensor column.
-    const hidden: { name: string; missing: number; total: number }[] = [];
-    const hiddenIds = new Set<string>();
+    // The one design the user picked, where this abundance does not cover it: a design is chosen
+    // one at a time, so the note speaks about that one and says nothing about the rest.
+    let uncovered: { missing: number; total: number } | undefined;
     const chosen = ctx.data.abundanceRef;
     for (const a of abundances) {
       plain.push({ value: JSON.stringify({ abundanceRef: a.ref }), label: a.label });
@@ -431,11 +429,11 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
           const want = designSamples(d);
           const missing = samples ? want.filter((s) => !samples.has(s)).length : 0;
           if (missing > 0) {
-            const mine = a.ref.blockId === chosen?.blockId && a.ref.name === chosen?.name;
-            if (mine && !hiddenIds.has(d.designId)) {
-              hiddenIds.add(d.designId);
-              hidden.push({ name: d.name, missing, total: want.length });
-            }
+            const mine =
+              a.ref.blockId === chosen?.blockId &&
+              a.ref.name === chosen?.name &&
+              d.designId === ctx.data.designId;
+            if (mine) uncovered = { missing, total: want.length };
             continue;
           }
           withDesign.push({
@@ -449,7 +447,7 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
         }
       }
     }
-    return { withDesign, plain, hidden };
+    return { withDesign, plain, uncovered };
   })
 
   // Comparison options, questions and the plan for the selected design.
