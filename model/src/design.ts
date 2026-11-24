@@ -48,6 +48,8 @@ export type TensorLabel = {
   mixed: LabelColumn[];
   within: string[];
   constant: [string, string][];
+  /** Trajectories only: the columns that name the last position, which the axes do not. */
+  end?: [string, string][];
 };
 
 export type Design = {
@@ -172,6 +174,13 @@ export class Names {
     const id = this.ids.get(panel);
     const i = panel.arms.findIndex((a) => a.split === split);
     return (id !== undefined && groupName(this.design.labels[id], i)) || split;
+  }
+
+  /** What names a trajectory's last position, as [column, value]: the columns its axes and
+   *  constants leave out. Sibling trajectories differ in these. */
+  endLabel(t: Tensor | undefined): [string, string][] {
+    const id = t ? this.ids.get(t) : undefined;
+    return (id !== undefined && this.design.labels[id]?.end) || [];
   }
 
   /** Sample-label name, for when derived names collide. */
@@ -462,10 +471,34 @@ export function buildPlan(design: Design, choices: DesignChoices, label: Labeler
   const armComparisons = new Map<string, string[]>();
   // What tells one end point from another: the arm it ran in, then the position it ends at. Either
   // alone repeats itself once a design has several arms ending in the same round.
-  const endName = (arm: string, end: Position) => {
-    const where = names.pos(end);
-    return [arm, arm === where ? "" : where].filter((part) => part !== "").join(" · ") || where;
+  /**
+   * What tells one end point of an arm from the others: the end-label columns every one of the
+   * arm's trajectories carries with a differing value. The position's own name is no use where
+   * the lines run in parallel to the same round, as vfp1602's three gates all end in
+   * "antigen-sort R3"; the gate itself is in the end label.
+   */
+  const tellApart = (split: string): string[] => {
+    const ends = armEnds.filter((e) => e.split === split && e.t);
+    if (ends.length < 2) return [];
+    const seen = new Map<string, string[]>();
+    for (const e of ends)
+      for (const [col, value] of names.endLabel(e.t))
+        seen.set(col, [...(seen.get(col) ?? []), value]);
+    return [...seen]
+      .filter(([, vs]) => vs.length === ends.length && new Set(vs).size > 1)
+      .map(([col]) => col);
   };
+  /** Where a trajectory ends, named by what tells it from its siblings, else by its position. */
+  const endOf = (split: string, t: TrajectoryTensor | undefined, end: Position): string => {
+    const cols = tellApart(split);
+    const own = names
+      .endLabel(t)
+      .filter(([col]) => cols.includes(col))
+      .map(([, value]) => value);
+    return own.length ? own.join(" ") : names.pos(end);
+  };
+  const endName = (arm: string, where: string) =>
+    [arm, arm === where ? "" : where].filter((part) => part !== "").join(" · ") || where;
   // Comparison labels in an arm start with the arm's derived name; the column group is that name.
   const groupOf = (arm: ArmIn): Group => ({
     group: arm.name || arm.split,
@@ -560,9 +593,10 @@ export function buildPlan(design: Design, choices: DesignChoices, label: Labeler
       const sibControls = siblings
         .map((p) => b.control(g, p, e.base))
         .filter((x): x is string => !!x);
+      const where = endOf(arm.split, e.t, e.end);
       const name =
         ends.length > 1
-          ? `Specific enrichment, ${g.group} · ${names.pos(e.end)}`
+          ? `Specific enrichment, ${g.group} · ${where}`
           : `Specific enrichment, ${g.group}`;
       const sid = b.score(
         name,
@@ -574,7 +608,7 @@ export function buildPlan(design: Design, choices: DesignChoices, label: Labeler
         [...e.steps, target],
         e.path,
         posKey(e.end),
-        endName(g.group, e.end),
+        endName(g.group, where),
         choices.thresholds?.[posKey(e.end)],
       );
       armOut.push({ split: arm.split, name: g.group, role: "target", score: sid });
@@ -588,13 +622,14 @@ export function buildPlan(design: Design, choices: DesignChoices, label: Labeler
   for (const arm of arms) {
     const group = groupOf(arm).group;
     const name = tensor.type === "trajectory" ? "Path" : group;
-    const pathsOf = arm.segments.length
-      ? arm.segments.map((s) => s.trajectory.positions)
-      : [[...(baseline ? [baseline] : []), ...arm.firstPositions]];
-    for (const ps of pathsOf) {
+    const pathsOf: { positions: Position[]; t?: TrajectoryTensor }[] = arm.segments.length
+      ? arm.segments.map((s) => ({ positions: s.trajectory.positions, t: s.trajectory }))
+      : [{ positions: [...(baseline ? [baseline] : []), ...arm.firstPositions] }];
+    for (const { positions: ps, t } of pathsOf) {
       const live = ps.filter((p) => p.length);
       if (live.length === 0) continue;
-      let label = pathsOf.length > 1 ? `${name} · ${names.pos(live[live.length - 1])}` : name;
+      let label =
+        pathsOf.length > 1 ? `${name} · ${endOf(arm.split, t, live[live.length - 1]!)}` : name;
       if (tracks.some((t) => t.label === label)) label = `${label} (${tracks.length + 1})`;
       tracks.push({ label, group, positions: live.map((p) => b.pos(p)) });
     }
