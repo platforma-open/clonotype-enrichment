@@ -671,6 +671,10 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
             // Skip if axis doesn't match enrichment (e.g. stale results after switching input)
             (col) => col.getSpec().axesSpec[0]?.name === enrichmentAxisName,
           )
+          // The enrichment results are one row per clonotype. A sequence column carrying a second
+          // axis would split each clonotype across that axis' values, fill the top N with copies
+          // and put a "Show for" above the table (alpaca gets one holding only R1_A).
+          .filter((col) => col.getSpec().axesSpec.length === 1)
       : [];
 
     // Assembling feature (or centroid) amino acid sequences — visible by default
