@@ -24,6 +24,7 @@ pfClonotypeFrequencyConv := import(":pf-clonotype-frequency-conv")
 pfDesignConv := import(":pf-design-conv")
 pfDesignPlots := import(":pf-design-plots")
 designEnrichmentSw := assets.importSoftware("@platforma-open/milaboratories.clonotype-enrichment.software:calculate-design-enrichment")
+designPlotsSw := assets.importSoftware("@platforma-open/milaboratories.clonotype-enrichment.software:calculate-design-plots")
 
 // Label for a per-element entity carried on the pl7.app/variantKey axis.
 // Distinguishes synthetic-repertoire-profiler amplicon variants (which stamp
@@ -131,6 +132,29 @@ buildClonotypeDefinitionFile := func(columns, args, abundanceSpec) {
 	return table.build()
 }
 
+// The plan with every label taken out. The file a step is given is what decides whether it runs
+// again, so a plan carrying display text made renaming a sample recompute the enrichment for the
+// same answer. The numbers are built from this; design_plots.py gets the whole plan.
+planStructure := func(plan) {
+	positions := []
+	for p in plan.positions {
+		positions = append(positions, { id: p.id, samples: p.samples })
+	}
+	comparisons := []
+	for c in plan.comparisons {
+		comparisons = append(comparisons, { id: c.id, num: c.num, den: c.den })
+	}
+	scores := []
+	for s in plan.scores {
+		kept := { id: s.id, target: s.target, controls: s.controls, steps: s.steps, path: s.path }
+		if s.threshold != undefined {
+			kept["threshold"] = s.threshold
+		}
+		scores = append(scores, kept)
+	}
+	return { positions: positions, comparisons: comparisons, scores: scores }
+}
+
 // ---- Experiment design (draft) ----
 // When the block runs with a design, `args.design` holds the plan built by the
 // model (see model/src/design.ts). The comparisons come from the plan, not from
@@ -163,18 +187,15 @@ designBody := func(args) {
 		mem("16GiB").
 		cpu(2).
 		addFile("input.csv", runDownsampling.getFile("result.csv")).
-		writeFile("plan.json", json.encode(plan)).
+		writeFile("plan.json", json.encode(planStructure(plan))).
 		arg("--input").arg("input.csv").
 		arg("--plan").arg("plan.json").
 		arg("--output").arg("design_enrichment.csv").
 		arg("--filtered_too_much").arg("filtered_too_much.txt").
 		arg("--pseudo_count").arg(string(args.pseudoCount)).
-		arg("--plot_freq").arg("plot_freq.csv").
-		arg("--plot_bubble").arg("plot_bubble.csv").
-		arg("--plot_control").arg("plot_control.csv").
+		arg("--plot_data").arg("plot_data.csv").
 		arg("--stats").arg("stats.json").
-		arg("--enrichment_threshold").arg(string(args.enrichmentThreshold)).
-		arg("--control_threshold").arg(string(args.controlThreshold))
+		arg("--enrichment_threshold").arg(string(args.enrichmentThreshold))
 	clonotypeDefinitionFile := buildClonotypeDefinitionFile(columns, args, abundanceSpec)
 	if clonotypeDefinitionFile != undefined {
 		cmd = cmd.addFile("clonotypeDefinition.csv", clonotypeDefinitionFile).
@@ -182,11 +203,30 @@ designBody := func(args) {
 	}
 	run := addFilterArgs(cmd, args.FilteringConfig, false).
 		saveFile("design_enrichment.csv").
+		saveFile("plot_data.csv").
+		saveFileContent("filtered_too_much.txt").
+		saveFileContent("stats.json").
+		printErrStreamToStdout().
+		saveStdoutContent().
+		run()
+
+	// Labels enter here, after the numbers are settled: this reads one frame and writes three.
+	plots := exec.builder().
+		software(designPlotsSw).
+		mem("8GiB").
+		cpu(1).
+		addFile("plot_data.csv", run.getFile("plot_data.csv")).
+		writeFile("plan.json", json.encode(plan)).
+		arg("--plot_data").arg("plot_data.csv").
+		arg("--plan").arg("plan.json").
+		arg("--plot_freq").arg("plot_freq.csv").
+		arg("--plot_bubble").arg("plot_bubble.csv").
+		arg("--plot_control").arg("plot_control.csv").
+		arg("--enrichment_threshold").arg(string(args.enrichmentThreshold)).
+		arg("--control_threshold").arg(string(args.controlThreshold)).
 		saveFile("plot_freq.csv").
 		saveFile("plot_bubble.csv").
 		saveFile("plot_control.csv").
-		saveFileContent("filtered_too_much.txt").
-		saveFileContent("stats.json").
 		printErrStreamToStdout().
 		saveStdoutContent().
 		run()
@@ -214,7 +254,7 @@ designBody := func(args) {
 
 	// Plot data. The line and bar plots read the same frame, as in classic mode
 	importPlot := func(file, params) {
-		return pframes.exportFrame(xsv.importFile(run.getFile(file), "csv", params, { cpu: 1, mem: "16GiB" }))
+		return pframes.exportFrame(xsv.importFile(plots.getFile(file), "csv", params, { cpu: 1, mem: "16GiB" }))
 	}
 	freqPf := importPlot("plot_freq.csv", pfDesignPlots.freqColumns(abundanceSpec, len(plan.tracks)))
 	outputs := {

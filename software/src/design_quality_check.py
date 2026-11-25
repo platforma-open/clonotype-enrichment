@@ -13,7 +13,20 @@ import polars as pl
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import design_enrichment  # noqa: E402
+import design_plots  # noqa: E402
 from design_enrichment import quality  # noqa: E402
+
+
+def structure_of(plan: dict) -> dict:
+    """The plan as main.tpl.tengo's planStructure gives it to the enrichment step: no labels."""
+    return {
+        "positions": [{"id": p["id"], "samples": p["samples"]} for p in plan["positions"]],
+        "comparisons": [{"id": c["id"], "num": c["num"], "den": c["den"]} for c in plan["comparisons"]],
+        "scores": [
+            {k: s[k] for k in ("id", "target", "controls", "steps", "path")}
+            for s in plan["scores"]
+        ],
+    }
 
 
 def check_run() -> None:
@@ -52,21 +65,31 @@ def check_run() -> None:
         pl.DataFrame(rows, schema=["sampleId", "elementId", "abundance"], orient="row").write_csv(
             d / "in.csv"
         )
+        # The enrichment step is given the structural plan only. If it ever reads a label again
+        # this raises a KeyError here, which is the point: labels must not reach it.
+        (d / "structure.json").write_text(json.dumps(structure_of(plan)))
         (d / "plan.json").write_text(json.dumps(plan))
         argv = sys.argv
         sys.argv = [
             "design_enrichment.py",
             *("--input", str(d / "in.csv")),
-            *("--plan", str(d / "plan.json")),
+            *("--plan", str(d / "structure.json")),
             *("--output", str(d / "out.csv")),
             *("--filtered_too_much", str(d / "ftm.txt")),
-            *("--plot_freq", str(d / "freq.csv")),
-            *("--plot_bubble", str(d / "bubble.csv")),
-            *("--plot_control", str(d / "control.csv")),
+            *("--plot_data", str(d / "plot_data.csv")),
             *("--stats", str(d / "stats.json")),
         ]
         try:
             design_enrichment.main()
+            sys.argv = [
+                "design_plots.py",
+                *("--plot_data", str(d / "plot_data.csv")),
+                *("--plan", str(d / "plan.json")),
+                *("--plot_freq", str(d / "freq.csv")),
+                *("--plot_bubble", str(d / "bubble.csv")),
+                *("--plot_control", str(d / "control.csv")),
+            ]
+            design_plots.main()
         finally:
             sys.argv = argv
         got = pl.read_csv(d / "out.csv")

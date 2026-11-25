@@ -371,7 +371,10 @@ const conditionOrderOptions = computed(() => mapToOptions([...app.model.data.con
 const roundOptions = computed(() => {
   if (!designMode.value) return conditionOrderOptions.value;
   const plan = app.model.data.designPlan;
-  return plan ? mapToOptions(plan.positions.map((p) => p.label)) : undefined;
+  // The saved value is the position's id, not its label: a label is a derived name, so renaming a
+  // sample used to drop the selection on the floor. Classic mode keeps condition values, which are
+  // the data itself.
+  return plan ? plan.positions.map((p) => ({ value: p.id, label: p.label })) : undefined;
 });
 
 /** Antigens map to their conditions. */
