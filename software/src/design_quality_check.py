@@ -32,7 +32,7 @@ def check_run() -> None:
         "scores": [
             {
                 "id": "s1",
-                "label": "Specific enrichment, arm",
+                "label": "Enrichment, arm",
                 "arm": "arm",
                 "group": "arm",
                 "target": "c1",

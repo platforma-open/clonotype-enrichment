@@ -625,10 +625,9 @@ export function buildPlan(design: Design, choices: DesignChoices, label: Labeler
       const sibControls = siblings
         .map((p) => b.control(g, p, e.base))
         .filter((x): x is string => !!x);
-      const name =
-        ends.length > 1
-          ? `Specific enrichment, ${g.group} · ${where}`
-          : `Specific enrichment, ${g.group}`;
+      // Plain "Enrichment", as the classic block says it. The control background is subtracted
+      // into this number where there is one, which the setting above the table already states.
+      const name = ends.length > 1 ? `Enrichment, ${g.group} · ${where}` : `Enrichment, ${g.group}`;
       const sid = b.score(
         name,
         arm.split,
