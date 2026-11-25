@@ -109,7 +109,7 @@ function setInputChoice(value?: string) {
   setInput(choice.abundanceRef);
   if (choice.designId !== d.designId) {
     d.designComparison = undefined;
-    d.designControlArms = [];
+    d.designControlEnds = [];
     d.designTargetPieces = {};
     d.designPlan = undefined;
   }

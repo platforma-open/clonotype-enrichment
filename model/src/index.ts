@@ -26,7 +26,6 @@ import {
   readAnnotationJson,
 } from "@platforma-sdk/model";
 import {
-  Names,
   TENSOR_COLUMN_NAME,
   TENSOR_SAMPLE_AXIS_ANNOTATION,
   buildPlan,
@@ -83,12 +82,12 @@ export type DesignControlMode = "none" | "pooled";
 /** Whether one cutoff covers the whole run, or each end point carries its own. */
 export type DesignThresholdMode = "global" | "endpoint";
 
-/** The mode in force. Drafts saved before the switch existed keep the arms they had picked. */
+/** The mode in force. Drafts saved before the switch existed keep the controls they had picked. */
 export function designControlMode(data: {
   designControlMode?: DesignControlMode;
-  designControlArms?: string[];
+  designControlEnds?: string[];
 }): DesignControlMode {
-  return data.designControlMode ?? (data.designControlArms?.length ? "pooled" : "none");
+  return data.designControlMode ?? (data.designControlEnds?.length ? "pooled" : "none");
 }
 
 export type BlockData = {
@@ -129,8 +128,8 @@ export type BlockData = {
   designComparison?: string;
   /** Whether the end points marked as controls are used at all. */
   designControlMode?: DesignControlMode;
-  /** Split names of the panel arms marked as controls. */
-  designControlArms?: string[];
+  /** End point keys marked as controls (see `posKey`). */
+  designControlEnds?: string[];
   /** Partition tensor id -> chosen target piece (see `posKey`). */
   designTargetPieces?: Record<string, string>;
   /** Whether the enrichment cutoff is one value for the run or one per end point. */
@@ -466,18 +465,12 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
 
     const comparisons = comparisonOptions(design, label);
     const chosen = ctx.data.designComparison;
-    const tensor = chosen ? design.tensors[chosen] : undefined;
-    const names = new Names(design, label);
-    const arms =
-      tensor?.type === "panel"
-        ? tensor.arms.map((a) => ({ split: a.split, name: names.arm(tensor, a.split) }))
-        : [];
     const result = buildPlan(
       design,
       {
         comparison: chosen,
-        controlArms:
-          designControlMode(ctx.data) === "pooled" ? (ctx.data.designControlArms ?? []) : [],
+        controlEnds:
+          designControlMode(ctx.data) === "pooled" ? (ctx.data.designControlEnds ?? []) : [],
         targetPieces: ctx.data.designTargetPieces ?? {},
         thresholds:
           ctx.data.designThresholdMode === "endpoint" ? (ctx.data.designThresholds ?? {}) : {},
@@ -487,7 +480,6 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
     return {
       designName: design.name,
       comparisons,
-      arms,
       questions: result.questions,
       plan: result.plan,
       error: result.error,

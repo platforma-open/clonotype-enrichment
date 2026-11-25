@@ -265,8 +265,10 @@ function panelSummary(design: Design, t: PanelTensor): string {
 export type DesignChoices = {
   /** Tensor id of the chosen comparison (a panel or a trajectory). */
   comparison?: string;
-  /** Split names of the panel arms the user marked as controls. */
-  controlArms: string[];
+  /** End point keys (see posKey) the user marked as controls. An arm can hold several end
+   *  points, and a design can want one of them as the control of another, as vfp1602 reads its
+   *  low gate against its high one, so the choice is per end point rather than per arm. */
+  controlEnds: string[];
   /** Partition tensor id -> key of the chosen target piece (see posKey). */
   targetPieces: Record<string, string>;
   /** End point key -> its own enrichment cutoff, where the run's global one does not fit it. */
@@ -316,6 +318,8 @@ export type PlanScore = {
   threshold?: number;
 };
 export type PlanArm = { split: string; name: string; role: "target" | "control"; score?: string };
+/** One end point of the comparison, control or not: what the settings offer to tick. */
+export type PlanEnd = { end: string; name: string; role: "target" | "control" };
 export type TargetQuestion = {
   partition: string;
   label: string;
@@ -329,6 +333,8 @@ export type Plan = {
   comparisons: PlanComparison[];
   scores: PlanScore[];
   arms: PlanArm[];
+  /** Every end point in plan order, so a control can be unticked again. */
+  ends: PlanEnd[];
   tracks: PlanTrack[];
 };
 export type PlanResult = {
@@ -588,27 +594,37 @@ export function buildPlan(design: Design, choices: DesignChoices, label: Labeler
   }
 
   // Scores
-  const controlSet = new Set(choices.controlArms);
-  const controlIds = arms
-    .filter((a) => controlSet.has(a.split))
-    .flatMap((a) => armComparisons.get(a.split) ?? [])
+  const controlSet = new Set(choices.controlEnds);
+  const isControl = (e: { end: Position }) => controlSet.has(posKey(e.end));
+  // Every step along a control end point's own path, pooled with the others: a sequence counts as
+  // a hit only where it beat the best of them.
+  const controlIds = armEnds
+    .filter(isControl)
+    .flatMap((e) => e.steps)
     .filter((id) => b.kindOf(id) === "step");
   const armOut: PlanArm[] = [];
+  const endOut: PlanEnd[] = [];
   for (const arm of arms) {
     const g = groupOf(arm);
-    if (controlSet.has(arm.split)) {
-      armOut.push({ split: arm.split, name: g.group, role: "control" });
-      continue;
-    }
     const ends = armEnds.filter((e) => e.split === arm.split);
+    const controls = ends.filter(isControl).length;
+    armOut.push({
+      split: arm.split,
+      name: g.group,
+      role: controls === ends.length && ends.length > 0 ? "control" : "target",
+    });
     for (const e of ends) {
+      const where = endOf(arm.split, e.t, e.end);
+      if (isControl(e)) {
+        endOut.push({ end: posKey(e.end), name: endName(g.group, where), role: "control" });
+        continue;
+      }
       const target = b.step(g, e.end, e.base, true);
       if (!target) continue;
       const siblings = e.t ? b.siblingsOf(e.t, e.i) : [];
       const sibControls = siblings
         .map((p) => b.control(g, p, e.base))
         .filter((x): x is string => !!x);
-      const where = endOf(arm.split, e.t, e.end);
       const name =
         ends.length > 1
           ? `Specific enrichment, ${g.group} · ${where}`
@@ -626,18 +642,17 @@ export function buildPlan(design: Design, choices: DesignChoices, label: Labeler
         endName(g.group, where),
         choices.thresholds?.[posKey(e.end)],
       );
-      armOut.push({ split: arm.split, name: g.group, role: "target", score: sid });
+      endOut.push({ end: posKey(e.end), name: endName(g.group, where), role: "target" });
+      armOut[armOut.length - 1]!.score ??= sid;
     }
-    if (ends.length === 0) armOut.push({ split: arm.split, name: g.group, role: "target" });
   }
 
-  // Tracks: every trajectory of a target arm, so the frequency plots can follow each one. An arm
-  // with no trajectory is its baseline then its pieces. A control arm has no score and so no top
-  // sequences of its own, and counting it would leave a design with one target arm facetted by a
+  // Tracks: every trajectory that ends in a target, so the frequency plots can follow each one. An
+  // arm with no trajectory is its baseline then its pieces. A control end point has no score and so
+  // no top sequences of its own, and counting it would leave a design with one target facetted by a
   // single path.
   const tracks: PlanTrack[] = [];
   for (const arm of arms) {
-    if (controlSet.has(arm.split)) continue;
     const group = groupOf(arm).group;
     const name = tensor.type === "trajectory" ? "Path" : group;
     const pathsOf: { positions: Position[]; t?: TrajectoryTensor }[] = arm.segments.length
@@ -645,7 +660,7 @@ export function buildPlan(design: Design, choices: DesignChoices, label: Labeler
       : [{ positions: [...(baseline ? [baseline] : []), ...arm.firstPositions] }];
     for (const { positions: ps, t } of pathsOf) {
       const live = ps.filter((p) => p.length);
-      if (live.length === 0) continue;
+      if (live.length === 0 || controlSet.has(posKey(live[live.length - 1]!))) continue;
       let label =
         pathsOf.length > 1 ? `${name} · ${endOf(arm.split, t, live[live.length - 1]!)}` : name;
       if (tracks.some((t) => t.label === label)) label = `${label} (${tracks.length + 1})`;
@@ -663,6 +678,7 @@ export function buildPlan(design: Design, choices: DesignChoices, label: Labeler
       comparisons: b.comparisons,
       scores: b.scores,
       arms: armOut,
+      ends: endOut,
       tracks,
     },
   };

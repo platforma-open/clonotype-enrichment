@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Settings shown instead of the condition / antigen settings when a design is
 // selected in the abundance dropdown (draft). Everything the design answers is
-// not asked: only the comparison, the control arms and, where trajectories end
+// not asked: only the comparison, the controls and, where trajectories end
 // in different pieces of one separation, the target piece.
 import type {
   DesignControlMode,
@@ -47,18 +47,16 @@ const comparisonOptions = computed(() =>
   })),
 );
 
-/** One checkbox per arm, labelled by its name. */
-const arms = sticky(() => view.value?.arms);
-const armOptions = computed(() =>
-  arms.value.map(({ split, name }) => ({ value: split, label: name })),
-);
+/** One checkbox per end point, control or not, so a control can be unticked again. */
+const ends = sticky(() => view.value?.plan?.ends);
+const endOptions = computed(() => ends.value.map(({ end, name }) => ({ value: end, label: name })));
 
-const controlArms = computed({
-  get: () => app.model.data.designControlArms ?? [],
-  set: (v: string[]) => (app.model.data.designControlArms = v),
+const controlEnds = computed({
+  get: () => app.model.data.designControlEnds ?? [],
+  set: (v: string[]) => (app.model.data.designControlEnds = v),
 });
 
-/** No control at all, or the ticked arms taken together as the background to subtract. */
+/** No control at all, or the ticked end points taken together as the background to subtract. */
 const controlMode = computed({
   get: () => designControlMode(app.model.data),
   set: (v: DesignControlMode) => (app.model.data.designControlMode = v),
@@ -110,21 +108,21 @@ const questions = sticky(() => view.value?.questions);
     required
   />
 
-  <template v-if="armOptions.length > 0">
+  <template v-if="endOptions.length > 0">
     <PlBtnGroup v-model="controlMode" :options="controlModeOptions" label="Control" :compact="true">
       <template #tooltip>
-        Enables specificity analysis by comparing your target against control arms.<br /><br />
+        Enables specificity analysis by comparing your target against control end points.<br /><br />
         You can select multiple negative controls (e.g. irrelevant antigens). The analysis
         calculates enrichment for each one independently and subtracts the
         <strong>maximum value</strong> found across all controls, as a baseline for background
-        binding. This discounts "sticky" or non-specific sequences that appear in your control arms.
+        binding. This discounts "sticky" or non-specific sequences that appear in your controls.
       </template>
     </PlBtnGroup>
     <PlCheckboxGroup
       v-if="controlMode === 'pooled'"
-      v-model="controlArms"
-      :options="armOptions"
-      label="Control arms"
+      v-model="controlEnds"
+      :options="endOptions"
+      label="Control end points"
     />
   </template>
 
