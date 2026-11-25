@@ -1,27 +1,26 @@
 // Experiment design support (draft).
 //
-// Reads the design tensors published in the result pool (column
-// `pl7.app/design/tensors`, axes [designId, tensorId], one JSON tensor per
-// cell, its STEP 3 label inside) and turns the user's choices into an analysis plan that the workflow
-// computes. The tensor shape follows the spec draft "Each tensor is a JSON
-// object with a fixed shape" (schemaVersion 1).
+// Reads an experiment design published in the result pool as an object of its own
+// (`kind: "ExperimentDesign"`, name `pl7.app/design`, one per design) and turns the user's choices
+// into an analysis plan that the workflow computes. The object files its tensors under four
+// sections by type and keeps every name in `labels`.
 //
 // Everything here is pure: no SDK calls, so it can be unit-tested and reused
 // by the UI.
 
-export const TENSOR_COLUMN_NAME = "pl7.app/design/tensors";
-export const TENSOR_SAMPLE_AXIS_ANNOTATION = "pl7.app/design/sampleAxis";
+export const DESIGN_OBJECT_KIND = "ExperimentDesign";
+export const DESIGN_OBJECT_NAME = "pl7.app/design";
+/** The sample axis the ids in `positions` belong to, so a block can find the data that covers them. */
+export const DESIGN_SAMPLE_AXIS_ANNOTATION = "pl7.app/design/sampleAxis";
+/** Every sample the design names, so coverage is checked without reading the object's data. */
+export const DESIGN_SAMPLES_ANNOTATION = "pl7.app/design/samples";
 export const SUPPORTED_SCHEMA_VERSION = 1;
 
 export type Position = string[];
 export type StepKind = "selection" | "piece" | "portion" | "timecourse";
 
-type TensorBase = {
-  schemaVersion: number;
-  designName: string;
-  datasets: string[];
-  label?: TensorLabel;
-};
+/** A tensor as this block works with it: structure, plus the label looked up for it. */
+type TensorBase = { label?: TensorLabel };
 
 export type TrajectoryTensor = TensorBase & {
   type: "trajectory";
@@ -60,31 +59,55 @@ export type Design = {
   labels: Record<string, TensorLabel>;
 };
 
-/** Content of a `PColumnData/Json` resource: keys are JSON arrays of axis values. */
-export type JsonColumnData = { keyLength: number; data: Record<string, unknown> };
+/**
+ * The published design object. Samples & Data owns this shape
+ * (`samples-and-data/model/src/design_tensors`, type `ExperimentDesignData`); it is repeated here
+ * because the two blocks share no package. A section says what a tensor is, so nothing reads a
+ * type out of an id, and `labels` holds everything meant for a reader.
+ */
+export type ExperimentDesignData = {
+  schemaVersion: number;
+  trajectories: Record<
+    string,
+    { positions: Position[]; pieceOf: (string | null)[]; steps: StepKind[] }
+  >;
+  partitions: Record<string, { positions: Position[] }>;
+  panels: Record<string, { anchor: { material: string; reads: string[] }; arms: PanelArm[] }>;
+  recurrence: { positions: Position[] } | null;
+  labels: {
+    materials: Record<string, string>;
+    trajectories: Record<string, TensorLabel>;
+    partitions: Record<string, TensorLabel>;
+    panels: Record<string, TensorLabel>;
+    recurrence?: TensorLabel;
+  };
+};
 
-/** Groups the cells of a tensor column into designs. Unknown schema versions are skipped. */
-export function readDesigns(content: JsonColumnData | undefined): Design[] {
-  if (!content?.data) return [];
-  const byId = new Map<string, Design>();
-  for (const [key, value] of Object.entries(content.data)) {
-    let designId: string, tensorId: string, tensor: Tensor;
-    try {
-      [designId, tensorId] = JSON.parse(key) as [string, string];
-      tensor = (typeof value === "string" ? JSON.parse(value) : value) as Tensor;
-    } catch {
-      continue;
-    }
-    if (tensor?.schemaVersion !== SUPPORTED_SCHEMA_VERSION) continue;
-    let d = byId.get(designId);
-    if (!d) {
-      d = { designId, name: tensor.designName || designId, tensors: {}, labels: {} };
-      byId.set(designId, d);
-    }
-    d.tensors[tensorId] = tensor;
-    if (tensor.label) d.labels[tensorId] = tensor.label;
-  }
-  return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
+/**
+ * One published design, flattened into the map the rest of this file works with. The type a
+ * section gave is carried on each tensor, so no id is ever parsed. An unknown schema version
+ * gives undefined rather than a half-read design.
+ */
+export function readDesign(
+  data: ExperimentDesignData | undefined,
+  designId: string,
+  name: string,
+): Design | undefined {
+  if (data?.schemaVersion !== SUPPORTED_SCHEMA_VERSION) return undefined;
+  const design: Design = { designId, name: name || designId, tensors: {}, labels: {} };
+  const put = (id: string, tensor: Tensor, label: TensorLabel | undefined) => {
+    design.tensors[id] = label ? { ...tensor, label } : tensor;
+    if (label) design.labels[id] = label;
+  };
+  for (const [id, t] of Object.entries(data.trajectories))
+    put(id, { type: "trajectory", ...t }, data.labels.trajectories[id]);
+  for (const [id, t] of Object.entries(data.partitions))
+    put(id, { type: "partition", ...t }, data.labels.partitions[id]);
+  for (const [id, t] of Object.entries(data.panels))
+    put(id, { type: "panel", ...t }, data.labels.panels[id]);
+  if (data.recurrence)
+    put("recurrence", { type: "recurrence", ...data.recurrence }, data.labels.recurrence);
+  return design;
 }
 
 /** Every sample the design's tensors name. A design can only be analysed where all of these

@@ -73,7 +73,7 @@ const inputValue = computed(() => {
     d.designId !== undefined
       ? JSON.stringify({
           abundanceRef: d.abundanceRef,
-          designTensorsRef: d.designTensorsRef,
+          designRef: d.designRef,
           designId: d.designId,
         })
       : JSON.stringify({ abundanceRef: d.abundanceRef });
@@ -87,8 +87,8 @@ const inputValue = computed(() => {
         JSON.stringify(x.abundanceRef?.blockId) === JSON.stringify(y.abundanceRef?.blockId) &&
         x.abundanceRef?.name === y.abundanceRef?.name &&
         x.designId === y.designId &&
-        x.designTensorsRef?.blockId === y.designTensorsRef?.blockId &&
-        x.designTensorsRef?.name === y.designTensorsRef?.name
+        x.designRef?.blockId === y.designRef?.blockId &&
+        x.designRef?.name === y.designRef?.name
       );
     } catch {
       return false;
@@ -102,7 +102,7 @@ function setInputChoice(value?: string) {
   if (!value) {
     setInput(undefined);
     d.designId = undefined;
-    d.designTensorsRef = undefined;
+    d.designRef = undefined;
     return;
   }
   const choice = JSON.parse(value) as InputChoice;
@@ -114,7 +114,7 @@ function setInputChoice(value?: string) {
     d.designPlan = undefined;
   }
   d.designId = choice.designId;
-  d.designTensorsRef = choice.designTensorsRef;
+  d.designRef = choice.designRef;
 }
 
 // Default comparison: the first panel, else the first path. Also replaces a saved choice the
