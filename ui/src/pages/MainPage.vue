@@ -189,8 +189,7 @@ watchEffect(() => {
     label = label ? `${label}, ${filteringLabel}` : filteringLabel;
   }
 
-  // uncommitted: marks the experiment-design build apart in the project sidebar
-  app.model.data.defaultBlockLabel = label ? `(exp design) ${label}` : "(exp design)";
+  app.model.data.defaultBlockLabel = label;
 });
 
 // Persist the auto-discovered per-clonotype abundance so the workflow can
@@ -898,7 +897,7 @@ const isControlOrderOpen = ref(true); // Open by default
   <PlBlockPage
     v-model:subtitle="app.model.data.customBlockLabel"
     :subtitle-placeholder="app.model.data.defaultBlockLabel"
-    title="Enrichment Analysis (exp design)"
+    title="Enrichment Analysis"
   >
     <template #append>
       <PlBtnGhost @click.stop="() => (statsOpen = true)">
