@@ -58,14 +58,14 @@ const controlArms = computed({
   set: (v: string[]) => (app.model.data.designControlArms = v),
 });
 
-/** No control at all, or every ticked end point pooled into one veto. */
+/** No control at all, or the ticked arms taken together as the background to subtract. */
 const controlMode = computed({
   get: () => designControlMode(app.model.data),
   set: (v: DesignControlMode) => (app.model.data.designControlMode = v),
 });
 const controlModeOptions = [
-  { value: "none" as const, label: "No control" },
-  { value: "pooled" as const, label: "Pooled control" },
+  { value: "none" as const, label: "No controls" },
+  { value: "pooled" as const, label: "Negative controls" },
 ];
 
 function setTarget(partition: string, value: string | undefined) {
