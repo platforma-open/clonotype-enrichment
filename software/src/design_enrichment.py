@@ -205,6 +205,9 @@ def quality(out: pl.DataFrame, s: dict, threshold: float) -> pl.Expr:
 def write_plots(args, plan: dict, res: pl.DataFrame) -> None:
     """Plot data from the results: comparisons, scores and per-position frequencies (f_<pid>)."""
     names = {p["id"]: p.get("name") or p["label"] for p in plan["positions"]}
+    # The frequency plot's x axis: the step without the piece it is of, so round 1 of every
+    # parallel line lands on one tick instead of one tick per line. The piece names the facet.
+    steps = {p["id"]: p.get("step") or p.get("name") or p["label"] for p in plan["positions"]}
     cmp_ids = [c["id"] for c in plan["comparisons"]]
     score_ids = [s["id"] for s in plan["scores"]]
 
@@ -235,7 +238,7 @@ def write_plots(args, plan: dict, res: pl.DataFrame) -> None:
                     "elementId",
                     pl.lit(t["label"]).alias("Track"),
                     # numbered so the plots keep the path's order
-                    pl.lit(f"{k + 1:0{width}d}. {names[pid]}").alias("Condition"),
+                    pl.lit(f"{k + 1:0{width}d}. {steps[pid]}").alias("Condition"),
                     f.alias("Frequency"),
                     pl.when((f > 0) & (pl.col(first) > 0)).then((f / pl.col(first)).log(2))
                     .otherwise(None).alias("EnrichmentVsBaseline"),

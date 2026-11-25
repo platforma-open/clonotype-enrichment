@@ -29,14 +29,18 @@ doubleColumn := func(column, id, name, label, format, extra) {
 	}
 }
 
-// Line and bar plots: top clones' frequency along each path of the plan
-freqColumns := func(abundanceSpec) {
+// Line and bar plots: top clones' frequency along each path of the plan. The path axis only
+// where the plan holds more than one: a single path facetted by itself is a strip with one title.
+freqColumns := func(abundanceSpec, tracks) {
+	axes := [
+		{ column: "elementId", spec: abundanceSpec.axesSpec[1] },
+		stringAxis("Condition", "pl7.app/condition", "Position")
+	]
+	if tracks > 1 {
+		axes = append(axes, stringAxis("Track", PATH_AXIS, "Path"))
+	}
 	return {
-		axes: [
-			{ column: "elementId", spec: abundanceSpec.axesSpec[1] },
-			stringAxis("Condition", "pl7.app/condition", "Position"),
-			stringAxis("Track", PATH_AXIS, "Path")
-		],
+		axes: axes,
 		columns: [
 			doubleColumn("Frequency", "frequency", "pl7.app/frequency", "Frequency", ".2e", {}),
 			doubleColumn("EnrichmentVsBaseline", "enrichmentVsBaseline", "pl7.app/enrichmentVsBaseline",

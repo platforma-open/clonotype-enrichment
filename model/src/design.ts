@@ -122,6 +122,7 @@ export function groupName(label: TensorLabel | undefined, i: number): string | u
 /** Display names for one design, from its labels; sample labels where there are none. */
 export class Names {
   private byPos = new Map<string, string>();
+  private byStep = new Map<string, string>();
   private pieces = new Map<string, Map<string, string>>(); // partition id -> position key -> name
   private ids = new Map<Tensor, string>();
   readonly derived: boolean;
@@ -149,9 +150,10 @@ export class Names {
       t.positions.forEach((p, i) => {
         const k = posKey(p);
         if (!p.length || this.byPos.has(k)) return;
-        const parts = [groupName(design.labels[id], i), this.piece(t.pieceOf[i], p)];
-        const n = parts.filter(Boolean).join(" ");
+        const own = groupName(design.labels[id], i);
+        const n = [own, this.piece(t.pieceOf[i], p)].filter(Boolean).join(" ");
         if (n) this.byPos.set(k, n);
+        if (own) this.byStep.set(k, own);
       });
     }
     for (const m of this.pieces.values())
@@ -161,6 +163,11 @@ export class Names {
   /** A position: derived name, else its sample labels. */
   pos(p: Position): string {
     return this.byPos.get(posKey(p)) ?? this.sampleLabel(p);
+  }
+
+  /** A position without the piece it is of: what the parallel lines have in common at this step. */
+  step(p: Position): string {
+    return this.byStep.get(posKey(p)) ?? this.pos(p);
   }
 
   /** A piece of a separation by what tells it from the other pieces, else as a position. */
@@ -267,7 +274,15 @@ export type DesignChoices = {
 };
 
 /** `label` is the samples' labels (unique); `name` is the derived display name. */
-export type PlanPosition = { id: string; label: string; name: string; samples: string[] };
+export type PlanPosition = {
+  id: string;
+  label: string;
+  name: string;
+  /** `name` without the piece it is of, so a step shared by parallel lines reads the same in all
+   *  of them. The piece is what the lines are facetted by, so repeating it crowds the x axis. */
+  step: string;
+  samples: string[];
+};
 /** One trajectory of the comparison, for the frequency plots: its positions in order, and the
  *  comparison group (arm) it belongs to. */
 export type PlanTrack = { label: string; group: string; positions: string[] };
@@ -616,10 +631,13 @@ export function buildPlan(design: Design, choices: DesignChoices, label: Labeler
     if (ends.length === 0) armOut.push({ split: arm.split, name: g.group, role: "target" });
   }
 
-  // Tracks: every trajectory of the comparison (target pieces and their siblings alike), so the
-  // frequency plots can follow each one. An arm with no trajectory is its baseline then its pieces.
+  // Tracks: every trajectory of a target arm, so the frequency plots can follow each one. An arm
+  // with no trajectory is its baseline then its pieces. A control arm has no score and so no top
+  // sequences of its own, and counting it would leave a design with one target arm facetted by a
+  // single path.
   const tracks: PlanTrack[] = [];
   for (const arm of arms) {
+    if (controlSet.has(arm.split)) continue;
     const group = groupOf(arm).group;
     const name = tensor.type === "trajectory" ? "Path" : group;
     const pathsOf: { positions: Position[]; t?: TrajectoryTensor }[] = arm.segments.length
@@ -677,6 +695,7 @@ class PlanBuilder {
         id,
         label: this.names.fallback(p),
         name: this.names.pos(p),
+        step: this.names.step(p),
         samples: [...p].sort(),
       });
     }

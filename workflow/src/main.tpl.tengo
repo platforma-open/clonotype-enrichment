@@ -216,7 +216,7 @@ designBody := func(args) {
 	importPlot := func(file, params) {
 		return pframes.exportFrame(xsv.importFile(run.getFile(file), "csv", params, { cpu: 1, mem: "16GiB" }))
 	}
-	freqPf := importPlot("plot_freq.csv", pfDesignPlots.freqColumns(abundanceSpec))
+	freqPf := importPlot("plot_freq.csv", pfDesignPlots.freqColumns(abundanceSpec, len(plan.tracks)))
 	outputs := {
 		enrichmentPf: pframes.exportFrame(designPf),
 		filteredTooMuch: run.getFileContent("filtered_too_much.txt"),
