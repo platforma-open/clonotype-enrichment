@@ -625,6 +625,11 @@ export function buildPlan(design: Design, choices: DesignChoices, label: Labeler
       const sibControls = siblings
         .map((p) => b.control(g, p, e.base))
         .filter((x): x is string => !!x);
+      // A control that shares a step with this end point cannot speak against it: where the two
+      // ran together, whatever rose did so in both. Dropping those leaves the control saying only
+      // what happened after they parted.
+      const own = new Set([...e.steps, target]);
+      const pooled = controlIds.filter((id) => !own.has(id));
       // Plain "Enrichment", as the classic block says it. The control background is subtracted
       // into this number where there is one, which the setting above the table already states.
       const name = ends.length > 1 ? `Enrichment, ${g.group} · ${where}` : `Enrichment, ${g.group}`;
@@ -633,7 +638,7 @@ export function buildPlan(design: Design, choices: DesignChoices, label: Labeler
         arm.split,
         g.group,
         target,
-        [...controlIds, ...sibControls],
+        [...pooled, ...sibControls],
         // the end point's own comparison counts towards its Max Log2FC, and `score` dedupes
         [...e.steps, target],
         e.path,
