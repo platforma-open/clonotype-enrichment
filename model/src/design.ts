@@ -290,6 +290,12 @@ export type PlanPosition = {
 export type PlanTrack = { label: string; group: string; positions: string[] };
 export type PlanComparison = {
   id: string;
+  /** What this comparison is, as its two sample sets. `id` is a running number, so it moves when
+   *  another comparison appears or goes; this does not, and it is what the exported column's
+   *  domain carries, so a block that remembers one of our columns still finds it.
+   *  ponytail: a plain pair of posKeys, long for a pooled side; hash it if a domain value ever
+   *  has to be short. */
+  key: string;
   label: string;
   /** Column group in the results: "Trunk", an arm's split name, or "Controls". */
   group: string;
@@ -747,7 +753,8 @@ class PlanBuilder {
     if (this.labels.has(text)) text = label((p) => this.names.fallback(p), false);
     if (this.labels.has(text)) text = `${text} (${id})`;
     this.labels.add(text);
-    this.comparisons.push({ id, label: text, group: g.group, kind, num: n, den: d });
+    const key = `${posKey(num)}/${posKey(den)}`;
+    this.comparisons.push({ id, key, label: text, group: g.group, kind, num: n, den: d });
     return id;
   }
 

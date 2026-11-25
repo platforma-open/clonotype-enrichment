@@ -14,8 +14,11 @@ getColumns := func(abundanceSpec, plan, blockId, enrichmentThreshold) {
 	}
 
 	columns := []
-	// One result column. `domainId` is the plan column it belongs to, so an end point's score, its
-	// Max Log2FC and its Enrichment Quality share one domain and are told apart by the type.
+	// One result column. `domainId` says what the column is about, not where it sits in the plan:
+	// a comparison's two sample sets, an end point's own key. Marking an arm as a control drops its
+	// score, which used to shift every later `s2` down a place and silently re-point a block that
+	// had remembered one of ours. An end point's score, its Max Log2FC and its Enrichment Quality
+	// share one domain and are told apart by the type.
 	add := func(id, domainId, valueType, kind, label, group, priority, extra) {
 		columns = append(columns, {
 			column: id,
@@ -44,7 +47,7 @@ getColumns := func(abundanceSpec, plan, blockId, enrichmentThreshold) {
 	}
 
 	for i, c in plan.comparisons {
-		add(c.id, c.id, "Double", "designComparison", c.label, c.group, 9000 - i, {
+		add(c.id, c.key, "Double", "designComparison", c.label, c.group, 9000 - i, {
 			"pl7.app/table/visibility": "optional",
 			"pl7.app/format": ".2f"
 		})
@@ -55,11 +58,11 @@ getColumns := func(abundanceSpec, plan, blockId, enrichmentThreshold) {
 		if s.threshold != undefined {
 			cutoff = s.threshold
 		}
-		add(s.id, s.id, "Double", "designScore", s.label, group, 95000 - i, maps.merge(asScore, {
+		add(s.id, s.end, "Double", "designScore", s.label, group, 95000 - i, maps.merge(asScore, {
 			"pl7.app/score/defaultCutoff": string(cutoff)
 		}))
-		add(s.id + "_max", s.id, "Double", "designMax", "Max Log2FC, " + group, group, 94000 - i, asScore)
-		add(s.id + "_quality", s.id, "String", "designQuality", "Enrichment Quality, " + group, group, 93000 - i, {
+		add(s.id + "_max", s.end, "Double", "designMax", "Max Log2FC, " + group, group, 94000 - i, asScore)
+		add(s.id + "_quality", s.end, "String", "designQuality", "Enrichment Quality, " + group, group, 93000 - i, {
 			"pl7.app/table/visibility": "default"
 		})
 	}
