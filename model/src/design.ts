@@ -661,7 +661,10 @@ export function buildPlan(design: Design, choices: DesignChoices, label: Labeler
       const pooled = controlIds.filter((id) => !own.has(id));
       // Plain "Enrichment", as the classic block says it. The control background is subtracted
       // into this number where there is one, which the setting above the table already states.
-      const name = ends.length > 1 ? `Enrichment, ${g.group} · ${where}` : `Enrichment, ${g.group}`;
+      // Named as classic mode names it, beside the Max Log2FC and Enrichment Quality columns that
+      // already carry classic's names.
+      const name =
+        ends.length > 1 ? `Overall Log2FC, ${g.group} · ${where}` : `Overall Log2FC, ${g.group}`;
       const sid = b.score(
         name,
         arm.split,

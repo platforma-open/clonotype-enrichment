@@ -45,7 +45,7 @@ def check_run() -> None:
         "scores": [
             {
                 "id": "s1",
-                "label": "Enrichment, arm",
+                "label": "Overall Log2FC, arm",
                 "arm": "arm",
                 "group": "arm",
                 "target": "c1",
