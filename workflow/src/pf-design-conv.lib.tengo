@@ -46,8 +46,10 @@ getColumns := func(abundanceSpec, plan, blockId, enrichmentThreshold) {
 		"pl7.app/format": ".2f"
 	}
 
+	// the plan's label names the two ends ("SKOV3: R2 vs R1"); every other Double here says what
+	// the number is, and the comparison column held the only figure the table did not name
 	for i, c in plan.comparisons {
-		add(c.id, c.key, "Double", "designComparison", c.label, c.group, 9000 - i, {
+		add(c.id, c.key, "Double", "designComparison", "Log2FC " + c.label, c.group, 9000 - i, {
 			"pl7.app/table/visibility": "optional",
 			"pl7.app/format": ".2f"
 		})
