@@ -219,20 +219,6 @@ export class Names {
   }
 }
 
-/** Axis ids are equal when type, name and every domain entry are equal (any key order). */
-export function sameAxisId(
-  a: { type?: string; name: string; domain?: Record<string, string> } | undefined,
-  b: { type?: string; name: string; domain?: Record<string, string> } | undefined,
-): boolean {
-  if (!a || !b) return false;
-  if (a.name !== b.name || (a.type ?? "") !== (b.type ?? "")) return false;
-  const da = a.domain ?? {};
-  const db = b.domain ?? {};
-  const ka = Object.keys(da);
-  if (ka.length !== Object.keys(db).length) return false;
-  return ka.every((k) => da[k] === db[k]);
-}
-
 // ---------------------------------------------------------------------------
 // Comparisons offered for a design
 // ---------------------------------------------------------------------------

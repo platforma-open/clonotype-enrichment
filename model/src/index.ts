@@ -7,6 +7,7 @@ import type {
 import { kind } from "@platforma-open/milaboratories.clonotype-enrichment.kind";
 import type {
   AnchoredPColumnSelector,
+  AxisId,
   PColumnIdAndSpec,
   PFrameHandle,
   PlDataTableStateV2,
@@ -19,6 +20,7 @@ import {
   ColumnsCollection,
   DataColumn,
   DataModelBuilder,
+  canonicalizeAxisId,
   createPFrameForGraphs,
   createPlDataTableStateV2,
   createPlDataTableV3,
@@ -33,7 +35,6 @@ import {
   buildPlan,
   comparisonOptions,
   readDesign,
-  sameAxisId,
   type Design,
   type ExperimentDesignData,
   type Plan,
@@ -401,10 +402,11 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
           return undefined;
         }
       };
-      const axis = parse<{ type?: string; name: string; domain?: Record<string, string> }>(
-        DESIGN_SAMPLE_AXIS_ANNOTATION,
-      );
-      if (!sameAxisId(axis, sampleAxis)) continue;
+      // `getAxisId` behind this drops an empty domain, so the design's axis and the column's
+      // compare equal however each of the two was written.
+      const axis = parse<AxisId>(DESIGN_SAMPLE_AXIS_ANNOTATION);
+      if (!axis || !sampleAxis) continue;
+      if (canonicalizeAxisId(axis) !== canonicalizeAxisId(sampleAxis)) continue;
       const designId = spec?.domain?.["pl7.app/design/designId"] ?? opt.ref.name;
       // Strict containment: every sample the design names must carry abundance here, so a
       // plan never reaches the workflow with a position that has no data behind it.
