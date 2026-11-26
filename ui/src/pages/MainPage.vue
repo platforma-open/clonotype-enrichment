@@ -98,7 +98,6 @@ watchEffect(() => {
     ...d,
     designId: undefined,
     designRef: undefined,
-    designComparison: undefined,
     designControlEnds: [],
     designTargetPieces: {},
     designPlan: undefined,
@@ -110,24 +109,12 @@ function setDesign(designId?: string) {
   const d = app.model.data;
   if (designId === d.designId) return;
   uncovered.value = undefined;
-  d.designComparison = undefined;
   d.designControlEnds = [];
   d.designTargetPieces = {};
   d.designPlan = undefined;
   d.designId = designId;
   d.designRef = app.model.outputs.designOptions?.options.find((o) => o.designId === designId)?.ref;
 }
-
-// Default comparison: the first panel, else the first path. Also replaces a saved choice the
-// design no longer offers. Written with updateData, as it reacts to an output (see below).
-watchEffect(() => {
-  const view = app.model.outputs.designView;
-  if (!designMode.value || !view?.comparisons?.length) return;
-  const current = app.model.data.designComparison;
-  if (current && view.comparisons.some((c) => c.value === current)) return;
-  const first = view.comparisons[0].value;
-  void app.updateData((d) => ({ ...d, designComparison: first }));
-});
 
 // The args lambda has no access to the result pool, so the plan built by the
 // `designView` output is copied into the block data, as is done for

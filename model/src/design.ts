@@ -199,6 +199,18 @@ export class Names {
     return this.pieces.get(partition)?.get(posKey(p));
   }
 
+  /**
+   * A trajectory planned on its own, named by what holds still along the whole of it: the columns
+   * its own positions agree on are what tell it from its siblings, which is the job an arm name
+   * does inside a panel. Without this a lone trajectory is called "path", and two of them in one
+   * plan are told apart only by an id.
+   */
+  path(t: Tensor): string {
+    const id = this.ids.get(t);
+    const constant = (id !== undefined && this.design.labels[id]?.constant) || [];
+    return constant.map(([, value]) => value).join(" · ");
+  }
+
   /** Arm `split` of a panel tensor. */
   arm(panel: PanelTensor, split: string): string {
     const id = this.ids.get(panel);
@@ -272,8 +284,6 @@ function panelSummary(design: Design, t: PanelTensor): string {
 // ---------------------------------------------------------------------------
 
 export type DesignChoices = {
-  /** Tensor id of the chosen comparison (a panel or a trajectory). */
-  comparison?: string;
   /** End point keys (see posKey) the user marked as controls. An arm can hold several end
    *  points, and a design can want one of them as the control of another, as vfp1602 reads its
    *  low gate against its high one, so the choice is per end point rather than per arm. */
@@ -390,17 +400,14 @@ type Segment = {
  * is asked.
  */
 
-export function buildPlan(design: Design, choices: DesignChoices, label: Labeler): PlanResult {
-  const tensor = choices.comparison ? design.tensors[choices.comparison] : undefined;
-  // No comparison yet means the UI has not written the default back; the alert would only blink.
-  if (!tensor)
-    return {
-      questions: [],
-      error: comparisonOptions(design, label).length
-        ? undefined
-        : "This design has nothing to compare",
-    };
-  if (tensor.type !== "panel" && tensor.type !== "trajectory")
+function planTensor(
+  design: Design,
+  tensorId: string,
+  choices: DesignChoices,
+  label: Labeler,
+): PlanResult {
+  const tensor = design.tensors[tensorId];
+  if (tensor?.type !== "panel" && tensor?.type !== "trajectory")
     return { questions: [], error: "This comparison type is not supported yet" };
 
   const names = new Names(design, label);
@@ -434,7 +441,7 @@ export function buildPlan(design: Design, choices: DesignChoices, label: Labeler
   } else {
     arms.push({
       split: "path",
-      name: "",
+      name: names.path(tensor),
       segments: [{ trajectory: tensor, from: 1 }],
       firstPositions: [],
     });
@@ -695,7 +702,7 @@ export function buildPlan(design: Design, choices: DesignChoices, label: Labeler
     plan: {
       designId: design.designId,
       designName: design.name,
-      comparison: choices.comparison!,
+      comparison: tensorId,
       positions: b.positions,
       comparisons: b.comparisons,
       scores: b.scores,
@@ -703,6 +710,138 @@ export function buildPlan(design: Design, choices: DesignChoices, label: Labeler
       ends: endOut,
       tracks,
     },
+  };
+}
+
+/**
+ * The plan for a whole design: every tensor that yields a score, in one plan.
+ *
+ * A design is not a menu. A panel and the trajectories it covers are the same samples seen at one
+ * remove, so the panel is planned and they are not; two panels over separate material are two
+ * halves of one experiment and both belong in the results. What is left out is only what cannot be
+ * computed: a fork whose arms hold a single sample each has nothing to measure along them, and
+ * offering it as a choice is how a design came to sit on "Data is not computed" with a second
+ * comparison right beneath it that worked.
+ */
+export function buildPlan(design: Design, choices: DesignChoices, label: Labeler): PlanResult {
+  const options = comparisonOptions(design, label);
+  const built = options.map((o) => planTensor(design, o.value, choices, label));
+  // One question per partition, whichever tensor raised it, and nothing is planned until they
+  // are all answered: the user is choosing what the target is, not which tensor asks.
+  const questions: TargetQuestion[] = [];
+  for (const r of built)
+    for (const q of r.questions)
+      if (!questions.some((x) => x.partition === q.partition)) questions.push(q);
+  const asking = built.find((r) => r.error !== undefined && r.questions.length > 0);
+  if (asking) return { questions, error: asking.error };
+
+  const plans = built.flatMap((r) => (r.plan && r.plan.scores.length > 0 ? [r.plan] : []));
+  if (plans.length === 0) return { questions, error: "This design has nothing to compare" };
+  return { questions, plan: mergePlans(plans) };
+}
+
+/**
+ * Several tensors' plans as one. Ids are per plan, so they are handed out again here; a position
+ * or a comparison the plans share is kept once, which is what makes the ids worth rewriting rather
+ * than prefixing. Labels are made unique the same way the builder does it within a plan.
+ */
+function mergePlans(plans: Plan[]): Plan {
+  const positions: PlanPosition[] = [];
+  const comparisons: PlanComparison[] = [];
+  const scores: PlanScore[] = [];
+  const arms: PlanArm[] = [];
+  const ends: PlanEnd[] = [];
+  const tracks: PlanTrack[] = [];
+  const byPosition = new Map<string, string>();
+  const byComparison = new Map<string, string>();
+  const taken = new Set<string>();
+  const once = (text: string, id: string) => {
+    const unique = taken.has(text) ? `${text} (${id})` : text;
+    taken.add(unique);
+    return unique;
+  };
+  /**
+   * Two tensors over the same material name their arms the same way, so the same end point can
+   * arrive twice. What separates those scores is what each was measured against, which is also
+   * the only thing a reader needs to tell them apart, so the baseline names the second one.
+   */
+  const scoreLabel = (text: string, den: string, end: string, id: string) => {
+    if (!taken.has(text)) {
+      taken.add(text);
+      return text;
+    }
+    const against = positions.find((p) => p.id === den)?.name;
+    const withBase = against ? `${text} vs ${against}` : text;
+    if (!taken.has(withBase)) {
+      taken.add(withBase);
+      return withBase;
+    }
+    // Sibling lines that agree on everything a column can say are still different samples, and
+    // the sample labels are unique where every derived name has run out.
+    const samples = positions.find((p) => posKey(p.samples) === end)?.label;
+    return once(samples ? `${text} (${samples})` : withBase, id);
+  };
+
+  for (const plan of plans) {
+    const position = new Map<string, string>();
+    for (const p of plan.positions) {
+      const key = posKey(p.samples);
+      let id = byPosition.get(key);
+      if (id === undefined) {
+        id = `p${positions.length + 1}`;
+        byPosition.set(key, id);
+        positions.push({ ...p, id });
+      }
+      position.set(p.id, id);
+    }
+    const comparison = new Map<string, string>();
+    for (const c of plan.comparisons) {
+      let id = byComparison.get(c.key);
+      if (id === undefined) {
+        id = `c${comparisons.length + 1}`;
+        byComparison.set(c.key, id);
+        comparisons.push({
+          ...c,
+          id,
+          label: once(c.label, id),
+          num: position.get(c.num)!,
+          den: position.get(c.den)!,
+        });
+      }
+      comparison.set(c.id, id);
+    }
+    for (const s of plan.scores) {
+      const id = `s${scores.length + 1}`;
+      const target = comparison.get(s.target)!;
+      scores.push({
+        ...s,
+        id,
+        label: scoreLabel(s.label, comparisons.find((c) => c.id === target)!.den, s.end, id),
+        target,
+        controls: s.controls.map((c) => comparison.get(c)!),
+        steps: s.steps.map((c) => comparison.get(c)!),
+        path: s.path.map((p) => position.get(p)!),
+      });
+    }
+    arms.push(...plan.arms);
+    for (const e of plan.ends) if (!ends.some((x) => x.end === e.end)) ends.push(e);
+    for (const t of plan.tracks)
+      tracks.push({
+        ...t,
+        label: once(t.label, `t${tracks.length + 1}`),
+        positions: t.positions.map((p) => position.get(p)!),
+      });
+  }
+
+  return {
+    ...plans[0]!,
+    comparison: plans.map((p) => p.comparison).join("+"),
+    positions,
+    comparisons,
+    scores,
+    arms,
+    ends,
+    tracks,
   };
 }
 

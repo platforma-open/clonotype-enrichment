@@ -1,8 +1,8 @@
 <script setup lang="ts">
 // Settings shown instead of the condition / antigen settings when a design is
-// selected in the abundance dropdown (draft). Everything the design answers is
-// not asked: only the comparison, the controls and, where trajectories end
-// in different pieces of one separation, the target piece.
+// selected (draft). Everything the design answers is not asked: the design is
+// planned whole, so what is left is the controls, the cutoff and, where
+// trajectories end in different pieces of one separation, the target piece.
 import type {
   DesignControlMode,
   DesignThresholdMode,
@@ -37,15 +37,6 @@ function sticky<T>(pick: () => readonly T[] | undefined) {
   });
   return last;
 }
-
-const comparisons = sticky(() => view.value?.comparisons);
-const comparisonOptions = computed(() =>
-  comparisons.value.map((c) => ({
-    value: c.value,
-    label: c.label,
-    group: c.kind === "panel" ? "Panels" : "Paths",
-  })),
-);
 
 /** One checkbox per end point, control or not, so a control can be unticked again. */
 const ends = sticky(() => view.value?.plan?.ends);
@@ -97,17 +88,6 @@ const questions = sticky(() => view.value?.questions);
 </script>
 
 <template>
-  <!-- A choice only when the design offers more than one comparison; else a read-only summary -->
-  <!-- Only where the design holds more than one: with a single comparison there is nothing to pick
-       and nothing to say, since Samples & Data has already shown what the design is. -->
-  <PlDropdown
-    v-if="comparisonOptions.length > 1"
-    v-model="app.model.data.designComparison"
-    :options="comparisonOptions"
-    label="Comparison"
-    required
-  />
-
   <template v-if="endOptions.length > 0">
     <PlBtnGroup v-model="controlMode" :options="controlModeOptions" label="Control" :compact="true">
       <template #tooltip>

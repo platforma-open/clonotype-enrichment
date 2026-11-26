@@ -33,7 +33,6 @@ import {
   DESIGN_SAMPLES_ANNOTATION,
   DESIGN_SAMPLE_AXIS_ANNOTATION,
   buildPlan,
-  comparisonOptions,
   readDesign,
   type Design,
   type ExperimentDesignData,
@@ -128,8 +127,6 @@ export type BlockData = {
   /** The design object in the result pool that the design came from. */
   designRef?: PlRef;
   designId?: string;
-  /** Tensor id of the chosen comparison (a panel or a trajectory). */
-  designComparison?: string;
   /** Whether the end points marked as controls are used at all. */
   designControlMode?: DesignControlMode;
   /** End point keys marked as controls (see `posKey`). */
@@ -268,8 +265,7 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
     // With a design, the comparisons come from the plan, not from metadata.
     if (data.designId !== undefined) {
       const plan = data.designPlan;
-      if (!plan || plan.designId !== data.designId || plan.comparison !== data.designComparison)
-        throw new Error("Finish the design settings");
+      if (!plan || plan.designId !== data.designId) throw new Error("Finish the design settings");
       if (plan.comparisons.length === 0) throw new Error("The design gives no comparisons");
       return {
         defaultBlockLabel: data.defaultBlockLabel,
@@ -445,12 +441,9 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
     const labels = sampleAxis ? (ctx.resultPool.findLabels(sampleAxis) ?? {}) : {};
     const label = (ids: string[]) => ids.map((id) => labels[id] ?? id).join(" + ");
 
-    const comparisons = comparisonOptions(design, label);
-    const chosen = ctx.data.designComparison;
     const result = buildPlan(
       design,
       {
-        comparison: chosen,
         controlEnds:
           designControlMode(ctx.data) === "pooled" ? (ctx.data.designControlEnds ?? []) : [],
         targetPieces: ctx.data.designTargetPieces ?? {},
@@ -461,7 +454,6 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
     );
     return {
       designName: design.name,
-      comparisons,
       questions: result.questions,
       plan: result.plan,
       error: result.error,
