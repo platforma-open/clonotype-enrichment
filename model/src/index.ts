@@ -659,7 +659,7 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
           )
           // The enrichment results are one row per clonotype. A sequence column carrying a second
           // axis would split each clonotype across that axis' values, fill the top N with copies
-          // and put a "Show for" above the table (alpaca gets one holding only R1_A).
+          // and put a "Show for" above the table, often over a single value.
           .filter((col) => col.getSpec().axesSpec.length === 1)
       : [];
 

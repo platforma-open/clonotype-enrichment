@@ -285,7 +285,7 @@ function panelSummary(design: Design, t: PanelTensor): string {
 
 export type DesignChoices = {
   /** End point keys (see posKey) the user marked as controls. An arm can hold several end
-   *  points, and a design can want one of them as the control of another, as vfp1602 reads its
+   *  points, and a design can want one of them as the control of another, as a sort reads its
    *  low gate against its high one, so the choice is per end point rather than per arm. */
   controlEnds: string[];
   /** Partition tensor id -> key of the chosen target piece (see posKey). */
@@ -517,8 +517,8 @@ function planTensor(
   /**
    * What tells one end point of an arm from the others: the end-label columns every one of the
    * arm's trajectories carries with a differing value. The position's own name is no use where
-   * the lines run in parallel to the same round, as vfp1602's three gates all end in
-   * "antigen-sort R3"; the gate itself is in the end label.
+   * the lines run in parallel to the same round, as the gates of one sort all end in the same
+   * round and are told apart only by the gate, which is in the end label.
    */
   const tellApart = (split: string): string[] => {
     const ends = armEnds.filter((e) => e.split === split && e.t);
