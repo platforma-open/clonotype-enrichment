@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { PlRef, SUniversalPColumnId } from "@platforma-sdk/model";
-import type { InputChoice } from "@platforma-open/milaboratories.clonotype-enrichment.model";
 import { getRawPlatformaInstance, getSingleColumnData, type PObjectId } from "@platforma-sdk/model";
 import type { ListOption } from "@platforma-sdk/ui-vue";
 import {
@@ -46,75 +45,77 @@ function setInput(inputRef?: PlRef) {
   app.model.data.abundanceRef = inputRef;
 }
 
+/** A dropdown value cannot be a ref: it has to compare equal to one read back from the data,
+ *  where key order is not ours to rely on. Block and column name identify a ref. */
+const refKey = (r: PlRef) => `${r.blockId}/${r.name}`;
+
+const abundanceOptions = computed(() =>
+  (app.model.outputs.abundanceOptions ?? []).map((o) => ({ value: refKey(o.ref), label: o.label })),
+);
+const abundanceValue = computed(() => {
+  const ref = app.model.data.abundanceRef;
+  return ref ? refKey(ref) : undefined;
+});
+function setAbundance(key?: string) {
+  setInput(app.model.outputs.abundanceOptions?.find((o) => refKey(o.ref) === key)?.ref);
+}
+
 // ---- Experiment design (draft) ----
-// The abundance dropdown lists plain abundances and, above them, each design
-// that matches an abundance. A choice is a JSON-encoded InputChoice.
-const designMode = computed(() => app.model.data.designId !== undefined);
-
-const inputOptions = computed(() => {
-  const o = app.model.outputs.inputOptions;
-  if (!o) return undefined;
-  return [
-    ...o.withDesign.map((x) => ({ ...x, group: "With a design" })),
-    ...o.plain.map((x) => ({ ...x, group: "Abundances" })),
-  ];
+// The dataset is picked first, as it always was. "Design" then offers the designs that run over
+// it: same sample axis, every sample covered.
+const inputMode = computed({
+  get: () =>
+    app.model.data.inputMode ?? (app.model.data.designId !== undefined ? "design" : "dataset"),
+  set: (v: "dataset" | "design") => {
+    app.model.data.inputMode = v;
+    if (v === "dataset") setDesign(undefined);
+  },
 });
+const inputModeOptions = [
+  { value: "dataset" as const, label: "Dataset" },
+  { value: "design" as const, label: "Design" },
+];
+const designMode = computed(() => inputMode.value === "design");
 
-/** Set when the design in the input is one this abundance does not cover, so the input reads
- *  empty. Closable, and shown again whenever the counts change (a different abundance, say). */
-const uncovered = computed(() => app.model.outputs.inputOptions?.uncovered);
+const designOptions = computed(() =>
+  (app.model.outputs.designOptions?.options ?? []).map((d) => ({
+    value: d.designId,
+    label: d.label,
+  })),
+);
+
+/** The chosen design is one this dataset does not cover. The model can only say so while that
+ *  design is still chosen, so the note is kept here and the choice dropped: no plan is ever built
+ *  against samples that have no abundance. Written with updateData, as it reacts to an output. */
+const uncovered = ref<{ missing: number; total: number }>();
 const uncoveredShown = ref(true);
-watch(uncovered, () => (uncoveredShown.value = true));
-
-const inputValue = computed(() => {
-  const d = app.model.data;
-  if (!d.abundanceRef) return undefined;
-  const want =
-    d.designId !== undefined
-      ? JSON.stringify({
-          abundanceRef: d.abundanceRef,
-          designRef: d.designRef,
-          designId: d.designId,
-        })
-      : JSON.stringify({ abundanceRef: d.abundanceRef });
-  // Match on the parsed value: refs from the model may order keys differently.
-  const options = inputOptions.value ?? [];
-  const same = (a: string, b: string) => {
-    try {
-      const x = JSON.parse(a);
-      const y = JSON.parse(b);
-      return (
-        JSON.stringify(x.abundanceRef?.blockId) === JSON.stringify(y.abundanceRef?.blockId) &&
-        x.abundanceRef?.name === y.abundanceRef?.name &&
-        x.designId === y.designId &&
-        x.designRef?.blockId === y.designRef?.blockId &&
-        x.designRef?.name === y.designRef?.name
-      );
-    } catch {
-      return false;
-    }
-  };
-  return options.find((o) => same(o.value, want))?.value ?? want;
+watchEffect(() => {
+  const missed = app.model.outputs.designOptions?.uncovered;
+  if (!missed) return;
+  uncovered.value = missed;
+  uncoveredShown.value = true;
+  void app.updateData((d) => ({
+    ...d,
+    designId: undefined,
+    designRef: undefined,
+    designComparison: undefined,
+    designControlEnds: [],
+    designTargetPieces: {},
+    designPlan: undefined,
+  }));
 });
 
-function setInputChoice(value?: string) {
+/** A different design makes every choice taken against the previous one meaningless. */
+function setDesign(designId?: string) {
   const d = app.model.data;
-  if (!value) {
-    setInput(undefined);
-    d.designId = undefined;
-    d.designRef = undefined;
-    return;
-  }
-  const choice = JSON.parse(value) as InputChoice;
-  setInput(choice.abundanceRef);
-  if (choice.designId !== d.designId) {
-    d.designComparison = undefined;
-    d.designControlEnds = [];
-    d.designTargetPieces = {};
-    d.designPlan = undefined;
-  }
-  d.designId = choice.designId;
-  d.designRef = choice.designRef;
+  if (designId === d.designId) return;
+  uncovered.value = undefined;
+  d.designComparison = undefined;
+  d.designControlEnds = [];
+  d.designTargetPieces = {};
+  d.designPlan = undefined;
+  d.designId = designId;
+  d.designRef = app.model.outputs.designOptions?.options.find((o) => o.designId === designId)?.ref;
 }
 
 // Default comparison: the first panel, else the first path. Also replaces a saved choice the
@@ -189,6 +190,7 @@ watchEffect(() => {
     label = label ? `${label}, ${filteringLabel}` : filteringLabel;
   }
 
+  // uncommitted: marks the experiment-design build apart in the project sidebar
   app.model.data.defaultBlockLabel = label;
 });
 
@@ -937,18 +939,38 @@ const isControlOrderOpen = ref(true); // Open by default
   <PlSlideModal v-model="settingsAreShown">
     <template #title>Settings</template>
     <PlDropdown
-      :model-value="inputValue"
-      :options="inputOptions"
+      :model-value="abundanceValue"
+      :options="abundanceOptions"
       label="Select abundance"
       clearable
       required
-      @update:model-value="setInputChoice"
+      @update:model-value="setAbundance"
     />
-    <PlAlert v-if="uncovered" v-model="uncoveredShown" type="info" icon closeable>
-      This design is not offered here: {{ uncovered.missing }} of its {{ uncovered.total }} samples
-      have no abundance in this column.
+    <PlBtnGroup
+      v-model="inputMode"
+      :options="inputModeOptions"
+      label="Analysis input"
+      :compact="true"
+    >
+      <template #tooltip>
+        <strong>Dataset</strong> compares the conditions you name in the metadata.<br /><br />
+        <strong>Design</strong> takes the comparisons from an experiment design built in Samples &
+        Data, which already knows which samples came from which.
+      </template>
+    </PlBtnGroup>
+    <PlDropdown
+      v-if="designMode"
+      :model-value="app.model.data.designId"
+      :options="designOptions"
+      label="Design"
+      required
+      @update:model-value="setDesign"
+    />
+    <PlAlert v-if="designMode && uncovered" v-model="uncoveredShown" type="info" icon closeable>
+      That design does not fit this dataset: {{ uncovered.missing }} of its
+      {{ uncovered.total }} samples have no abundance here. Pick another one.
     </PlAlert>
-    <DesignSettings v-if="designMode" />
+    <DesignSettings v-if="designMode && app.model.data.designId !== undefined" />
     <template v-if="!designMode">
       <PlDropdown
         v-model="app.model.data.conditionColumnRef"

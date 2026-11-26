@@ -119,10 +119,12 @@ export type BlockData = {
   excludedAlertDismissedKey?: string;
 
   // ---- Experiment design (draft) ----
-  // Set when the user picks a design in the abundance dropdown. When
-  // `designId` is set, the condition column, condition order and antigen /
-  // control settings are not used: the comparisons come from the design.
-  /** The `pl7.app/design/tensors` column the design came from. */
+  // The dataset is picked first; a design is then picked over it. When `designId` is set, the
+  // condition column, condition order and antigen / control settings are not used: the
+  // comparisons come from the design.
+  /** Which input the user is choosing. Held on its own, as the mode is set before the design. */
+  inputMode?: "dataset" | "design";
+  /** The design object in the result pool that the design came from. */
   designRef?: PlRef;
   designId?: string;
   /** Tensor id of the chosen comparison (a panel or a trajectory). */
@@ -140,9 +142,6 @@ export type BlockData = {
   /** The plan built from the choices above; written by the UI from `designView.plan`. */
   designPlan?: Plan;
 };
-
-/** Value of one entry in the combined abundance / design dropdown. */
-export type InputChoice = { abundanceRef: PlRef; designRef?: PlRef; designId?: string };
 
 function migrateScatterStateToUmap(state: GraphMakerState): GraphMakerState {
   const optionsState = state?.optionsState;
@@ -369,92 +368,59 @@ export const platforma = BlockModelV3.create({ dataModel, kind })
     ),
   )
 
-  // Abundances plus, under each, the designs whose sample axis matches it.
-  // Values are JSON-encoded InputChoice objects.
-  .output("inputOptions", (ctx) => {
-    const abundances = ctx.resultPool.getOptions(
-      [
-        {
-          axes: [{ name: "pl7.app/sampleId" }, {}],
-          annotations: {
-            "pl7.app/isAbundance": "true",
-            "pl7.app/abundance/normalized": "false",
-            "pl7.app/abundance/isPrimary": "true",
-          },
-        },
-      ],
-      { includeNativeLabel: true },
-    );
+  // The designs that can run over the selected dataset: same sample axis, and every sample they
+  // name carries abundance there. A design is picked after a dataset, so this is empty until one
+  // is chosen.
+  .output("designOptions", (ctx) => {
+    const options: { designId: string; label: string; ref: PlRef }[] = [];
+    // Set when the chosen design is one this dataset does not cover, so the dropdown reads empty.
+    let uncovered: { missing: number; total: number } | undefined;
+    const abundanceRef = ctx.data.abundanceRef;
+    if (!abundanceRef) return { options, uncovered };
+
+    const sampleAxis = ctx.resultPool.getPColumnSpecByRef(abundanceRef)?.axesSpec?.[0];
+    // Sample ids behind the abundance column: its partition keys on the sample axis, the same
+    // notion of "this sample has data" the rest of the block uses.
+    const pCol = ctx.resultPool.getPColumnByRef(abundanceRef);
+    const idx = pCol?.spec.axesSpec.findIndex((a) => a.name === "pl7.app/sampleId") ?? -1;
+    const keys = pCol && idx >= 0 ? getUniquePartitionKeys(pCol.data) : undefined;
+    const samples =
+      keys && idx < keys.length ? new Set(keys[idx].map((v) => String(v))) : undefined;
+
     // Each design is its own object in the pool, picked like a dataset. Its spec carries the
     // sample axis and the samples it names, so the list below is built without reading any of
     // their contents.
-    const designs = ctx.resultPool
-      .getOptions((spec) => spec.kind === DESIGN_OBJECT_KIND && spec.name === DESIGN_OBJECT_NAME)
-      .map((opt) => {
-        const spec = ctx.resultPool.getSpecByRef(opt.ref);
-        const parse = <T>(annotation: string): T | undefined => {
-          try {
-            return JSON.parse(spec?.annotations?.[annotation] ?? "null") ?? undefined;
-          } catch {
-            return undefined;
-          }
-        };
-        return {
-          ref: opt.ref,
-          name: spec?.annotations?.["pl7.app/label"] ?? opt.label,
-          designId: spec?.domain?.["pl7.app/design/designId"] ?? opt.ref.name,
-          axis: parse<{ type?: string; name: string; domain?: Record<string, string> }>(
-            DESIGN_SAMPLE_AXIS_ANNOTATION,
-          ),
-          samples: parse<string[]>(DESIGN_SAMPLES_ANNOTATION) ?? [],
-        };
-      });
-
-    // Sample ids behind an abundance column: its partition keys on the sample axis, the same
-    // notion of "this sample has data" the rest of the block uses.
-    const samplesOf = (ref: PlRef): Set<string> | undefined => {
-      const pCol = ctx.resultPool.getPColumnByRef(ref);
-      const idx = pCol?.spec.axesSpec.findIndex((a) => a.name === "pl7.app/sampleId") ?? -1;
-      if (!pCol || idx < 0) return undefined;
-      const keys = getUniquePartitionKeys(pCol.data);
-      return keys && idx < keys.length ? new Set(keys[idx].map((v) => String(v))) : undefined;
-    };
-
-    const withDesign: { value: string; label: string }[] = [];
-    const plain: { value: string; label: string }[] = [];
-    // The one design the user picked, where this abundance does not cover it: a design is chosen
-    // one at a time, so the note speaks about that one and says nothing about the rest.
-    let uncovered: { missing: number; total: number } | undefined;
-    const chosen = ctx.data.abundanceRef;
-    for (const a of abundances) {
-      plain.push({ value: JSON.stringify({ abundanceRef: a.ref }), label: a.label });
-      const sampleAxis = ctx.resultPool.getPColumnSpecByRef(a.ref)?.axesSpec?.[0];
-      const samples = samplesOf(a.ref);
-      for (const d of designs) {
-        if (!sameAxisId(d.axis, sampleAxis)) continue;
-        // Strict containment: every sample the design names must carry abundance here, so a
-        // plan never reaches the workflow with a position that has no data behind it.
-        const want = d.samples;
-        const missing = samples ? want.filter((s) => !samples.has(s)).length : 0;
-        if (missing > 0) {
-          const mine =
-            a.ref.blockId === chosen?.blockId &&
-            a.ref.name === chosen?.name &&
-            d.designId === ctx.data.designId;
-          if (mine) uncovered = { missing, total: want.length };
-          continue;
+    for (const opt of ctx.resultPool.getOptions(
+      (spec) => spec.kind === DESIGN_OBJECT_KIND && spec.name === DESIGN_OBJECT_NAME,
+    )) {
+      const spec = ctx.resultPool.getSpecByRef(opt.ref);
+      const parse = <T>(annotation: string): T | undefined => {
+        try {
+          return JSON.parse(spec?.annotations?.[annotation] ?? "null") ?? undefined;
+        } catch {
+          return undefined;
         }
-        withDesign.push({
-          value: JSON.stringify({
-            abundanceRef: a.ref,
-            designRef: d.ref,
-            designId: d.designId,
-          } satisfies InputChoice),
-          label: `${a.label} / ${d.name}`,
-        });
+      };
+      const axis = parse<{ type?: string; name: string; domain?: Record<string, string> }>(
+        DESIGN_SAMPLE_AXIS_ANNOTATION,
+      );
+      if (!sameAxisId(axis, sampleAxis)) continue;
+      const designId = spec?.domain?.["pl7.app/design/designId"] ?? opt.ref.name;
+      // Strict containment: every sample the design names must carry abundance here, so a
+      // plan never reaches the workflow with a position that has no data behind it.
+      const want = parse<string[]>(DESIGN_SAMPLES_ANNOTATION) ?? [];
+      const missing = samples ? want.filter((s) => !samples.has(s)).length : 0;
+      if (missing > 0) {
+        if (designId === ctx.data.designId) uncovered = { missing, total: want.length };
+        continue;
       }
+      options.push({
+        designId,
+        label: spec?.annotations?.["pl7.app/label"] ?? opt.label,
+        ref: opt.ref,
+      });
     }
-    return { withDesign, plain, uncovered };
+    return { options, uncovered };
   })
 
   // Comparison options, questions and the plan for the selected design.
